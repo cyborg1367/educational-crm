@@ -9,6 +9,7 @@ from app.consultation import model as consultation_model  # noqa: F401
 from app.course import model as course_model  # noqa: F401
 from app.course_class import model as course_class_model  # noqa: F401
 from app.department import model as department_model  # noqa: F401
+from app.enrollment import model as enrollment_model  # noqa: F401
 from app.journey import model as journey_model  # noqa: F401
 from app.organization import model as organization_model  # noqa: F401
 from app.person import model as person_model  # noqa: F401
