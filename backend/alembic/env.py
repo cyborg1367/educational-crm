@@ -5,6 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import settings
 from app.core.db import Base
+from app.course import model as course_model  # noqa: F401
 from app.department import model as department_model  # noqa: F401
 from app.journey import model as journey_model  # noqa: F401
 from app.organization import model as organization_model  # noqa: F401
