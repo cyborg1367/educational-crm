@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.router import router as auth_router
 from app.core.db import get_db
+from app.course.router import router as courses_router
 from app.department.router import router as departments_router
 from app.journey.router import router as journeys_router
 from app.person.router import router as people_router
@@ -15,6 +16,7 @@ app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(users_router, prefix="/users", tags=["users"])
 app.include_router(people_router, prefix="/people", tags=["people"])
 app.include_router(departments_router, prefix="/departments", tags=["departments"])
+app.include_router(courses_router, prefix="/courses", tags=["courses"])
 app.include_router(journeys_router, prefix="/journeys", tags=["journeys"])
 
 
