@@ -14,7 +14,8 @@ docs/capsules/00..14.md       # one bounded "skill capsule" per build slice
   10-finance.mdc               # auto-attaches when touching money files
 docker-compose.yml             # Postgres
 backend/.env.example           # config template
-backend/requirements.txt       # python deps
+backend/pyproject.toml         # python deps (uv)
+backend/uv.lock                  # locked dependency versions
 backend/app/{core,models,schemas,services,routers}/   # empty layered skeleton
 ```
 
@@ -31,11 +32,11 @@ backend/app/{core,models,schemas,services,routers}/   # empty layered skeleton
    ```bash
    docker compose up -d
    ```
-3. **Python env + deps**
+3. **Python env + deps** ([uv](https://docs.astral.sh/uv/))
    ```bash
    cd backend
-   python -m venv .venv && source .venv/bin/activate   # WSL/Ubuntu
-   pip install -r requirements.txt
+   uv venv && source .venv/bin/activate   # WSL/Ubuntu
+   uv sync
    cp .env.example .env        # then edit SECRET_KEY
    ```
 4. **Open the folder in Cursor.** Confirm Cursor sees the rules:
@@ -55,8 +56,8 @@ Run capsules **in order** (00 → 14). For each one, paste this prompt, swapping
 
 Then, every single time:
 1. **Read the whole diff.** If you don't understand a line, ask Cursor to explain or simplify — don't accept it.
-2. **Run the migration:** `alembic revision --autogenerate -m "<thing>"` then `alembic upgrade head`.
-3. **Test the endpoints** (Swagger at `/docs`, or a quick `httpx`/pytest check).
+2. **Run the migration:** `uv run alembic revision --autogenerate -m "<thing>"` then `uv run alembic upgrade head`.
+3. **Test the endpoints** (Swagger at `/docs`, or `uv run pytest` / a quick `httpx` check). Run the app with `uv run uvicorn app.main:app --reload`.
 4. **Commit:** `git commit -am "feat(<id>): ..."`. Small commit = cheap undo.
 
 If a capsule says a constraint can't be met, Cursor must **stop and tell you**, not work around it. That's by design.
