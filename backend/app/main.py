@@ -8,6 +8,7 @@ from app.course.router import router as courses_router
 from app.department.router import router as departments_router
 from app.journey.router import router as journeys_router
 from app.person.router import router as people_router
+from app.roadmap.router import router as roadmaps_router
 from app.user.router import router as users_router
 
 app = FastAPI()
@@ -18,6 +19,7 @@ app.include_router(people_router, prefix="/people", tags=["people"])
 app.include_router(departments_router, prefix="/departments", tags=["departments"])
 app.include_router(courses_router, prefix="/courses", tags=["courses"])
 app.include_router(journeys_router, prefix="/journeys", tags=["journeys"])
+app.include_router(roadmaps_router, prefix="/roadmaps", tags=["roadmaps"])
 
 
 @app.get("/health")
