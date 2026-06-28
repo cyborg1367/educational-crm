@@ -2,6 +2,7 @@ from fastapi import Depends, FastAPI
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.attendance.router import router as attendances_router
 from app.auth.router import router as auth_router
 from app.communication.router import router as communications_router
 from app.consultation.router import router as consultations_router
@@ -36,6 +37,9 @@ app.include_router(
     communications_router, prefix="/communications", tags=["communications"]
 )
 app.include_router(invoices_router, prefix="/invoices", tags=["invoices"])
+app.include_router(
+    attendances_router, prefix="/attendances", tags=["attendances"]
+)
 
 
 @app.get("/health")
