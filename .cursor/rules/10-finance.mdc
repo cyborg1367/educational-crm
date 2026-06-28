@@ -1,0 +1,29 @@
+---
+description: Finance laws — auto-attaches when editing money-related files
+globs:
+  - "backend/app/**/invoice*"
+  - "backend/app/**/installment*"
+  - "backend/app/**/payment*"
+  - "backend/app/**/finance*"
+  - "backend/app/**/enrollment*"
+---
+
+# Finance laws (absolute)
+
+- ALL monetary values are **integers in Toman**. No float, no Decimal, ever.
+- Price is snapshotted onto the Enrollment at creation. NEVER read a Course's live
+  `current_price` for an existing enrollment.
+- Once an Invoice is issued, the enrollment's money fields are frozen.
+- Invoice.total_amount = enrollment.final_amount (frozen copy at issue).
+- Invariant, validated on create/update:
+  `sum(installments.amount where status != 'cancelled') == invoice.total_amount`.
+- Installment & Invoice statuses are ALWAYS **derived** from payments — never set by hand:
+  - installment `paid` when sum(payments) >= amount;
+    `partially_paid` when 0 < sum < amount;
+    `overdue` when past due_date and not fully paid;
+    `cancelled` only via the drop flow.
+  - invoice `paid` when all non-cancelled installments paid;
+    `partially_paid` when any payment exists; `void` when enrollment dropped with no payments.
+- On enrollment → `dropped`: pending / partially_paid installments → `cancelled`.
+  Refunds of money already received are OUT OF SCOPE (record a note only; no refund ledger).
+- Every payment records `recorded_by` (the staff user) and writes an Activity via `log_activity`.

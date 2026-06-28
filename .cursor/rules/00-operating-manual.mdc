@@ -1,0 +1,45 @@
+---
+description: MicroSkill operating manual — how the agent must work on this repo
+alwaysApply: true
+---
+
+# Operating manual (read on every task)
+
+## How you work
+- Work ONLY within the **capsule** named in the current task (see /docs/capsules/).
+  Never edit files outside that capsule's `domain`.
+- Never ingest the whole codebase. Load only the files the active capsule needs.
+- The active capsule's `constraints` are **absolute laws**. If you cannot satisfy one,
+  STOP and report it — do not work around it.
+- The source of truth for the data model & workflows is **/docs/spec.md**.
+  If a request conflicts with the spec, STOP and ask before coding.
+- Do ONLY what the prompt asks. No scaffolding ahead, no out-of-scope refactors,
+  no new architectural patterns (event bus, rule engine, extra layers) without asking.
+- Keep diffs small. If a change must reach beyond the capsule domain, list a short plan and wait.
+- When a business rule is unclear, ASK — never guess.
+
+## Architecture (non-negotiable)
+- One PostgreSQL database. No microservices, no DDD bounded contexts, no event sourcing.
+- Layering: **router → service → model**.
+  Routers handle HTTP only (validation, status codes). ALL business logic lives in services.
+  Models are SQLAlchemy only.
+
+## Conventions
+- Stack: FastAPI · SQLAlchemy 2.x (typed `Mapped[...]`) · Pydantic v2 · Alembic.
+- snake_case columns, plural table names (`people`, `enrollments`).
+- Every mutable table has `created_at` and `updated_at` (timezone-aware).
+- Enums are declared once and reused; default values match /docs/spec.md.
+- **Money:** every monetary field is an **integer in Toman**. Never float, never Decimal.
+- All timeline writes go through the single `log_activity` helper — never inline an Activity insert.
+- Never return password hashes or secrets in API responses.
+
+## Multi-tenancy (always on)
+- Every tenant-owned table has an `org_id` (see /docs/spec.md §8). User carries `org_id`.
+- ALL reads/writes are scoped to the current org via the shared scoping helper — never rely on a developer remembering to add the filter per endpoint.
+- For v1 there is one organization; set `org_id` automatically from the current user's token.
+
+## Definition of done for a capsule
+- Model + Pydantic schemas + service + router implemented inside the domain.
+- An Alembic migration generated for any schema change.
+- No other entity touched.
+- All capsule constraints satisfied; if any can't be, reported instead of bypassed.
