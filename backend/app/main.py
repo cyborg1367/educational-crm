@@ -8,6 +8,7 @@ from app.core.db import get_db
 from app.course.router import router as courses_router
 from app.course_class.router import router as classes_router
 from app.department.router import router as departments_router
+from app.enrollment.router import router as enrollments_router
 from app.journey.router import router as journeys_router
 from app.person.router import router as people_router
 from app.roadmap.router import router as roadmaps_router
@@ -25,6 +26,9 @@ app.include_router(journeys_router, prefix="/journeys", tags=["journeys"])
 app.include_router(roadmaps_router, prefix="/roadmaps", tags=["roadmaps"])
 app.include_router(
     consultations_router, prefix="/consultations", tags=["consultations"]
+)
+app.include_router(
+    enrollments_router, prefix="/enrollments", tags=["enrollments"]
 )
 
 
