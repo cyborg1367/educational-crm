@@ -2,6 +2,7 @@ from fastapi import Depends, FastAPI
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.activity.router import router as activities_router
 from app.attendance.router import router as attendances_router
 from app.auth.router import router as auth_router
 from app.communication.router import router as communications_router
@@ -15,6 +16,7 @@ from app.finance.router import router as invoices_router
 from app.journey.router import router as journeys_router
 from app.person.router import router as people_router
 from app.roadmap.router import router as roadmaps_router
+from app.task.router import router as tasks_router
 from app.user.router import router as users_router
 
 app = FastAPI()
@@ -40,6 +42,8 @@ app.include_router(invoices_router, prefix="/invoices", tags=["invoices"])
 app.include_router(
     attendances_router, prefix="/attendances", tags=["attendances"]
 )
+app.include_router(tasks_router, prefix="/tasks", tags=["tasks"])
+app.include_router(activities_router, prefix="/activities", tags=["activities"])
 
 
 @app.get("/health")

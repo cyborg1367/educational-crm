@@ -6,9 +6,11 @@ from sqlalchemy.orm import Session
 from app.auth.deps import get_current_user
 from app.core.db import get_db
 from app.course_class import service as class_service
+from app.course_class.enums import ClassStatus
 from app.course_class.model import CourseClass
 from app.course_class.schemas import CourseClassCreate, CourseClassRead, CourseClassUpdate
 from app.user.model import User
+from app.workflow import service as workflow_service
 
 router = APIRouter()
 
@@ -46,4 +48,16 @@ def update_class(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> CourseClass:
-    return class_service.update_class(db, current_user.org_id, class_id, body)
+    existing = class_service.get_class(db, current_user.org_id, class_id)
+    was_completed = existing.status == ClassStatus.completed
+
+    course_class = class_service.update_class(
+        db, current_user.org_id, class_id, body
+    )
+
+    if not was_completed and course_class.status == ClassStatus.completed:
+        workflow_service.on_class_completed(
+            db, current_user.org_id, class_id, actor_id=current_user.id
+        )
+
+    return course_class

@@ -13,6 +13,8 @@ from app.consultation.schemas import (
 )
 from app.core.db import get_db
 from app.user.model import User
+from app.workflow import service as workflow_service
+from app.workflow.schemas import ConsultationOutcomeUpdate
 
 router = APIRouter()
 
@@ -54,4 +56,21 @@ def update_consultation(
 ) -> Consultation:
     return consultation_service.update_consultation(
         db, current_user.org_id, consultation_id, body
+    )
+
+
+@router.patch("/{consultation_id}/outcome", response_model=ConsultationRead)
+def set_consultation_outcome(
+    consultation_id: int,
+    body: ConsultationOutcomeUpdate,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> Consultation:
+    return workflow_service.on_consultation_outcome(
+        db,
+        current_user.org_id,
+        consultation_id,
+        body.outcome,
+        class_id=body.class_id,
+        actor_id=current_user.id,
     )

@@ -9,6 +9,7 @@ from app.enrollment import service as enrollment_service
 from app.enrollment.model import Enrollment
 from app.enrollment.schemas import EnrollmentCreate, EnrollmentRead, EnrollmentUpdate
 from app.user.model import User
+from app.workflow import service as workflow_service
 
 router = APIRouter()
 
@@ -36,7 +37,11 @@ def create_enrollment(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Enrollment:
-    return enrollment_service.create_enrollment(db, current_user.org_id, body)
+    enrollment = enrollment_service.create_enrollment(db, current_user.org_id, body)
+    workflow_service.on_enrollment_created(
+        db, current_user.org_id, enrollment.id, actor_id=current_user.id
+    )
+    return enrollment
 
 
 @router.patch("/{enrollment_id}", response_model=EnrollmentRead)

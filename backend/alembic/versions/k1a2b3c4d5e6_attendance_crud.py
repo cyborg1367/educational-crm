@@ -1,7 +1,7 @@
 """attendance_crud
 
 Revision ID: k1a2b3c4d5e6
-Revises: j0e1f2a3b4c5
+Revises: m3c4d5e6f7a8
 Create Date: 2026-06-28 24:00:00.000000
 
 """
@@ -12,12 +12,17 @@ import sqlalchemy as sa
 
 
 revision: str = "k1a2b3c4d5e6"
-down_revision: Union[str, None] = "j0e1f2a3b4c5"
+down_revision: Union[str, None] = "m3c4d5e6f7a8"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if inspector.has_table("attendances"):
+        return
+
     op.create_table(
         "attendances",
         sa.Column("id", sa.Integer(), nullable=False),
