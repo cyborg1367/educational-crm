@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, UniqueConstraint, func
+from sqlalchemy import DateTime, Enum, ForeignKey, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -21,7 +21,9 @@ class Journey(Base):
     person_id: Mapped[int] = mapped_column(ForeignKey("people.id"), nullable=False)
     department_id: Mapped[int] = mapped_column(ForeignKey("departments.id"), nullable=False)
     owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    roadmap_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    roadmap_id: Mapped[int | None] = mapped_column(
+        ForeignKey("roadmaps.id"), nullable=True
+    )
     status: Mapped[JourneyStatus] = mapped_column(
         Enum(JourneyStatus, name="journey_status", native_enum=False),
         nullable=False,
