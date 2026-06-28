@@ -3,6 +3,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.auth.router import router as auth_router
+from app.consultation.router import router as consultations_router
 from app.core.db import get_db
 from app.course.router import router as courses_router
 from app.course_class.router import router as classes_router
@@ -22,6 +23,9 @@ app.include_router(courses_router, prefix="/courses", tags=["courses"])
 app.include_router(classes_router, prefix="/classes", tags=["classes"])
 app.include_router(journeys_router, prefix="/journeys", tags=["journeys"])
 app.include_router(roadmaps_router, prefix="/roadmaps", tags=["roadmaps"])
+app.include_router(
+    consultations_router, prefix="/consultations", tags=["consultations"]
+)
 
 
 @app.get("/health")
