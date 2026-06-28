@@ -5,6 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import settings
 from app.core.db import Base
+from app.activity import model as activity_model  # noqa: F401
 from app.attendance import model as attendance_model  # noqa: F401
 from app.communication import model as communication_model  # noqa: F401
 from app.consultation import model as consultation_model  # noqa: F401
@@ -17,6 +18,7 @@ from app.journey import model as journey_model  # noqa: F401
 from app.organization import model as organization_model  # noqa: F401
 from app.person import model as person_model  # noqa: F401
 from app.roadmap import model as roadmap_model  # noqa: F401
+from app.task import model as task_model  # noqa: F401
 from app.user import model as user_model  # noqa: F401
 
 config = context.config
