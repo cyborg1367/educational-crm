@@ -3,6 +3,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.auth.router import router as auth_router
+from app.communication.router import router as communications_router
 from app.consultation.router import router as consultations_router
 from app.core.db import get_db
 from app.course.router import router as courses_router
@@ -29,6 +30,9 @@ app.include_router(
 )
 app.include_router(
     enrollments_router, prefix="/enrollments", tags=["enrollments"]
+)
+app.include_router(
+    communications_router, prefix="/communications", tags=["communications"]
 )
 
 

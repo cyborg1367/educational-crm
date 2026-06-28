@@ -5,6 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import settings
 from app.core.db import Base
+from app.communication import model as communication_model  # noqa: F401
 from app.consultation import model as consultation_model  # noqa: F401
 from app.course import model as course_model  # noqa: F401
 from app.course_class import model as course_class_model  # noqa: F401
