@@ -1,11 +1,12 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth import service as auth_service
 from app.auth.schemas import LoginRequest, TokenResponse
 from app.core.db import get_db
+from app.core.rate_limit import AUTH_LIMIT
 
 router = APIRouter()
 
@@ -13,9 +14,14 @@ router = APIRouter()
 @router.post(
     "/login",
     response_model=TokenResponse,
-    responses={401: {"description": "Invalid email or password."}},
+    responses={
+        401: {"description": "Invalid email or password."},
+        429: {"description": "Too many login attempts."},
+    },
 )
+@AUTH_LIMIT
 def login(
+    request: Request,
     body: LoginRequest,
     db: Annotated[Session, Depends(get_db)],
 ) -> TokenResponse:

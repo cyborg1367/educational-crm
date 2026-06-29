@@ -1,10 +1,11 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
 from app.core.db import get_db
+from app.core.rate_limit import SENSITIVE_LIMIT
 from app.core.openapi import PROTECTED_RESPONSES
 from app.core.pagination import PaginatedResponse, PaginationParams
 from app.finance import service as finance_service
@@ -176,7 +177,9 @@ def get_payment(
 
 
 @payments_router.post("", response_model=PaymentRead, status_code=status.HTTP_201_CREATED)
+@SENSITIVE_LIMIT
 def record_payment(
+    request: Request,
     body: PaymentCreate,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
@@ -237,7 +240,9 @@ def get_refund(
 
 
 @refunds_router.post("", response_model=RefundRead, status_code=status.HTTP_201_CREATED)
+@SENSITIVE_LIMIT
 def refund_payment(
+    request: Request,
     body: RefundCreate,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],

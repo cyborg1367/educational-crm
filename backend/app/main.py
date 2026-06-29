@@ -14,6 +14,13 @@ from app.core.db import get_db
 from app.core.exception_handlers import register_exception_handlers
 from app.core.logging_config import configure_logging
 from app.core.logging_middleware import LoggingMiddleware, SecurityHeadersMiddleware
+from app.core.rate_limit import (
+    LoginEmailMiddleware,
+    RateLimitExceeded,
+    SlowAPIMiddleware,
+    _rate_limit_exceeded_handler,
+    limiter,
+)
 from app.core.security import get_cors_middleware_kwargs
 from app.course.router import router as courses_router
 from app.course_class.router import router as classes_router
@@ -54,9 +61,13 @@ app = FastAPI(
 )
 
 register_exception_handlers(app)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(CORSMiddleware, **get_cors_middleware_kwargs())
 app.add_middleware(LoggingMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(SlowAPIMiddleware)
+app.add_middleware(LoginEmailMiddleware)
 
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(users_router, prefix="/users", tags=["Users"])
