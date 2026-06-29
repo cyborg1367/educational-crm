@@ -1,0 +1,24 @@
+services:
+  api:
+    env_file:
+      - .env.production
+    ports:
+      - "8000:8000"
+    command:
+      [
+        "uv",
+        "run",
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--workers",
+        "4",
+      ]
+    restart: always
+
+  postgres:
+    ports: []
+    restart: always
