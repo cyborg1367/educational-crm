@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
     PRE_ENROLL_FOLLOWUP_DAYS: int = 3
     DORMANT_DAYS: int = 365
+    RATE_LIMIT_STORAGE_URI: str = "memory://"
 
 
 settings = Settings()

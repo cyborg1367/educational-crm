@@ -1,10 +1,11 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
 from app.core.db import get_db
+from app.core.rate_limit import SENSITIVE_LIMIT
 from app.core.openapi import PROTECTED_RESPONSES
 from app.core.pagination import PaginatedResponse, PaginationParams
 from app.enrollment import service as enrollment_service
@@ -97,7 +98,9 @@ def update_enrollment(
 
 
 @router.patch("/{enrollment_id}/drop", response_model=EnrollmentRead)
+@SENSITIVE_LIMIT
 def drop_enrollment(
+    request: Request,
     enrollment_id: int,
     body: EnrollmentDrop,
     db: Annotated[Session, Depends(get_db)],
