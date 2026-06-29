@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -16,10 +18,19 @@ from app.finance.router import payments_router, router as invoices_router
 from app.journey.router import router as journeys_router
 from app.person.router import router as people_router
 from app.roadmap.router import router as roadmaps_router
+from app.scheduler import shutdown_scheduler, start_scheduler
 from app.task.router import router as tasks_router
 from app.user.router import router as users_router
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    start_scheduler()
+    yield
+    shutdown_scheduler()
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(users_router, prefix="/users", tags=["users"])
