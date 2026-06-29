@@ -93,6 +93,35 @@ class PaymentCreate(BaseModel):
     notes: str | None = Field(default=None, description="Optional payment notes.")
 
 
+class RefundCreate(BaseModel):
+    payment_id: int = Field(description="Payment to refund.")
+    amount: int = Field(
+        gt=0,
+        description="Refund amount in Toman. Must be > 0 and <= payment amount.",
+        examples=[500000],
+    )
+    reason: str = Field(min_length=1, description="Reason for the refund.")
+    notes: str | None = Field(default=None, description="Optional refund notes.")
+
+
+class RefundRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = Field(description="Unique refund identifier.")
+    payment_id: int = Field(description="Refunded payment. Immutable.")
+    amount: int = Field(
+        description="Refund amount in Toman.",
+        examples=[500000],
+    )
+    reason: str = Field(description="Reason for the refund.")
+    refunded_by: int = Field(description="User who processed the refund.")
+    refund_date: date = Field(description="Date the refund was issued.")
+    notes: str | None = Field(description="Optional refund notes.")
+    org_id: int = Field(description="Owning organization. Immutable.")
+    created_at: datetime = Field(description="Record creation timestamp (UTC).")
+    updated_at: datetime = Field(description="Last update timestamp (UTC).")
+
+
 class PaymentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

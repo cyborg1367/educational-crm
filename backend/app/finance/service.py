@@ -1,14 +1,14 @@
 from datetime import date
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.activity import service as activity_service
 from app.enrollment import service as enrollment_service
 from app.finance.enums import InstallmentStatus, InvoiceStatus
-from app.finance.model import Installment, Invoice, Payment
+from app.finance.model import Installment, Invoice, Payment, Refund
 from app.finance.schemas import InstallmentUpdate, InvoiceCreate
 from app.tenancy.scoping import scoped
 
@@ -274,3 +274,97 @@ def record_payment(
     db.commit()
     db.refresh(payment)
     return payment
+
+
+def _refunded_amount_for_payment(db: Session, org_id: int, payment_id: int) -> int:
+    stmt = scoped(
+        select(func.coalesce(func.sum(Refund.amount), 0)),
+        Refund,
+        org_id,
+    ).where(Refund.payment_id == payment_id)
+    return int(db.scalar(stmt) or 0)
+
+
+def list_refunds(db: Session, org_id: int) -> list[Refund]:
+    stmt = scoped(select(Refund), Refund, org_id).order_by(Refund.id.desc())
+    return list(db.scalars(stmt).all())
+
+
+def get_refund(db: Session, org_id: int, refund_id: int) -> Refund:
+    stmt = scoped(select(Refund), Refund, org_id).where(Refund.id == refund_id)
+    refund = db.scalars(stmt).first()
+    if refund is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Refund not found"
+        )
+    return refund
+
+
+def refund_payment(
+    db: Session,
+    org_id: int,
+    payment_id: int,
+    amount: int,
+    reason: str,
+    refunded_by_user_id: int,
+    *,
+    refund_date: date | None = None,
+    notes: str | None = None,
+) -> Refund:
+    if amount <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Refund amount must be greater than zero",
+        )
+
+    payment = get_payment(db, org_id, payment_id)
+    already_refunded = _refunded_amount_for_payment(db, org_id, payment_id)
+    refundable = payment.amount - already_refunded
+    if amount > refundable:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Refund amount cannot exceed refundable balance "
+                f"({refundable} Toman remaining on this payment)"
+            ),
+        )
+
+    installment = get_installment(db, org_id, payment.installment_id)
+    refund = Refund(
+        payment_id=payment.id,
+        amount=amount,
+        reason=reason,
+        refunded_by=refunded_by_user_id,
+        refund_date=refund_date or date.today(),
+        notes=notes,
+        org_id=org_id,
+    )
+    db.add(refund)
+    installment.paid_amount -= amount
+    recompute_installment_status(installment)
+
+    invoice = get_invoice(db, org_id, installment.invoice_id)
+    installments = get_installments_for_invoice(db, org_id, invoice.id)
+    recompute_invoice_status(invoice, installments)
+    db.flush()
+
+    enrollment = enrollment_service.get_enrollment(db, org_id, invoice.enrollment_id)
+    activity_service.log_activity(
+        db,
+        org_id,
+        enrollment.person_id,
+        "payment_refunded",
+        payload={
+            "refund_id": refund.id,
+            "payment_id": payment.id,
+            "installment_id": installment.id,
+            "amount": amount,
+            "reason": reason,
+            "invoice_id": invoice.id,
+            "enrollment_id": enrollment.id,
+        },
+        actor_id=refunded_by_user_id,
+    )
+    db.commit()
+    db.refresh(refund)
+    return refund

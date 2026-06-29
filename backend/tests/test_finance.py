@@ -320,3 +320,162 @@ def test_payment_cancelled_installment(
 
     assert exc_info.value.status_code == 422
     assert exc_info.value.detail == "Cannot record payment on a cancelled installment"
+
+
+def _record_partial_payment(
+    db_session: Session,
+    org_id: int,
+    enrollment: Enrollment,
+    admin_user: User,
+    *,
+    amount: int = 2_500_000,
+    due_date: date = date(2026, 12, 1),
+):
+    invoice = _issue_single_installment_invoice(
+        db_session, org_id, enrollment, due_date=due_date
+    )
+    installments = finance_service.get_installments_for_invoice(
+        db_session, org_id, invoice.id
+    )
+    installment = installments[0]
+    payment = finance_service.record_payment(
+        db_session, org_id, installment.id, amount, admin_user.id
+    )
+    return invoice, installment, payment
+
+
+def test_refund_partial(
+    db_session: Session,
+    org_id: int,
+    person: Person,
+    course: Course,
+    admin_user: User,
+    request: pytest.FixtureRequest,
+) -> None:
+    course_class = request.getfixturevalue("class")
+    enrollment = _create_enrollment(db_session, org_id, person, course_class)
+    _, installment, payment = _record_partial_payment(
+        db_session, org_id, enrollment, admin_user
+    )
+
+    refund = finance_service.refund_payment(
+        db_session,
+        org_id,
+        payment.id,
+        1_000_000,
+        "Partial refund",
+        admin_user.id,
+    )
+
+    assert refund.amount == 1_000_000
+    assert refund.payment_id == payment.id
+    assert refund.refunded_by == admin_user.id
+
+    refreshed = finance_service.get_installment(db_session, org_id, installment.id)
+    assert refreshed.paid_amount == 1_500_000
+    assert refreshed.status == InstallmentStatus.partially_paid
+
+    activities = activity_service.list_activities(
+        db_session, org_id, person_id=person.id
+    )
+    refund_activities = [a for a in activities if a.action == "payment_refunded"]
+    assert len(refund_activities) == 1
+    assert refund_activities[0].payload["amount"] == 1_000_000
+    assert refund_activities[0].payload["payment_id"] == payment.id
+
+
+def test_refund_full(
+    db_session: Session,
+    org_id: int,
+    person: Person,
+    course: Course,
+    admin_user: User,
+    request: pytest.FixtureRequest,
+) -> None:
+    course_class = request.getfixturevalue("class")
+    enrollment = _create_enrollment(db_session, org_id, person, course_class)
+    _, installment, payment = _record_partial_payment(
+        db_session, org_id, enrollment, admin_user
+    )
+
+    finance_service.refund_payment(
+        db_session,
+        org_id,
+        payment.id,
+        2_500_000,
+        "Full refund",
+        admin_user.id,
+    )
+
+    refreshed = finance_service.get_installment(db_session, org_id, installment.id)
+    assert refreshed.paid_amount == 0
+    assert refreshed.status == InstallmentStatus.pending
+
+
+def test_refund_invalid_amount(
+    db_session: Session,
+    org_id: int,
+    person: Person,
+    course: Course,
+    admin_user: User,
+    request: pytest.FixtureRequest,
+) -> None:
+    course_class = request.getfixturevalue("class")
+    enrollment = _create_enrollment(db_session, org_id, person, course_class)
+    _, _, payment = _record_partial_payment(
+        db_session, org_id, enrollment, admin_user
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        finance_service.refund_payment(
+            db_session,
+            org_id,
+            payment.id,
+            3_000_000,
+            "Too much",
+            admin_user.id,
+        )
+
+    assert exc_info.value.status_code == 422
+    assert "cannot exceed refundable balance" in exc_info.value.detail.lower()
+
+
+def test_refund_twice(
+    db_session: Session,
+    org_id: int,
+    person: Person,
+    course: Course,
+    admin_user: User,
+    request: pytest.FixtureRequest,
+) -> None:
+    course_class = request.getfixturevalue("class")
+    enrollment = _create_enrollment(db_session, org_id, person, course_class)
+    _, installment, payment = _record_partial_payment(
+        db_session, org_id, enrollment, admin_user
+    )
+
+    finance_service.refund_payment(
+        db_session,
+        org_id,
+        payment.id,
+        1_500_000,
+        "First partial refund",
+        admin_user.id,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        finance_service.refund_payment(
+            db_session,
+            org_id,
+            payment.id,
+            1_500_000,
+            "Second refund exceeds remaining balance",
+            admin_user.id,
+        )
+
+    assert exc_info.value.status_code == 422
+    assert "cannot exceed refundable balance" in exc_info.value.detail.lower()
+
+    refreshed = finance_service.get_installment(db_session, org_id, installment.id)
+    assert refreshed.paid_amount == 1_000_000
+    assert refreshed.status == InstallmentStatus.partially_paid
