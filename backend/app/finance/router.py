@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
 from app.core.db import get_db
+from app.core.openapi import PROTECTED_RESPONSES
 from app.finance import service as finance_service
 from app.finance.model import Installment, Invoice, Payment
 from app.finance.schemas import (
@@ -18,8 +19,8 @@ from app.finance.schemas import (
 )
 from app.user.model import User
 
-router = APIRouter()
-payments_router = APIRouter()
+router = APIRouter(responses=PROTECTED_RESPONSES)
+payments_router = APIRouter(responses=PROTECTED_RESPONSES)
 
 
 @router.get("", response_model=list[InvoiceRead])
@@ -27,6 +28,10 @@ def list_invoices(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> list[Invoice]:
+    """List all invoices.
+
+    Returns every invoice in the authenticated user's organization.
+    """
     return finance_service.list_invoices(db, current_user.org_id)
 
 
@@ -36,6 +41,11 @@ def get_invoice(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Invoice:
+    """Get an invoice by ID.
+
+    Fetches an invoice with its installment schedule.
+    Returns 404 if the invoice is not found in the org.
+    """
     invoice = finance_service.get_invoice(db, current_user.org_id, invoice_id)
     invoice.installments = finance_service.get_installments_for_invoice(
         db, current_user.org_id, invoice_id
@@ -49,6 +59,13 @@ def issue_invoice(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Invoice:
+    """Issue an invoice for an enrollment.
+
+    Creates an invoice and installment plan for an enrollment.
+    Returns 404 if the enrollment is not found.
+    Returns 409 if the enrollment already has an invoice.
+    Returns 422 if installment amounts do not sum to total or sequences are duplicated.
+    """
     invoice = finance_service.issue_invoice(db, current_user.org_id, body)
     invoice.installments = finance_service.get_installments_for_invoice(
         db, current_user.org_id, invoice.id
@@ -62,6 +79,11 @@ def list_installments(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> list[Installment]:
+    """List installments for an invoice.
+
+    Returns the installment schedule for a given invoice.
+    Returns 404 if the invoice is not found in the org.
+    """
     return finance_service.get_installments_for_invoice(
         db, current_user.org_id, invoice_id
     )
@@ -77,6 +99,12 @@ def update_installment(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Installment:
+    """Update an installment.
+
+    Changes amount or due date on a pending installment.
+    Returns 404 if the installment is not found.
+    Returns 422 if the installment is paid/cancelled or amount changes after payments.
+    """
     return finance_service.update_installment(
         db, current_user.org_id, installment_id, body
     )
@@ -87,6 +115,10 @@ def list_payments(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> list[Payment]:
+    """List all payments.
+
+    Returns every payment record in the authenticated user's organization.
+    """
     return finance_service.list_payments(db, current_user.org_id)
 
 
@@ -96,6 +128,11 @@ def get_payment(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Payment:
+    """Get a payment by ID.
+
+    Fetches a single payment record from the organization.
+    Returns 404 if the payment is not found in the org.
+    """
     return finance_service.get_payment(db, current_user.org_id, payment_id)
 
 
@@ -105,6 +142,12 @@ def record_payment(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Payment:
+    """Record a payment against an installment.
+
+    Records a partial or full payment and updates installment/invoice status.
+    Returns 404 if the installment is not found.
+    Returns 422 if amount is invalid or installment is cancelled.
+    """
     return finance_service.record_payment(
         db,
         current_user.org_id,

@@ -8,17 +8,22 @@ from app.activity.model import Activity
 from app.activity.schemas import ActivityCreate, ActivityRead
 from app.auth.deps import get_current_user
 from app.core.db import get_db
+from app.core.openapi import PROTECTED_RESPONSES
 from app.user.model import User
 
-router = APIRouter()
+router = APIRouter(responses=PROTECTED_RESPONSES)
 
 
 @router.get("", response_model=list[ActivityRead])
 def list_activities(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-    person_id: Annotated[int | None, Query()] = None,
+    person_id: Annotated[int | None, Query(description="Filter by person ID.")] = None,
 ) -> list[Activity]:
+    """List activity timeline entries.
+
+    Returns audit/timeline events for the organization, optionally filtered by person.
+    """
     return activity_service.list_activities(
         db, current_user.org_id, person_id=person_id
     )
@@ -30,6 +35,12 @@ def create_activity(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Activity:
+    """Log an activity event.
+
+    Appends a timeline entry for a person. Defaults actor_id to the current user.
+    Returns 404 if the person is not found in the org.
+    Returns 422 if request validation fails.
+    """
     return activity_service.log_activity(
         db,
         current_user.org_id,

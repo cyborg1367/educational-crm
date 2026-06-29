@@ -22,6 +22,11 @@ from app.scheduler import shutdown_scheduler, start_scheduler
 from app.task.router import router as tasks_router
 from app.user.router import router as users_router
 
+OPENAPI_DESCRIPTION = (
+    "Multi-tenant SaaS CRM for educational institutes. Supports person management, "
+    "course enrollment, invoicing, and automated workflow orchestration."
+)
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -30,35 +35,48 @@ async def lifespan(_app: FastAPI):
     shutdown_scheduler()
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    title="Educational CRM API",
+    version="1.0.0-alpha",
+    description=OPENAPI_DESCRIPTION,
+    lifespan=lifespan,
+)
 
-app.include_router(auth_router, prefix="/auth", tags=["auth"])
-app.include_router(users_router, prefix="/users", tags=["users"])
-app.include_router(people_router, prefix="/people", tags=["people"])
-app.include_router(departments_router, prefix="/departments", tags=["departments"])
-app.include_router(courses_router, prefix="/courses", tags=["courses"])
-app.include_router(classes_router, prefix="/classes", tags=["classes"])
-app.include_router(journeys_router, prefix="/journeys", tags=["journeys"])
-app.include_router(roadmaps_router, prefix="/roadmaps", tags=["roadmaps"])
+app.include_router(auth_router, prefix="/auth", tags=["Auth"])
+app.include_router(users_router, prefix="/users", tags=["Users"])
+app.include_router(people_router, prefix="/people", tags=["People"])
+app.include_router(departments_router, prefix="/departments", tags=["Departments"])
+app.include_router(courses_router, prefix="/courses", tags=["Courses"])
+app.include_router(classes_router, prefix="/classes", tags=["Classes"])
+app.include_router(journeys_router, prefix="/journeys", tags=["Journeys"])
+app.include_router(roadmaps_router, prefix="/roadmaps", tags=["Roadmaps"])
 app.include_router(
-    consultations_router, prefix="/consultations", tags=["consultations"]
+    consultations_router, prefix="/consultations", tags=["Consultations"]
 )
 app.include_router(
-    enrollments_router, prefix="/enrollments", tags=["enrollments"]
+    enrollments_router, prefix="/enrollments", tags=["Enrollments"]
 )
 app.include_router(
-    communications_router, prefix="/communications", tags=["communications"]
+    communications_router, prefix="/communications", tags=["Communications"]
 )
-app.include_router(invoices_router, prefix="/invoices", tags=["invoices"])
-app.include_router(payments_router, prefix="/payments", tags=["payments"])
 app.include_router(
-    attendances_router, prefix="/attendances", tags=["attendances"]
+    invoices_router, prefix="/invoices", tags=["Invoices & Finance"]
 )
-app.include_router(tasks_router, prefix="/tasks", tags=["tasks"])
-app.include_router(activities_router, prefix="/activities", tags=["activities"])
+app.include_router(
+    payments_router, prefix="/payments", tags=["Invoices & Finance"]
+)
+app.include_router(
+    attendances_router, prefix="/attendances", tags=["Attendance"]
+)
+app.include_router(tasks_router, prefix="/tasks", tags=["Tasks"])
+app.include_router(activities_router, prefix="/activities", tags=["Activities"])
 
 
-@app.get("/health")
+@app.get("/health", tags=["Health"])
 def health(db: Session = Depends(get_db)) -> dict[str, str]:
+    """Health check.
+
+    Verifies API availability and database connectivity.
+    """
     db.execute(text("SELECT 1"))
     return {"status": "ok"}

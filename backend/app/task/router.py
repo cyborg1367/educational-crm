@@ -5,22 +5,31 @@ from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
 from app.core.db import get_db
+from app.core.openapi import PROTECTED_RESPONSES
 from app.task import service as task_service
 from app.task.enums import TaskStatus
 from app.task.model import Task
 from app.task.schemas import TaskCreate, TaskRead, TaskUpdate
 from app.user.model import User
 
-router = APIRouter()
+router = APIRouter(responses=PROTECTED_RESPONSES)
 
 
 @router.get("", response_model=list[TaskRead])
 def list_tasks(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-    assignee_id: Annotated[int | None, Query()] = None,
-    status: Annotated[TaskStatus | None, Query()] = None,
+    assignee_id: Annotated[
+        int | None, Query(description="Filter by assignee user ID.")
+    ] = None,
+    status: Annotated[
+        TaskStatus | None, Query(description="Filter by task status.")
+    ] = None,
 ) -> list[Task]:
+    """List tasks.
+
+    Returns tasks in the organization, optionally filtered by assignee or status.
+    """
     return task_service.list_tasks(
         db, current_user.org_id, assignee_id=assignee_id, status=status
     )
@@ -32,6 +41,11 @@ def get_task(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Task:
+    """Get a task by ID.
+
+    Fetches a single task record from the organization.
+    Returns 404 if the task is not found in the org.
+    """
     return task_service.get_task(db, current_user.org_id, task_id)
 
 
@@ -41,6 +55,12 @@ def create_task(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Task:
+    """Create a new task.
+
+    Assigns a follow-up or operational task to a person.
+    Returns 404 if the person or assignee is not found.
+    Returns 422 if request validation fails.
+    """
     return task_service.create_task_from_schema(
         db, current_user.org_id, body, actor_id=current_user.id
     )
@@ -53,6 +73,12 @@ def update_task(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Task:
+    """Update a task.
+
+    Applies partial updates to title, due date, assignee, or status.
+    Returns 404 if the task or assignee is not found.
+    Returns 422 if request validation fails.
+    """
     return task_service.update_task(db, current_user.org_id, task_id, body)
 
 
@@ -62,4 +88,9 @@ def complete_task(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Task:
+    """Mark a task as completed.
+
+    Sets task status to completed and records completion timestamp.
+    Returns 404 if the task is not found in the org.
+    """
     return task_service.complete_task(db, current_user.org_id, task_id)

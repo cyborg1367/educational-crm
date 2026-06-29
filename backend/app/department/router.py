@@ -5,12 +5,13 @@ from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
 from app.core.db import get_db
+from app.core.openapi import PROTECTED_RESPONSES
 from app.department import service as department_service
 from app.department.model import Department
 from app.department.schemas import DepartmentCreate, DepartmentRead, DepartmentUpdate
 from app.user.model import User
 
-router = APIRouter()
+router = APIRouter(responses=PROTECTED_RESPONSES)
 
 
 @router.get("", response_model=list[DepartmentRead])
@@ -18,6 +19,10 @@ def list_departments(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> list[Department]:
+    """List all departments.
+
+    Returns every department in the authenticated user's organization.
+    """
     return department_service.list_departments(db, current_user.org_id)
 
 
@@ -27,6 +32,11 @@ def get_department(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Department:
+    """Get a department by ID.
+
+    Fetches a single department record from the organization.
+    Returns 404 if the department is not found in the org.
+    """
     return department_service.get_department(db, current_user.org_id, department_id)
 
 
@@ -36,6 +46,12 @@ def create_department(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Department:
+    """Create a new department.
+
+    Adds a department to the organization.
+    Returns 404 if manager_id references a user not in the org.
+    Returns 422 if request validation fails.
+    """
     return department_service.create_department(db, current_user.org_id, body)
 
 
@@ -46,6 +62,12 @@ def update_department(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Department:
+    """Update a department.
+
+    Applies partial updates to an existing department.
+    Returns 404 if the department or referenced manager is not found.
+    Returns 422 if request validation fails.
+    """
     return department_service.update_department(
         db, current_user.org_id, department_id, body
     )
