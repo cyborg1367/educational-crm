@@ -277,6 +277,40 @@ def on_enrollment_created(
     db.commit()
 
 
+def on_first_payment(
+    db: Session,
+    org_id: int,
+    enrollment_id: int,
+    *,
+    actor_id: int | None = None,
+) -> None:
+    enrollment = enrollment_service.get_enrollment(db, org_id, enrollment_id)
+    person = person_service.get_person(db, org_id, enrollment.person_id)
+
+    activated = False
+    if enrollment.status == EnrollmentStatus.pre_enroll:
+        enrollment.status = EnrollmentStatus.active
+        activated = True
+
+    if person.status == PersonStatus.lead:
+        person.status = PersonStatus.student
+
+    if activated:
+        activity_service.log_activity(
+            db,
+            org_id,
+            enrollment.person_id,
+            "enrollment_activated",
+            payload={
+                "enrollment_id": enrollment_id,
+                "status": EnrollmentStatus.active.value,
+            },
+            actor_id=actor_id,
+        )
+
+    db.commit()
+
+
 def on_class_completed(
     db: Session,
     org_id: int,

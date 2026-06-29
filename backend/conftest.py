@@ -4,6 +4,7 @@ from collections.abc import Generator
 from datetime import date
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import JSON, Index, create_engine, event, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session, sessionmaker
@@ -11,10 +12,10 @@ from sqlalchemy.pool import StaticPool
 
 from app.activity import model as activity_model  # noqa: F401
 from app.attendance import model as attendance_model  # noqa: F401
-from app.auth.security import hash_password
+from app.auth.security import create_access_token, hash_password
 from app.communication import model as communication_model  # noqa: F401
 from app.consultation import model as consultation_model  # noqa: F401
-from app.core.db import Base
+from app.core.db import Base, get_db
 from app.course import model as course_model  # noqa: F401
 from app.course.model import Course
 from app.course_class import model as course_class_model  # noqa: F401
@@ -26,6 +27,7 @@ from app.enrollment import model as enrollment_model  # noqa: F401
 from app.enrollment.model import Enrollment
 from app.finance import model as finance_model  # noqa: F401
 from app.journey import model as journey_model  # noqa: F401
+from app.main import app
 from app.organization import model as organization_model  # noqa: F401
 from app.organization.model import Organization
 from app.person import model as person_model  # noqa: F401
@@ -180,3 +182,23 @@ def course_class(
     db_session.commit()
     db_session.refresh(record)
     return record
+
+
+@pytest.fixture
+def api_client(
+    db_session: Session, admin_user: User
+) -> Generator[TestClient, None, None]:
+    """Authenticated TestClient with DB override."""
+
+    def override_get_db() -> Generator[Session, None, None]:
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    token = create_access_token(user_id=admin_user.id, org_id=admin_user.org_id)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    with TestClient(app) as client:
+        client.headers.update(headers)
+        yield client
+
+    app.dependency_overrides.clear()

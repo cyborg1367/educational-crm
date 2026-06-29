@@ -40,8 +40,8 @@ class CourseCreate(BaseModel):
         examples=["B2"],
     )
     current_price: int = Field(
-        ge=0,
-        description="List price in Toman. Must be >= 0.",
+        gt=0,
+        description="List price in Toman. Must be > 0.",
         examples=[1000000],
     )
     duration_sessions: int | None = Field(
@@ -72,8 +72,8 @@ class CourseUpdate(BaseModel):
     )
     current_price: int | None = Field(
         default=None,
-        ge=0,
-        description="Updated price in Toman. Must be >= 0.",
+        gt=0,
+        description="Updated price in Toman. Must be > 0.",
         examples=[1200000],
     )
     duration_sessions: int | None = Field(

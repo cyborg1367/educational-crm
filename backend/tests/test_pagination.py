@@ -1,35 +1,10 @@
 """Pagination tests for list endpoints."""
 
-from collections.abc import Generator
-
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.auth.security import create_access_token
-from app.core.db import get_db
-from app.main import app
 from app.person import service as person_service
 from app.person.schemas import PersonCreate
-from app.user.model import User
-
-
-@pytest.fixture
-def api_client(
-    db_session: Session, admin_user: User
-) -> Generator[TestClient, None, None]:
-    def override_get_db() -> Generator[Session, None, None]:
-        yield db_session
-
-    app.dependency_overrides[get_db] = override_get_db
-    token = create_access_token(user_id=admin_user.id, org_id=admin_user.org_id)
-    headers = {"Authorization": f"Bearer {token}"}
-
-    with TestClient(app) as client:
-        client.headers.update(headers)
-        yield client
-
-    app.dependency_overrides.clear()
 
 
 def _seed_people(db_session: Session, org_id: int, count: int) -> None:
