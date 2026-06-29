@@ -1,11 +1,11 @@
 from datetime import date
 
-from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.activity import service as activity_service
+from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.core.pagination import paginate_query
 from app.enrollment import service as enrollment_service
 from app.finance.enums import InstallmentStatus, InvoiceStatus
@@ -21,12 +21,12 @@ def validate_invariant(invoice: Invoice, installments: list[Installment]) -> Non
         if inst.status != InstallmentStatus.cancelled
     )
     if total != invoice.total_amount:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=(
+        raise ValidationError(
+            (
                 f"Installment amounts must sum to invoice total_amount "
                 f"({invoice.total_amount}); non-cancelled installments sum to {total}"
             ),
+            field="installments",
         )
 
 
@@ -72,9 +72,7 @@ def get_invoice(db: Session, org_id: int, invoice_id: int) -> Invoice:
     stmt = scoped(select(Invoice), Invoice, org_id).where(Invoice.id == invoice_id)
     invoice = db.scalars(stmt).first()
     if invoice is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found"
-        )
+        raise NotFoundError("Invoice not found")
     return invoice
 
 
@@ -113,9 +111,7 @@ def get_installment(db: Session, org_id: int, installment_id: int) -> Installmen
     )
     installment = db.scalars(stmt).first()
     if installment is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Installment not found"
-        )
+        raise NotFoundError("Installment not found")
     return installment
 
 
@@ -124,9 +120,9 @@ def issue_invoice(db: Session, org_id: int, data: InvoiceCreate) -> Invoice:
 
     sequences = [item.sequence for item in data.installments]
     if len(sequences) != len(set(sequences)):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Installment sequences must be unique",
+        raise ValidationError(
+            "Installment sequences must be unique",
+            field="installments",
         )
 
     invoice = Invoice(
@@ -161,10 +157,7 @@ def issue_invoice(db: Session, org_id: int, data: InvoiceCreate) -> Invoice:
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Enrollment already has an invoice",
-        ) from None
+        raise ConflictError("Enrollment already has an invoice") from None
     db.refresh(invoice)
     return invoice
 
@@ -174,14 +167,14 @@ def update_installment(
 ) -> Installment:
     installment = get_installment(db, org_id, installment_id)
     if installment.status in (InstallmentStatus.paid, InstallmentStatus.cancelled):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Cannot modify a paid or cancelled installment",
+        raise ValidationError(
+            "Cannot modify a paid or cancelled installment",
+            field="status",
         )
     if installment.paid_amount > 0 and data.amount is not None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Cannot change amount after payments have been recorded",
+        raise ValidationError(
+            "Cannot change amount after payments have been recorded",
+            field="amount",
         )
 
     updates = data.model_dump(exclude_unset=True)
@@ -232,9 +225,7 @@ def get_payment(db: Session, org_id: int, payment_id: int) -> Payment:
     stmt = scoped(select(Payment), Payment, org_id).where(Payment.id == payment_id)
     payment = db.scalars(stmt).first()
     if payment is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found"
-        )
+        raise NotFoundError("Payment not found")
     return payment
 
 
@@ -249,16 +240,16 @@ def record_payment(
     notes: str | None = None,
 ) -> Payment:
     if amount <= 0:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Payment amount must be greater than zero",
+        raise ValidationError(
+            "Payment amount must be greater than zero",
+            field="amount",
         )
 
     installment = get_installment(db, org_id, installment_id)
     if installment.status == InstallmentStatus.cancelled:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Cannot record payment on a cancelled installment",
+        raise ValidationError(
+            "Cannot record payment on a cancelled installment",
+            field="installment_id",
         )
 
     payment = Payment(
@@ -318,9 +309,7 @@ def get_refund(db: Session, org_id: int, refund_id: int) -> Refund:
     stmt = scoped(select(Refund), Refund, org_id).where(Refund.id == refund_id)
     refund = db.scalars(stmt).first()
     if refund is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Refund not found"
-        )
+        raise NotFoundError("Refund not found")
     return refund
 
 
@@ -336,21 +325,21 @@ def refund_payment(
     notes: str | None = None,
 ) -> Refund:
     if amount <= 0:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Refund amount must be greater than zero",
+        raise ValidationError(
+            "Refund amount must be greater than zero",
+            field="amount",
         )
 
     payment = get_payment(db, org_id, payment_id)
     already_refunded = _refunded_amount_for_payment(db, org_id, payment_id)
     refundable = payment.amount - already_refunded
     if amount > refundable:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=(
+        raise ValidationError(
+            (
                 f"Refund amount cannot exceed refundable balance "
                 f"({refundable} Toman remaining on this payment)"
             ),
+            field="amount",
         )
 
     installment = get_installment(db, org_id, payment.installment_id)

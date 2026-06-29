@@ -1,11 +1,11 @@
-from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.pagination import paginate_query
 from app.activity import service as activity_service
 from app.consultation import service as consultation_service
+from app.core.errors import ConflictError, NotFoundError, ValidationError
+from app.core.pagination import paginate_query
 from app.course import service as course_service
 from app.course_class import service as class_service
 from app.enrollment.enums import EnrollmentStatus
@@ -34,9 +34,7 @@ def get_enrollment(db: Session, org_id: int, enrollment_id: int) -> Enrollment:
     )
     enrollment = db.scalars(stmt).first()
     if enrollment is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Enrollment not found"
-        )
+        raise NotFoundError("Enrollment not found")
     return enrollment
 
 
@@ -60,9 +58,9 @@ def _validate_fks(
 
 def _validate_discount(discount_snapshot: int, price_snapshot: int) -> None:
     if discount_snapshot > price_snapshot:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="discount_snapshot cannot exceed price_snapshot",
+        raise ValidationError(
+            "discount_snapshot cannot exceed price_snapshot",
+            field="discount_snapshot",
         )
 
 
@@ -98,9 +96,8 @@ def create_enrollment(
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Person already has a live enrollment for this class",
+        raise ConflictError(
+            "Person already has a live enrollment for this class"
         ) from None
     db.refresh(enrollment)
     return enrollment
@@ -119,9 +116,8 @@ def update_status(
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Person already has a live enrollment for this class",
+        raise ConflictError(
+            "Person already has a live enrollment for this class"
         ) from None
     db.refresh(enrollment)
     return enrollment
@@ -148,10 +144,7 @@ def drop_enrollment(
 ) -> Enrollment:
     enrollment = get_enrollment(db, org_id, enrollment_id)
     if enrollment.status == EnrollmentStatus.dropped:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Enrollment is already dropped",
-        )
+        raise ValidationError("Enrollment is already dropped", field="status")
 
     enrollment.status = EnrollmentStatus.dropped
     db.flush()

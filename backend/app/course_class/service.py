@@ -1,7 +1,7 @@
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.errors import NotFoundError, ValidationError
 from app.core.pagination import paginate_query
 from app.course import service as course_service
 from app.course_class.model import CourseClass
@@ -26,9 +26,7 @@ def get_class(db: Session, org_id: int, class_id: int) -> CourseClass:
     )
     course_class = db.scalars(stmt).first()
     if course_class is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Class not found"
-        )
+        raise NotFoundError("Class not found")
     return course_class
 
 
@@ -39,9 +37,9 @@ def _validate_course(db: Session, org_id: int, course_id: int) -> None:
 def _validate_teacher(db: Session, org_id: int, teacher_id: int) -> None:
     teacher = user_service.get_user(db, org_id, teacher_id)
     if teacher.role != UserRole.teacher:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="teacher_id must reference a user with role teacher",
+        raise ValidationError(
+            "teacher_id must reference a user with role teacher",
+            field="teacher_id",
         )
 
 

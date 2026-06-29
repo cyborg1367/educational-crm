@@ -1,8 +1,8 @@
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.errors import ConflictError, NotFoundError
 from app.core.pagination import paginate_query
 from app.attendance.model import Attendance
 from app.attendance.schemas import AttendanceCreate, AttendanceUpdate
@@ -25,9 +25,7 @@ def get_attendance(db: Session, org_id: int, attendance_id: int) -> Attendance:
     )
     attendance = db.scalars(stmt).first()
     if attendance is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Attendance not found"
-        )
+        raise NotFoundError("Attendance not found")
     return attendance
 
 
@@ -48,9 +46,8 @@ def create_attendance(
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Attendance already recorded for this enrollment and session date",
+        raise ConflictError(
+            "Attendance already recorded for this enrollment and session date"
         ) from None
     db.refresh(attendance)
     return attendance

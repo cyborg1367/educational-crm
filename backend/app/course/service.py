@@ -1,7 +1,7 @@
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.errors import NotFoundError
 from app.core.pagination import paginate_query
 from app.course.model import Course
 from app.course.schemas import CourseCreate, CourseUpdate
@@ -20,9 +20,7 @@ def get_course(db: Session, org_id: int, course_id: int) -> Course:
     stmt = scoped(select(Course), Course, org_id).where(Course.id == course_id)
     course = db.scalars(stmt).first()
     if course is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
-        )
+        raise NotFoundError("Course not found")
     return course
 
 

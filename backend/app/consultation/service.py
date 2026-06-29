@@ -1,7 +1,7 @@
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.errors import NotFoundError
 from app.core.pagination import paginate_query
 from app.consultation.model import Consultation
 from app.consultation.schemas import ConsultationCreate, ConsultationUpdate
@@ -28,9 +28,7 @@ def get_consultation(db: Session, org_id: int, consultation_id: int) -> Consulta
     )
     consultation = db.scalars(stmt).first()
     if consultation is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Consultation not found"
-        )
+        raise NotFoundError("Consultation not found")
     return consultation
 
 

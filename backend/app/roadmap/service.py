@@ -1,7 +1,7 @@
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.errors import NotFoundError
 from app.core.pagination import paginate_query
 from app.course import service as course_service
 from app.department import service as department_service
@@ -26,9 +26,7 @@ def get_roadmap(db: Session, org_id: int, roadmap_id: int) -> Roadmap:
     stmt = scoped(select(Roadmap), Roadmap, org_id).where(Roadmap.id == roadmap_id)
     roadmap = db.scalars(stmt).first()
     if roadmap is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Roadmap not found"
-        )
+        raise NotFoundError("Roadmap not found")
     return roadmap
 
 
@@ -98,9 +96,7 @@ def get_roadmap_item(
     )
     item = db.scalars(stmt).first()
     if item is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Roadmap item not found"
-        )
+        raise NotFoundError("Roadmap item not found")
     return item
 
 

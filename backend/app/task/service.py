@@ -1,11 +1,11 @@
 from datetime import date, datetime, timezone
 
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.pagination import paginate_query
 from app.activity import service as activity_service
+from app.core.errors import NotFoundError
+from app.core.pagination import paginate_query
 from app.person import service as person_service
 from app.task.enums import TaskStatus, TaskType
 from app.task.model import Task
@@ -35,9 +35,7 @@ def get_task(db: Session, org_id: int, task_id: int) -> Task:
     stmt = scoped(select(Task), Task, org_id).where(Task.id == task_id)
     task = db.scalars(stmt).first()
     if task is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
-        )
+        raise NotFoundError("Task not found")
     return task
 
 

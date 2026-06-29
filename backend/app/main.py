@@ -10,6 +10,7 @@ from app.auth.router import router as auth_router
 from app.communication.router import router as communications_router
 from app.consultation.router import router as consultations_router
 from app.core.db import get_db
+from app.core.exception_handlers import register_exception_handlers
 from app.course.router import router as courses_router
 from app.course_class.router import router as classes_router
 from app.department.router import router as departments_router
@@ -45,6 +46,8 @@ app = FastAPI(
     description=OPENAPI_DESCRIPTION,
     lifespan=lifespan,
 )
+
+register_exception_handlers(app)
 
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(users_router, prefix="/users", tags=["Users"])
