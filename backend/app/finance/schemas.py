@@ -50,3 +50,24 @@ class InvoiceDetailRead(InvoiceRead):
 class InstallmentUpdate(BaseModel):
     amount: int | None = Field(default=None, gt=0)
     due_date: date | None = None
+
+
+class PaymentCreate(BaseModel):
+    installment_id: int
+    amount: int = Field(gt=0)
+    payment_date: date | None = None
+    notes: str | None = None
+
+
+class PaymentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    installment_id: int
+    amount: int
+    recorded_by: int
+    payment_date: date
+    notes: str | None
+    org_id: int
+    created_at: datetime
+    updated_at: datetime

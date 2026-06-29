@@ -5,9 +5,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.activity import service as activity_service
 from app.enrollment import service as enrollment_service
 from app.finance.enums import InstallmentStatus, InvoiceStatus
-from app.finance.model import Installment, Invoice
+from app.finance.model import Installment, Invoice, Payment
 from app.finance.schemas import InstallmentUpdate, InvoiceCreate
 from app.tenancy.scoping import scoped
 
@@ -198,3 +199,78 @@ def cancel_installments_on_drop(db: Session, org_id: int, enrollment_id: int) ->
 
     recompute_invoice_status(invoice, installments)
     db.commit()
+
+
+def list_payments(db: Session, org_id: int) -> list[Payment]:
+    stmt = scoped(select(Payment), Payment, org_id).order_by(Payment.id.desc())
+    return list(db.scalars(stmt).all())
+
+
+def get_payment(db: Session, org_id: int, payment_id: int) -> Payment:
+    stmt = scoped(select(Payment), Payment, org_id).where(Payment.id == payment_id)
+    payment = db.scalars(stmt).first()
+    if payment is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found"
+        )
+    return payment
+
+
+def record_payment(
+    db: Session,
+    org_id: int,
+    installment_id: int,
+    amount: int,
+    recorded_by_user_id: int,
+    *,
+    payment_date: date | None = None,
+    notes: str | None = None,
+) -> Payment:
+    if amount <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Payment amount must be greater than zero",
+        )
+
+    installment = get_installment(db, org_id, installment_id)
+    if installment.status == InstallmentStatus.cancelled:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Cannot record payment on a cancelled installment",
+        )
+
+    payment = Payment(
+        installment_id=installment.id,
+        amount=amount,
+        recorded_by=recorded_by_user_id,
+        payment_date=payment_date or date.today(),
+        notes=notes,
+        org_id=org_id,
+    )
+    db.add(payment)
+    installment.paid_amount += amount
+    recompute_installment_status(installment)
+
+    invoice = get_invoice(db, org_id, installment.invoice_id)
+    installments = get_installments_for_invoice(db, org_id, invoice.id)
+    recompute_invoice_status(invoice, installments)
+    db.flush()
+
+    enrollment = enrollment_service.get_enrollment(db, org_id, invoice.enrollment_id)
+    activity_service.log_activity(
+        db,
+        org_id,
+        enrollment.person_id,
+        "payment_recorded",
+        payload={
+            "payment_id": payment.id,
+            "installment_id": installment.id,
+            "amount": amount,
+            "invoice_id": invoice.id,
+            "enrollment_id": enrollment.id,
+        },
+        actor_id=recorded_by_user_id,
+    )
+    db.commit()
+    db.refresh(payment)
+    return payment
