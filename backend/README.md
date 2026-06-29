@@ -420,7 +420,7 @@ uv run alembic revision --autogenerate -m "describe_change"
 
 ## Production Deployment
 
-See **[DEPLOYMENT.md](../DEPLOYMENT.md)** for the full production guide covering:
+See **[DEPLOYMENT.md](DEPLOYMENT.md)** for the full production guide covering:
 
 - Docker image build and run
 - Environment variable checklist

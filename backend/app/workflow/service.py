@@ -23,6 +23,7 @@ from app.finance.schemas import InstallmentPlanItem, InvoiceCreate
 from app.journey import service as journey_service
 from app.journey.enums import JourneyStatus
 from app.journey.model import Journey
+from app.notifications import service as notifications_service
 from app.person import service as person_service
 from app.person.enums import PersonStatus
 from app.task import service as task_service
@@ -273,6 +274,9 @@ def on_enrollment_created(
             "status": enrollment.status.value,
         },
         actor_id=actor_id,
+    )
+    notifications_service.notify_payment_recorded(
+        db, org_id, enrollment.person_id, enrollment.final_amount
     )
     db.commit()
 
