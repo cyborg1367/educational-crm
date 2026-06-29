@@ -33,6 +33,7 @@ from app.finance.router import (
 )
 from app.journey.router import router as journeys_router
 from app.person.router import router as people_router
+from app.reports.router import router as reports_router
 from app.roadmap.router import router as roadmaps_router
 from app.scheduler import shutdown_scheduler, start_scheduler
 from app.task.router import router as tasks_router
@@ -100,6 +101,7 @@ app.include_router(
 )
 app.include_router(tasks_router, prefix="/tasks", tags=["Tasks"])
 app.include_router(activities_router, prefix="/activities", tags=["Activities"])
+app.include_router(reports_router, prefix="/reports", tags=["Reports"])
 
 
 @app.get("/health", tags=["Health"])
