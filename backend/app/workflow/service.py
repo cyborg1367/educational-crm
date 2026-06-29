@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 
 from app.core.errors import ValidationError
+from app.core.logging_config import get_logger
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -27,6 +28,8 @@ from app.person.enums import PersonStatus
 from app.task import service as task_service
 from app.task.enums import TaskType
 from app.tenancy.scoping import scoped
+
+logger = get_logger(__name__)
 
 
 def _find_open_class(
@@ -236,6 +239,14 @@ def on_consultation_outcome(
             ),
         },
         actor_id=actor_id,
+    )
+    logger.info(
+        "consultation_routed",
+        extra={
+            "event": "consultation_routing",
+            "consultation_id": consultation.id,
+            "outcome": new_outcome.value,
+        },
     )
     db.commit()
     db.refresh(consultation)

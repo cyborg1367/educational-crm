@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time as time_module
 from contextlib import contextmanager
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Generator
@@ -12,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.activity.model import Activity
 from app.core.config import settings
 from app.core.db import SessionLocal
+from app.core.logging_config import get_logger
 from app.course.model import Course
 from app.course_class.enums import ClassStatus
 from app.course_class.model import CourseClass
@@ -32,6 +34,8 @@ from app.tenancy.scoping import scoped
 
 DORMANT_INACTIVITY_DAYS = 30
 INACTIVE_JOURNEY_DAYS = 60
+
+logger = get_logger(__name__)
 
 
 @contextmanager
@@ -106,6 +110,9 @@ def _journey_manager_id(db: Session, org_id: int, journey: Journey) -> int | Non
 
 
 def job_check_pre_enroll_unpaid(db_session: Session | None = None) -> None:
+    job_name = "job_check_pre_enroll_unpaid"
+    start = time_module.perf_counter()
+    created_tasks = 0
     today = _today()
     cutoff = datetime.combine(
         today - timedelta(days=settings.PRE_ENROLL_FOLLOWUP_DAYS),
@@ -137,9 +144,24 @@ def job_check_pre_enroll_unpaid(db_session: Session | None = None) -> None:
                     related_entity_type="enrollment",
                     related_entity_id=enrollment.id,
                 )
+                created_tasks += 1
+
+    duration_ms = round((time_module.perf_counter() - start) * 1000, 2)
+    logger.info(
+        "job_completed",
+        extra={
+            "event": "job_execution",
+            "job_name": job_name,
+            "created_tasks": created_tasks,
+            "duration_ms": duration_ms,
+        },
+    )
 
 
 def job_check_installment_overdue(db_session: Session | None = None) -> None:
+    job_name = "job_check_installment_overdue"
+    start = time_module.perf_counter()
+    created_tasks = 0
     today = _today()
 
     with _job_session(db_session) as db:
@@ -166,9 +188,24 @@ def job_check_installment_overdue(db_session: Session | None = None) -> None:
                     related_entity_type="installment",
                     related_entity_id=installment.id,
                 )
+                created_tasks += 1
+
+    duration_ms = round((time_module.perf_counter() - start) * 1000, 2)
+    logger.info(
+        "job_completed",
+        extra={
+            "event": "job_execution",
+            "job_name": job_name,
+            "created_tasks": created_tasks,
+            "duration_ms": duration_ms,
+        },
+    )
 
 
 def job_check_dormant_followup(db_session: Session | None = None) -> None:
+    job_name = "job_check_dormant_followup"
+    start = time_module.perf_counter()
+    created_tasks = 0
     today = _today()
     inactivity_cutoff_date = today - timedelta(days=DORMANT_INACTIVITY_DAYS)
 
@@ -208,9 +245,24 @@ def job_check_dormant_followup(db_session: Session | None = None) -> None:
                     related_entity_type="journey" if journey else None,
                     related_entity_id=journey.id if journey else None,
                 )
+                created_tasks += 1
+
+    duration_ms = round((time_module.perf_counter() - start) * 1000, 2)
+    logger.info(
+        "job_completed",
+        extra={
+            "event": "job_execution",
+            "job_name": job_name,
+            "created_tasks": created_tasks,
+            "duration_ms": duration_ms,
+        },
+    )
 
 
 def job_class_start_reminder(db_session: Session | None = None) -> None:
+    job_name = "job_class_start_reminder"
+    start = time_module.perf_counter()
+    created_tasks = 0
     today = _today()
     tomorrow = today + timedelta(days=1)
 
@@ -237,9 +289,24 @@ def job_class_start_reminder(db_session: Session | None = None) -> None:
                         related_entity_type="class",
                         related_entity_id=course_class.id,
                     )
+                    created_tasks += 1
+
+    duration_ms = round((time_module.perf_counter() - start) * 1000, 2)
+    logger.info(
+        "job_completed",
+        extra={
+            "event": "job_execution",
+            "job_name": job_name,
+            "created_tasks": created_tasks,
+            "duration_ms": duration_ms,
+        },
+    )
 
 
 def job_archive_inactive_journeys(db_session: Session | None = None) -> None:
+    job_name = "job_archive_inactive_journeys"
+    start = time_module.perf_counter()
+    created_tasks = 0
     today = _today()
     inactivity_cutoff_date = today - timedelta(days=INACTIVE_JOURNEY_DAYS)
 
@@ -265,3 +332,15 @@ def job_archive_inactive_journeys(db_session: Session | None = None) -> None:
                     related_entity_type="journey",
                     related_entity_id=journey.id,
                 )
+                created_tasks += 1
+
+    duration_ms = round((time_module.perf_counter() - start) * 1000, 2)
+    logger.info(
+        "job_completed",
+        extra={
+            "event": "job_execution",
+            "job_name": job_name,
+            "created_tasks": created_tasks,
+            "duration_ms": duration_ms,
+        },
+    )
