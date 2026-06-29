@@ -6,17 +6,20 @@ from sqlalchemy.orm import Session
 from app.auth.deps import get_current_user
 from app.core.db import get_db
 from app.finance import service as finance_service
-from app.finance.model import Installment, Invoice
+from app.finance.model import Installment, Invoice, Payment
 from app.finance.schemas import (
     InstallmentRead,
     InstallmentUpdate,
     InvoiceCreate,
     InvoiceDetailRead,
     InvoiceRead,
+    PaymentCreate,
+    PaymentRead,
 )
 from app.user.model import User
 
 router = APIRouter()
+payments_router = APIRouter()
 
 
 @router.get("", response_model=list[InvoiceRead])
@@ -76,4 +79,38 @@ def update_installment(
 ) -> Installment:
     return finance_service.update_installment(
         db, current_user.org_id, installment_id, body
+    )
+
+
+@payments_router.get("", response_model=list[PaymentRead])
+def list_payments(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> list[Payment]:
+    return finance_service.list_payments(db, current_user.org_id)
+
+
+@payments_router.get("/{payment_id}", response_model=PaymentRead)
+def get_payment(
+    payment_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> Payment:
+    return finance_service.get_payment(db, current_user.org_id, payment_id)
+
+
+@payments_router.post("", response_model=PaymentRead, status_code=status.HTTP_201_CREATED)
+def record_payment(
+    body: PaymentCreate,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> Payment:
+    return finance_service.record_payment(
+        db,
+        current_user.org_id,
+        body.installment_id,
+        body.amount,
+        current_user.id,
+        payment_date=body.payment_date,
+        notes=body.notes,
     )
