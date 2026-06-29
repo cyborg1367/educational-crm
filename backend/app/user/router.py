@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.auth.deps import get_current_user, require_role
 from app.core.db import get_db
 from app.core.openapi import PROTECTED_RESPONSES
+from app.core.pagination import PaginatedResponse, PaginationParams
 from app.user import service as user_service
 from app.user.enums import UserRole
 from app.user.model import User
@@ -14,17 +15,29 @@ from app.user.schemas import UserCreate, UserRead, UserUpdate
 router = APIRouter(responses=PROTECTED_RESPONSES)
 
 
-@router.get("", response_model=list[UserRead])
+@router.get("", response_model=PaginatedResponse[UserRead])
 def list_users(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(require_role(UserRole.admin))],
-) -> list[User]:
-    """List all users.
+    pagination: Annotated[PaginationParams, Depends()],
+) -> PaginatedResponse[UserRead]:
+    """List users.
 
-    Returns every staff user in the organization. Admin role required.
+    Returns a paginated list of staff users in the organization. Admin role required.
     Returns 403 if the caller is not an admin.
     """
-    return user_service.list_users(db, current_user.org_id)
+    items, total_count = user_service.list_users(
+        db,
+        current_user.org_id,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
+    return PaginatedResponse.from_page(
+        items,
+        total_count,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
 
 
 @router.get("/{user_id}", response_model=UserRead)

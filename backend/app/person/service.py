@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.pagination import paginate_query
 from app.person.model import Person
 from app.person.schemas import PersonCreate, PersonUpdate
 from app.tenancy.scoping import scoped
@@ -15,9 +16,11 @@ def _phone_taken(db: Session, org_id: int, phone: str, exclude_id: int | None = 
     return db.scalars(stmt).first() is not None
 
 
-def list_people(db: Session, org_id: int) -> list[Person]:
+def list_people(
+    db: Session, org_id: int, *, limit: int = 50, offset: int = 0
+) -> tuple[list[Person], int]:
     stmt = scoped(select(Person), Person, org_id).order_by(Person.full_name)
-    return list(db.scalars(stmt).all())
+    return paginate_query(db, stmt, limit=limit, offset=offset)
 
 
 def get_person(db: Session, org_id: int, person_id: int) -> Person:

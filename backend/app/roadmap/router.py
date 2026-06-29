@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.auth.deps import get_current_user
 from app.core.db import get_db
 from app.core.openapi import PROTECTED_RESPONSES
+from app.core.pagination import PaginatedResponse, PaginationParams
 from app.roadmap import service as roadmap_service
 from app.roadmap.model import Roadmap, RoadmapItem
 from app.roadmap.schemas import (
@@ -21,16 +22,28 @@ from app.user.model import User
 router = APIRouter(responses=PROTECTED_RESPONSES)
 
 
-@router.get("", response_model=list[RoadmapRead])
+@router.get("", response_model=PaginatedResponse[RoadmapRead])
 def list_roadmaps(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-) -> list[Roadmap]:
-    """List all roadmaps.
+    pagination: Annotated[PaginationParams, Depends()],
+) -> PaginatedResponse[RoadmapRead]:
+    """List roadmaps.
 
-    Returns every learning roadmap in the authenticated user's organization.
+    Returns a paginated list of learning roadmaps in the organization.
     """
-    return roadmap_service.list_roadmaps(db, current_user.org_id)
+    items, total_count = roadmap_service.list_roadmaps(
+        db,
+        current_user.org_id,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
+    return PaginatedResponse.from_page(
+        items,
+        total_count,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
 
 
 @router.get("/{roadmap_id}", response_model=RoadmapRead)
@@ -78,18 +91,31 @@ def update_roadmap(
     return roadmap_service.update_roadmap(db, current_user.org_id, roadmap_id, body)
 
 
-@router.get("/{roadmap_id}/items", response_model=list[RoadmapItemRead])
+@router.get("/{roadmap_id}/items", response_model=PaginatedResponse[RoadmapItemRead])
 def list_roadmap_items(
     roadmap_id: int,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-) -> list[RoadmapItem]:
+    pagination: Annotated[PaginationParams, Depends()],
+) -> PaginatedResponse[RoadmapItemRead]:
     """List roadmap items.
 
-    Returns ordered steps for a roadmap.
+    Returns a paginated list of ordered steps for a roadmap.
     Returns 404 if the roadmap is not found in the org.
     """
-    return roadmap_service.list_roadmap_items(db, current_user.org_id, roadmap_id)
+    items, total_count = roadmap_service.list_roadmap_items(
+        db,
+        current_user.org_id,
+        roadmap_id,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
+    return PaginatedResponse.from_page(
+        items,
+        total_count,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
 
 
 @router.get("/{roadmap_id}/items/{item_id}", response_model=RoadmapItemRead)

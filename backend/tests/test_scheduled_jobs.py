@@ -48,7 +48,7 @@ def test_job_pre_enroll_unpaid(
     jobs.job_check_pre_enroll_unpaid(db_session=db_session)
     db_session.commit()
 
-    tasks = task_service.list_tasks(db_session, org_id)
+    tasks, _ = task_service.list_tasks(db_session, org_id)
     assert len(tasks) == 1
     task = tasks[0]
     assert task.type == TaskType.pre_enroll_unpaid
@@ -92,7 +92,7 @@ def test_job_installment_overdue(
     jobs.job_check_installment_overdue(db_session=db_session)
     db_session.commit()
 
-    tasks = task_service.list_tasks(db_session, org_id)
+    tasks, _ = task_service.list_tasks(db_session, org_id)
     assert len(tasks) == 1
     task = tasks[0]
     assert task.type == TaskType.installment_overdue
@@ -121,7 +121,7 @@ def test_job_dormant_followup(
     jobs.job_check_dormant_followup(db_session=db_session)
     db_session.commit()
 
-    tasks = task_service.list_tasks(db_session, org_id)
+    tasks, _ = task_service.list_tasks(db_session, org_id)
     assert len(tasks) == 1
     task = tasks[0]
     assert task.type == TaskType.dormant_followup
@@ -156,7 +156,7 @@ def test_job_class_start_reminder(
     jobs.job_class_start_reminder(db_session=db_session)
     db_session.commit()
 
-    tasks = task_service.list_tasks(db_session, org_id)
+    tasks, _ = task_service.list_tasks(db_session, org_id)
     assert len(tasks) == 1
     task = tasks[0]
     assert task.type == TaskType.custom
@@ -192,7 +192,7 @@ def test_job_archive_inactive_journeys(
     jobs.job_archive_inactive_journeys(db_session=db_session)
     db_session.commit()
 
-    tasks = task_service.list_tasks(db_session, org_id)
+    tasks, _ = task_service.list_tasks(db_session, org_id)
     assert len(tasks) == 1
     task = tasks[0]
     assert task.type == TaskType.custom

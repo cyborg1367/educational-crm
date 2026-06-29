@@ -226,7 +226,7 @@ def test_payment_record_valid(
     assert refreshed.paid_amount == 2_500_000
     assert refreshed.status == InstallmentStatus.partially_paid
 
-    activities = activity_service.list_activities(
+    activities, _ = activity_service.list_activities(
         db_session, org_id, person_id=person.id
     )
     payment_activities = [a for a in activities if a.action == "payment_recorded"]
@@ -375,7 +375,7 @@ def test_refund_partial(
     assert refreshed.paid_amount == 1_500_000
     assert refreshed.status == InstallmentStatus.partially_paid
 
-    activities = activity_service.list_activities(
+    activities, _ = activity_service.list_activities(
         db_session, org_id, person_id=person.id
     )
     refund_activities = [a for a in activities if a.action == "payment_refunded"]

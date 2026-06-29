@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.auth.deps import get_current_user
 from app.core.db import get_db
 from app.core.openapi import PROTECTED_RESPONSES
+from app.core.pagination import PaginatedResponse, PaginationParams
 from app.finance import service as finance_service
 from app.finance.model import Installment, Invoice, Payment, Refund
 from app.finance.schemas import (
@@ -26,16 +27,28 @@ payments_router = APIRouter(responses=PROTECTED_RESPONSES)
 refunds_router = APIRouter(responses=PROTECTED_RESPONSES)
 
 
-@router.get("", response_model=list[InvoiceRead])
+@router.get("", response_model=PaginatedResponse[InvoiceRead])
 def list_invoices(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-) -> list[Invoice]:
-    """List all invoices.
+    pagination: Annotated[PaginationParams, Depends()],
+) -> PaginatedResponse[InvoiceRead]:
+    """List invoices.
 
-    Returns every invoice in the authenticated user's organization.
+    Returns a paginated list of invoices in the organization.
     """
-    return finance_service.list_invoices(db, current_user.org_id)
+    items, total_count = finance_service.list_invoices(
+        db,
+        current_user.org_id,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
+    return PaginatedResponse.from_page(
+        items,
+        total_count,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
 
 
 @router.get("/{invoice_id}", response_model=InvoiceDetailRead)
@@ -76,19 +89,30 @@ def issue_invoice(
     return invoice
 
 
-@router.get("/{invoice_id}/installments", response_model=list[InstallmentRead])
+@router.get("/{invoice_id}/installments", response_model=PaginatedResponse[InstallmentRead])
 def list_installments(
     invoice_id: int,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-) -> list[Installment]:
+    pagination: Annotated[PaginationParams, Depends()],
+) -> PaginatedResponse[InstallmentRead]:
     """List installments for an invoice.
 
-    Returns the installment schedule for a given invoice.
+    Returns a paginated installment schedule for a given invoice.
     Returns 404 if the invoice is not found in the org.
     """
-    return finance_service.get_installments_for_invoice(
-        db, current_user.org_id, invoice_id
+    items, total_count = finance_service.list_installments(
+        db,
+        current_user.org_id,
+        invoice_id,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
+    return PaginatedResponse.from_page(
+        items,
+        total_count,
+        limit=pagination.limit,
+        offset=pagination.offset,
     )
 
 
@@ -113,16 +137,28 @@ def update_installment(
     )
 
 
-@payments_router.get("", response_model=list[PaymentRead])
+@payments_router.get("", response_model=PaginatedResponse[PaymentRead])
 def list_payments(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-) -> list[Payment]:
-    """List all payments.
+    pagination: Annotated[PaginationParams, Depends()],
+) -> PaginatedResponse[PaymentRead]:
+    """List payments.
 
-    Returns every payment record in the authenticated user's organization.
+    Returns a paginated list of payment records in the organization.
     """
-    return finance_service.list_payments(db, current_user.org_id)
+    items, total_count = finance_service.list_payments(
+        db,
+        current_user.org_id,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
+    return PaginatedResponse.from_page(
+        items,
+        total_count,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
 
 
 @payments_router.get("/{payment_id}", response_model=PaymentRead)
@@ -162,16 +198,28 @@ def record_payment(
     )
 
 
-@refunds_router.get("", response_model=list[RefundRead])
+@refunds_router.get("", response_model=PaginatedResponse[RefundRead])
 def list_refunds(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-) -> list[Refund]:
-    """List all refunds.
+    pagination: Annotated[PaginationParams, Depends()],
+) -> PaginatedResponse[RefundRead]:
+    """List refunds.
 
-    Returns every refund record in the authenticated user's organization.
+    Returns a paginated list of refund records in the organization.
     """
-    return finance_service.list_refunds(db, current_user.org_id)
+    items, total_count = finance_service.list_refunds(
+        db,
+        current_user.org_id,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
+    return PaginatedResponse.from_page(
+        items,
+        total_count,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
 
 
 @refunds_router.get("/{refund_id}", response_model=RefundRead)

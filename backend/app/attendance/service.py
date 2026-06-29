@@ -3,17 +3,20 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.pagination import paginate_query
 from app.attendance.model import Attendance
 from app.attendance.schemas import AttendanceCreate, AttendanceUpdate
 from app.enrollment import service as enrollment_service
 from app.tenancy.scoping import scoped
 
 
-def list_attendances(db: Session, org_id: int) -> list[Attendance]:
+def list_attendances(
+    db: Session, org_id: int, *, limit: int = 50, offset: int = 0
+) -> tuple[list[Attendance], int]:
     stmt = scoped(select(Attendance), Attendance, org_id).order_by(
         Attendance.session_date.desc(), Attendance.id.desc()
     )
-    return list(db.scalars(stmt).all())
+    return paginate_query(db, stmt, limit=limit, offset=offset)
 
 
 def get_attendance(db: Session, org_id: int, attendance_id: int) -> Attendance:

@@ -3,14 +3,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.security import hash_password
+from app.core.pagination import paginate_query
 from app.tenancy.scoping import scoped
 from app.user.model import User
 from app.user.schemas import UserCreate, UserUpdate
 
 
-def list_users(db: Session, org_id: int) -> list[User]:
+def list_users(
+    db: Session, org_id: int, *, limit: int = 50, offset: int = 0
+) -> tuple[list[User], int]:
     stmt = scoped(select(User), User, org_id).order_by(User.name)
-    return list(db.scalars(stmt).all())
+    return paginate_query(db, stmt, limit=limit, offset=offset)
 
 
 def get_user(db: Session, org_id: int, user_id: int) -> User:

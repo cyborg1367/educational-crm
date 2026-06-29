@@ -75,7 +75,7 @@ def test_task_scoped_by_org(
         due_date=date.today(),
     )
 
-    other_org_tasks = task_service.list_tasks(db_session, other_org_id)
+    other_org_tasks, _ = task_service.list_tasks(db_session, other_org_id)
     assert task.id not in [t.id for t in other_org_tasks]
 
     with pytest.raises(HTTPException) as exc_info:

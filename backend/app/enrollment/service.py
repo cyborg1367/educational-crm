@@ -3,6 +3,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.pagination import paginate_query
 from app.activity import service as activity_service
 from app.consultation import service as consultation_service
 from app.course import service as course_service
@@ -20,9 +21,11 @@ from app.task.model import Task
 from app.tenancy.scoping import scoped
 
 
-def list_enrollments(db: Session, org_id: int) -> list[Enrollment]:
+def list_enrollments(
+    db: Session, org_id: int, *, limit: int = 50, offset: int = 0
+) -> tuple[list[Enrollment], int]:
     stmt = scoped(select(Enrollment), Enrollment, org_id).order_by(Enrollment.id.desc())
-    return list(db.scalars(stmt).all())
+    return paginate_query(db, stmt, limit=limit, offset=offset)
 
 
 def get_enrollment(db: Session, org_id: int, enrollment_id: int) -> Enrollment:

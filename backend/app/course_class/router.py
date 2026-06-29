@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.auth.deps import get_current_user
 from app.core.db import get_db
 from app.core.openapi import PROTECTED_RESPONSES
+from app.core.pagination import PaginatedResponse, PaginationParams
 from app.course_class import service as class_service
 from app.course_class.enums import ClassStatus
 from app.course_class.model import CourseClass
@@ -16,16 +17,28 @@ from app.workflow import service as workflow_service
 router = APIRouter(responses=PROTECTED_RESPONSES)
 
 
-@router.get("", response_model=list[CourseClassRead])
+@router.get("", response_model=PaginatedResponse[CourseClassRead])
 def list_classes(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-) -> list[CourseClass]:
-    """List all classes.
+    pagination: Annotated[PaginationParams, Depends()],
+) -> PaginatedResponse[CourseClassRead]:
+    """List classes.
 
-    Returns every scheduled class instance in the authenticated user's organization.
+    Returns a paginated list of scheduled class instances in the organization.
     """
-    return class_service.list_classes(db, current_user.org_id)
+    items, total_count = class_service.list_classes(
+        db,
+        current_user.org_id,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
+    return PaginatedResponse.from_page(
+        items,
+        total_count,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
 
 
 @router.get("/{class_id}", response_model=CourseClassRead)

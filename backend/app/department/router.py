@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.auth.deps import get_current_user
 from app.core.db import get_db
 from app.core.openapi import PROTECTED_RESPONSES
+from app.core.pagination import PaginatedResponse, PaginationParams
 from app.department import service as department_service
 from app.department.model import Department
 from app.department.schemas import DepartmentCreate, DepartmentRead, DepartmentUpdate
@@ -14,16 +15,28 @@ from app.user.model import User
 router = APIRouter(responses=PROTECTED_RESPONSES)
 
 
-@router.get("", response_model=list[DepartmentRead])
+@router.get("", response_model=PaginatedResponse[DepartmentRead])
 def list_departments(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-) -> list[Department]:
-    """List all departments.
+    pagination: Annotated[PaginationParams, Depends()],
+) -> PaginatedResponse[DepartmentRead]:
+    """List departments.
 
-    Returns every department in the authenticated user's organization.
+    Returns a paginated list of departments in the authenticated user's organization.
     """
-    return department_service.list_departments(db, current_user.org_id)
+    items, total_count = department_service.list_departments(
+        db,
+        current_user.org_id,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
+    return PaginatedResponse.from_page(
+        items,
+        total_count,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
 
 
 @router.get("/{department_id}", response_model=DepartmentRead)

@@ -2,6 +2,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.pagination import paginate_query
 from app.course import service as course_service
 from app.course_class.model import CourseClass
 from app.course_class.schemas import CourseClassCreate, CourseClassUpdate
@@ -10,11 +11,13 @@ from app.user import service as user_service
 from app.user.enums import UserRole
 
 
-def list_classes(db: Session, org_id: int) -> list[CourseClass]:
+def list_classes(
+    db: Session, org_id: int, *, limit: int = 50, offset: int = 0
+) -> tuple[list[CourseClass], int]:
     stmt = scoped(select(CourseClass), CourseClass, org_id).order_by(
         CourseClass.start_date.desc(), CourseClass.name
     )
-    return list(db.scalars(stmt).all())
+    return paginate_query(db, stmt, limit=limit, offset=offset)
 
 
 def get_class(db: Session, org_id: int, class_id: int) -> CourseClass:

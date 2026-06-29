@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.auth.deps import get_current_user
 from app.core.db import get_db
 from app.core.openapi import PROTECTED_RESPONSES
+from app.core.pagination import PaginatedResponse, PaginationParams
 from app.course import service as course_service
 from app.course.model import Course
 from app.course.schemas import CourseCreate, CourseRead, CourseUpdate
@@ -14,16 +15,28 @@ from app.user.model import User
 router = APIRouter(responses=PROTECTED_RESPONSES)
 
 
-@router.get("", response_model=list[CourseRead])
+@router.get("", response_model=PaginatedResponse[CourseRead])
 def list_courses(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-) -> list[Course]:
-    """List all courses.
+    pagination: Annotated[PaginationParams, Depends()],
+) -> PaginatedResponse[CourseRead]:
+    """List courses.
 
-    Returns every course catalog entry in the authenticated user's organization.
+    Returns a paginated list of course catalog entries in the organization.
     """
-    return course_service.list_courses(db, current_user.org_id)
+    items, total_count = course_service.list_courses(
+        db,
+        current_user.org_id,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
+    return PaginatedResponse.from_page(
+        items,
+        total_count,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
 
 
 @router.get("/{course_id}", response_model=CourseRead)

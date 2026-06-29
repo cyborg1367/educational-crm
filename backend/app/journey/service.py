@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.pagination import paginate_query
 from app.department import service as department_service
 from app.journey.model import Journey
 from app.journey.schemas import JourneyCreate, JourneyUpdate
@@ -11,9 +12,11 @@ from app.tenancy.scoping import scoped
 from app.user import service as user_service
 
 
-def list_journeys(db: Session, org_id: int) -> list[Journey]:
+def list_journeys(
+    db: Session, org_id: int, *, limit: int = 50, offset: int = 0
+) -> tuple[list[Journey], int]:
     stmt = scoped(select(Journey), Journey, org_id).order_by(Journey.id)
-    return list(db.scalars(stmt).all())
+    return paginate_query(db, stmt, limit=limit, offset=offset)
 
 
 def get_journey(db: Session, org_id: int, journey_id: int) -> Journey:
