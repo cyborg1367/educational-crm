@@ -7,7 +7,7 @@ from app.auth.deps import get_current_user
 from app.core.db import get_db
 from app.core.openapi import PROTECTED_RESPONSES
 from app.finance import service as finance_service
-from app.finance.model import Installment, Invoice, Payment
+from app.finance.model import Installment, Invoice, Payment, Refund
 from app.finance.schemas import (
     InstallmentRead,
     InstallmentUpdate,
@@ -16,11 +16,14 @@ from app.finance.schemas import (
     InvoiceRead,
     PaymentCreate,
     PaymentRead,
+    RefundCreate,
+    RefundRead,
 )
 from app.user.model import User
 
 router = APIRouter(responses=PROTECTED_RESPONSES)
 payments_router = APIRouter(responses=PROTECTED_RESPONSES)
+refunds_router = APIRouter(responses=PROTECTED_RESPONSES)
 
 
 @router.get("", response_model=list[InvoiceRead])
@@ -155,5 +158,54 @@ def record_payment(
         body.amount,
         current_user.id,
         payment_date=body.payment_date,
+        notes=body.notes,
+    )
+
+
+@refunds_router.get("", response_model=list[RefundRead])
+def list_refunds(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> list[Refund]:
+    """List all refunds.
+
+    Returns every refund record in the authenticated user's organization.
+    """
+    return finance_service.list_refunds(db, current_user.org_id)
+
+
+@refunds_router.get("/{refund_id}", response_model=RefundRead)
+def get_refund(
+    refund_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> Refund:
+    """Get a refund by ID.
+
+    Fetches a single refund record from the organization.
+    Returns 404 if the refund is not found in the org.
+    """
+    return finance_service.get_refund(db, current_user.org_id, refund_id)
+
+
+@refunds_router.post("", response_model=RefundRead, status_code=status.HTTP_201_CREATED)
+def refund_payment(
+    body: RefundCreate,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> Refund:
+    """Refund a payment.
+
+    Creates a refund, reduces installment paid_amount, and recomputes statuses.
+    Returns 404 if the payment is not found.
+    Returns 422 if amount is invalid or exceeds the refundable balance.
+    """
+    return finance_service.refund_payment(
+        db,
+        current_user.org_id,
+        body.payment_id,
+        body.amount,
+        body.reason,
+        current_user.id,
         notes=body.notes,
     )

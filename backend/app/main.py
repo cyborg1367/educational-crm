@@ -14,7 +14,11 @@ from app.course.router import router as courses_router
 from app.course_class.router import router as classes_router
 from app.department.router import router as departments_router
 from app.enrollment.router import router as enrollments_router
-from app.finance.router import payments_router, router as invoices_router
+from app.finance.router import (
+    payments_router,
+    refunds_router,
+    router as invoices_router,
+)
 from app.journey.router import router as journeys_router
 from app.person.router import router as people_router
 from app.roadmap.router import router as roadmaps_router
@@ -64,6 +68,9 @@ app.include_router(
 )
 app.include_router(
     payments_router, prefix="/payments", tags=["Invoices & Finance"]
+)
+app.include_router(
+    refunds_router, prefix="/refunds", tags=["Invoices & Finance"]
 )
 app.include_router(
     attendances_router, prefix="/attendances", tags=["Attendance"]
