@@ -8,7 +8,12 @@ from app.core.db import get_db
 from app.core.openapi import PROTECTED_RESPONSES
 from app.enrollment import service as enrollment_service
 from app.enrollment.model import Enrollment
-from app.enrollment.schemas import EnrollmentCreate, EnrollmentRead, EnrollmentUpdate
+from app.enrollment.schemas import (
+    EnrollmentCreate,
+    EnrollmentDrop,
+    EnrollmentRead,
+    EnrollmentUpdate,
+)
 from app.user.model import User
 from app.workflow import service as workflow_service
 
@@ -76,3 +81,27 @@ def update_enrollment(
     Returns 422 if request validation fails.
     """
     return enrollment_service.update_status(db, current_user.org_id, enrollment_id, body)
+
+
+@router.patch("/{enrollment_id}/drop", response_model=EnrollmentRead)
+def drop_enrollment(
+    enrollment_id: int,
+    body: EnrollmentDrop,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> Enrollment:
+    """Drop an enrollment.
+
+    Marks the enrollment as dropped, cancels installments, refunds payments,
+    and cancels related tasks.
+    Returns 404 if the enrollment is not found.
+    Returns 422 if the enrollment is already dropped.
+    """
+    return enrollment_service.drop_enrollment(
+        db,
+        current_user.org_id,
+        enrollment_id,
+        body.reason,
+        current_user.id,
+        notes=body.notes,
+    )
