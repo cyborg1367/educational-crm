@@ -6,12 +6,15 @@ from sqlalchemy.orm import Session
 
 from app.activity import service as activity_service
 from app.core.errors import ConflictError, NotFoundError, ValidationError
+from app.core.logging_config import get_logger
 from app.core.pagination import paginate_query
 from app.enrollment import service as enrollment_service
 from app.finance.enums import InstallmentStatus, InvoiceStatus
 from app.finance.model import Installment, Invoice, Payment, Refund
 from app.finance.schemas import InstallmentUpdate, InvoiceCreate
 from app.tenancy.scoping import scoped
+
+logger = get_logger(__name__)
 
 
 def validate_invariant(invoice: Invoice, installments: list[Installment]) -> None:
@@ -283,6 +286,15 @@ def record_payment(
             "enrollment_id": enrollment.id,
         },
         actor_id=recorded_by_user_id,
+    )
+    logger.info(
+        "payment_recorded",
+        extra={
+            "event": "payment_recorded",
+            "payment_id": payment.id,
+            "amount": amount,
+            "status": installment.status.value,
+        },
     )
     db.commit()
     db.refresh(payment)
