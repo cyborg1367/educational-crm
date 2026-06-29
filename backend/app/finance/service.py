@@ -12,6 +12,7 @@ from app.enrollment import service as enrollment_service
 from app.finance.enums import InstallmentStatus, InvoiceStatus
 from app.finance.model import Installment, Invoice, Payment, Refund
 from app.finance.schemas import InstallmentUpdate, InvoiceCreate
+from app.notifications import service as notifications_service
 from app.tenancy.scoping import scoped
 
 logger = get_logger(__name__)
@@ -295,6 +296,9 @@ def record_payment(
             "amount": amount,
             "status": installment.status.value,
         },
+    )
+    notifications_service.notify_payment_recorded(
+        db, org_id, enrollment.person_id, amount
     )
 
     payment_count_stmt = scoped(

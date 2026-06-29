@@ -25,6 +25,7 @@ from app.finance.model import Installment, Invoice
 from app.finance.service import recompute_installment_status
 from app.journey.enums import JourneyStatus
 from app.journey.model import Journey
+from app.notifications import service as notifications_service
 from app.organization.model import Organization
 from app.person.enums import PersonStatus
 from app.person.model import Person
@@ -144,6 +145,12 @@ def job_check_pre_enroll_unpaid(db_session: Session | None = None) -> None:
                     related_entity_type="enrollment",
                     related_entity_id=enrollment.id,
                 )
+                notifications_service.notify_pre_enroll_unpaid(
+                    db,
+                    org_id,
+                    enrollment.person_id,
+                    settings.PRE_ENROLL_FOLLOWUP_DAYS,
+                )
                 created_tasks += 1
 
     duration_ms = round((time_module.perf_counter() - start) * 1000, 2)
@@ -187,6 +194,13 @@ def job_check_installment_overdue(db_session: Session | None = None) -> None:
                     due_date=today,
                     related_entity_type="installment",
                     related_entity_id=installment.id,
+                )
+                notifications_service.notify_overdue_installment(
+                    db,
+                    org_id,
+                    enrollment.person_id,
+                    installment.id,
+                    installment.due_date,
                 )
                 created_tasks += 1
 
@@ -288,6 +302,12 @@ def job_class_start_reminder(db_session: Session | None = None) -> None:
                         due_date=today,
                         related_entity_type="class",
                         related_entity_id=course_class.id,
+                    )
+                    notifications_service.notify_class_starts_tomorrow(
+                        db,
+                        org_id,
+                        enrollment.person_id,
+                        course_class.name,
                     )
                     created_tasks += 1
 
