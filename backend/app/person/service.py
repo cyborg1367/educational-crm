@@ -1,8 +1,8 @@
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.errors import ConflictError, NotFoundError
 from app.core.pagination import paginate_query
 from app.person.model import Person
 from app.person.schemas import PersonCreate, PersonUpdate
@@ -27,16 +27,13 @@ def get_person(db: Session, org_id: int, person_id: int) -> Person:
     stmt = scoped(select(Person), Person, org_id).where(Person.id == person_id)
     person = db.scalars(stmt).first()
     if person is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Person not found")
+        raise NotFoundError("Person not found")
     return person
 
 
 def create_person(db: Session, org_id: int, data: PersonCreate) -> Person:
     if data.phone is not None and _phone_taken(db, org_id, data.phone):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Phone already registered",
-        )
+        raise ConflictError("Phone already registered")
 
     person = Person(
         full_name=data.full_name,
@@ -51,10 +48,7 @@ def create_person(db: Session, org_id: int, data: PersonCreate) -> Person:
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Phone already registered",
-        ) from None
+        raise ConflictError("Phone already registered") from None
     db.refresh(person)
     return person
 
@@ -65,10 +59,7 @@ def update_person(db: Session, org_id: int, person_id: int, data: PersonUpdate) 
 
     if "phone" in updates and updates["phone"] is not None:
         if _phone_taken(db, org_id, updates["phone"], exclude_id=person_id):
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Phone already registered",
-            )
+            raise ConflictError("Phone already registered")
 
     if "email" in updates and updates["email"] is not None:
         updates["email"] = str(updates["email"])
@@ -80,9 +71,6 @@ def update_person(db: Session, org_id: int, person_id: int, data: PersonUpdate) 
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Phone already registered",
-        ) from None
+        raise ConflictError("Phone already registered") from None
     db.refresh(person)
     return person

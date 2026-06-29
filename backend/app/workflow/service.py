@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from fastapi import HTTPException, status
+from app.core.errors import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -74,17 +74,17 @@ def _route_pre_enroll(
     resolved_class_id = class_id
     if resolved_class_id is None:
         if consultation.recommended_course_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="recommended_course_id or class_id required for pre_enroll",
+            raise ValidationError(
+                "recommended_course_id or class_id required for pre_enroll",
+                field="class_id",
             )
         open_class = _find_open_class(
             db, org_id, consultation.recommended_course_id
         )
         if open_class is None:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="No open class found for the recommended course",
+            raise ValidationError(
+                "No open class found for the recommended course",
+                field="class_id",
             )
         resolved_class_id = open_class.id
     else:
@@ -155,9 +155,9 @@ def _route_refer_other_dept(
     actor_id: int | None,
 ) -> None:
     if consultation.refer_to_department_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="refer_to_department_id required for refer_other_dept",
+        raise ValidationError(
+            "refer_to_department_id required for refer_other_dept",
+            field="refer_to_department_id",
         )
 
     journey_service.get_or_create_journey(

@@ -1,7 +1,7 @@
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.errors import NotFoundError
 from app.core.pagination import paginate_query
 from app.department.model import Department
 from app.department.schemas import DepartmentCreate, DepartmentUpdate
@@ -22,9 +22,7 @@ def get_department(db: Session, org_id: int, department_id: int) -> Department:
     )
     department = db.scalars(stmt).first()
     if department is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Department not found"
-        )
+        raise NotFoundError("Department not found")
     return department
 
 

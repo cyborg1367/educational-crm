@@ -1,8 +1,8 @@
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.errors import ConflictError, NotFoundError
 from app.core.pagination import paginate_query
 from app.department import service as department_service
 from app.journey.model import Journey
@@ -23,9 +23,7 @@ def get_journey(db: Session, org_id: int, journey_id: int) -> Journey:
     stmt = scoped(select(Journey), Journey, org_id).where(Journey.id == journey_id)
     journey = db.scalars(stmt).first()
     if journey is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Journey not found"
-        )
+        raise NotFoundError("Journey not found")
     return journey
 
 
@@ -58,9 +56,8 @@ def create_journey(db: Session, org_id: int, data: JourneyCreate) -> Journey:
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Journey already exists for this person and department",
+        raise ConflictError(
+            "Journey already exists for this person and department"
         ) from None
     db.refresh(journey)
     return journey
