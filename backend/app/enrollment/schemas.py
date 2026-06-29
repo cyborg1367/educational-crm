@@ -67,3 +67,10 @@ class EnrollmentUpdate(BaseModel):
         description="Updated enrollment status.",
     )
     start_date: date | None = Field(default=None, description="Updated start date.")
+
+
+class EnrollmentDrop(BaseModel):
+    reason: str = Field(min_length=1, description="Reason for dropping the enrollment.")
+    notes: str | None = Field(
+        default=None, description="Optional notes about the drop."
+    )

@@ -1,5 +1,7 @@
 """Consultation outcome routing tests."""
 
+from datetime import date, timedelta
+
 import pytest
 from sqlalchemy.orm import Session
 
@@ -12,12 +14,15 @@ from app.course.model import Course
 from app.department.model import Department
 from app.enrollment import service as enrollment_service
 from app.enrollment.enums import EnrollmentStatus
+from app.enrollment.schemas import EnrollmentCreate
 from app.finance import service as finance_service
+from app.finance.enums import InstallmentStatus
+from app.finance.schemas import InstallmentPlanItem, InvoiceCreate
 from app.journey import service as journey_service
 from app.journey.enums import JourneyStatus
 from app.person.model import Person
 from app.task import service as task_service
-from app.task.enums import TaskType
+from app.task.enums import TaskStatus, TaskType
 from app.user.model import User
 from app.workflow import service as workflow_service
 
@@ -278,3 +283,100 @@ def test_consultation_outcome_closed(
     )
     assert len(done_activities) == 1
     assert done_activities[0].payload["outcome"] == ConsultationOutcome.closed.value
+
+
+def test_enrollment_drop(
+    db_session: Session,
+    org_id: int,
+    admin_user: User,
+    person: Person,
+    course: Course,
+    request: pytest.FixtureRequest,
+) -> None:
+    course_class = request.getfixturevalue("class")
+    enrollment = enrollment_service.create_enrollment(
+        db_session,
+        org_id,
+        EnrollmentCreate(person_id=person.id, class_id=course_class.id),
+    )
+
+    total = enrollment.final_amount
+    first_amount = total // 2
+    second_amount = total - first_amount
+    today = date.today()
+    invoice = finance_service.issue_invoice(
+        db_session,
+        org_id,
+        InvoiceCreate(
+            enrollment_id=enrollment.id,
+            installments=[
+                InstallmentPlanItem(sequence=1, amount=first_amount, due_date=today),
+                InstallmentPlanItem(
+                    sequence=2,
+                    amount=second_amount,
+                    due_date=today + timedelta(days=30),
+                ),
+            ],
+        ),
+    )
+    installments = finance_service.get_installments_for_invoice(
+        db_session, org_id, invoice.id
+    )
+    partial_amount = first_amount // 2
+    finance_service.record_payment(
+        db_session, org_id, installments[0].id, partial_amount, admin_user.id
+    )
+
+    task_service.create_task(
+        db_session,
+        org_id,
+        person_id=person.id,
+        task_type=TaskType.pre_enroll_unpaid,
+        title="Pre-enroll follow-up",
+        due_date=today + timedelta(days=7),
+        related_entity_type="enrollment",
+        related_entity_id=enrollment.id,
+        actor_id=admin_user.id,
+    )
+
+    dropped = enrollment_service.drop_enrollment(
+        db_session,
+        org_id,
+        enrollment.id,
+        "Student withdrew",
+        admin_user.id,
+        notes="Requested refund",
+    )
+
+    assert dropped.status == EnrollmentStatus.dropped
+
+    refreshed_installments = finance_service.get_installments_for_invoice(
+        db_session, org_id, invoice.id
+    )
+    assert all(i.status == InstallmentStatus.cancelled for i in refreshed_installments)
+
+    refunds = finance_service.list_refunds(db_session, org_id)
+    assert len(refunds) == 1
+    assert refunds[0].amount == partial_amount
+    assert refunds[0].reason == "Student withdrew"
+
+    tasks = task_service.list_tasks(db_session, org_id)
+    enrollment_tasks = [
+        t
+        for t in tasks
+        if t.related_entity_type == "enrollment"
+        and t.related_entity_id == enrollment.id
+    ]
+    assert len(enrollment_tasks) == 1
+    assert enrollment_tasks[0].status == TaskStatus.cancelled
+
+    activities = activity_service.list_activities(
+        db_session, org_id, person_id=person.id
+    )
+    drop_activities = [
+        a for a in activities if a.action == "enrollment_dropped"
+    ]
+    assert len(drop_activities) == 1
+    assert drop_activities[0].payload["enrollment_id"] == enrollment.id
+    assert drop_activities[0].payload["reason"] == "Student withdrew"
+    assert drop_activities[0].payload["notes"] == "Requested refund"
