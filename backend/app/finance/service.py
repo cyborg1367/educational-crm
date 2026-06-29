@@ -296,7 +296,27 @@ def record_payment(
             "status": installment.status.value,
         },
     )
-    db.commit()
+
+    payment_count_stmt = scoped(
+        select(func.count(Payment.id)),
+        Payment,
+        org_id,
+    ).where(
+        Payment.installment_id.in_(
+            select(Installment.id).where(Installment.invoice_id == invoice.id)
+        )
+    )
+    if int(db.scalar(payment_count_stmt) or 0) == 1:
+        from app.workflow import service as workflow_service
+
+        workflow_service.on_first_payment(
+            db,
+            org_id,
+            enrollment.id,
+            actor_id=recorded_by_user_id,
+        )
+    else:
+        db.commit()
     db.refresh(payment)
     return payment
 

@@ -1,8 +1,10 @@
+from datetime import date
+
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.errors import ConflictError, NotFoundError
+from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.core.pagination import paginate_query
 from app.attendance.model import Attendance
 from app.attendance.schemas import AttendanceCreate, AttendanceUpdate
@@ -32,6 +34,12 @@ def get_attendance(db: Session, org_id: int, attendance_id: int) -> Attendance:
 def create_attendance(
     db: Session, org_id: int, data: AttendanceCreate
 ) -> Attendance:
+    if data.session_date > date.today():
+        raise ValidationError(
+            "session_date cannot be in the future",
+            field="session_date",
+        )
+
     enrollment_service.get_enrollment(db, org_id, data.enrollment_id)
 
     attendance = Attendance(
