@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.activity import service as activity_service
+from app.core.pagination import paginate_query
 from app.enrollment import service as enrollment_service
 from app.finance.enums import InstallmentStatus, InvoiceStatus
 from app.finance.model import Installment, Invoice, Payment, Refund
@@ -60,9 +61,11 @@ def recompute_invoice_status(invoice: Invoice, installments: list[Installment]) 
         invoice.status = InvoiceStatus.open
 
 
-def list_invoices(db: Session, org_id: int) -> list[Invoice]:
+def list_invoices(
+    db: Session, org_id: int, *, limit: int = 50, offset: int = 0
+) -> tuple[list[Invoice], int]:
     stmt = scoped(select(Invoice), Invoice, org_id).order_by(Invoice.id.desc())
-    return list(db.scalars(stmt).all())
+    return paginate_query(db, stmt, limit=limit, offset=offset)
 
 
 def get_invoice(db: Session, org_id: int, invoice_id: int) -> Invoice:
@@ -73,6 +76,23 @@ def get_invoice(db: Session, org_id: int, invoice_id: int) -> Invoice:
             status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found"
         )
     return invoice
+
+
+def list_installments(
+    db: Session,
+    org_id: int,
+    invoice_id: int,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[Installment], int]:
+    get_invoice(db, org_id, invoice_id)
+    stmt = (
+        scoped(select(Installment), Installment, org_id)
+        .where(Installment.invoice_id == invoice_id)
+        .order_by(Installment.sequence)
+    )
+    return paginate_query(db, stmt, limit=limit, offset=offset)
 
 
 def get_installments_for_invoice(
@@ -201,9 +221,11 @@ def cancel_installments_on_drop(db: Session, org_id: int, enrollment_id: int) ->
     db.commit()
 
 
-def list_payments(db: Session, org_id: int) -> list[Payment]:
+def list_payments(
+    db: Session, org_id: int, *, limit: int = 50, offset: int = 0
+) -> tuple[list[Payment], int]:
     stmt = scoped(select(Payment), Payment, org_id).order_by(Payment.id.desc())
-    return list(db.scalars(stmt).all())
+    return paginate_query(db, stmt, limit=limit, offset=offset)
 
 
 def get_payment(db: Session, org_id: int, payment_id: int) -> Payment:
@@ -285,9 +307,11 @@ def _refunded_amount_for_payment(db: Session, org_id: int, payment_id: int) -> i
     return int(db.scalar(stmt) or 0)
 
 
-def list_refunds(db: Session, org_id: int) -> list[Refund]:
+def list_refunds(
+    db: Session, org_id: int, *, limit: int = 50, offset: int = 0
+) -> tuple[list[Refund], int]:
     stmt = scoped(select(Refund), Refund, org_id).order_by(Refund.id.desc())
-    return list(db.scalars(stmt).all())
+    return paginate_query(db, stmt, limit=limit, offset=offset)
 
 
 def get_refund(db: Session, org_id: int, refund_id: int) -> Refund:

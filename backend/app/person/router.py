@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.auth.deps import get_current_user
 from app.core.db import get_db
 from app.core.openapi import PROTECTED_RESPONSES
+from app.core.pagination import PaginatedResponse, PaginationParams
 from app.person import service as person_service
 from app.person.model import Person
 from app.person.schemas import PersonCreate, PersonRead, PersonUpdate
@@ -14,16 +15,28 @@ from app.user.model import User
 router = APIRouter(responses=PROTECTED_RESPONSES)
 
 
-@router.get("", response_model=list[PersonRead])
+@router.get("", response_model=PaginatedResponse[PersonRead])
 def list_people(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-) -> list[Person]:
-    """List all people in the organization.
+    pagination: Annotated[PaginationParams, Depends()],
+) -> PaginatedResponse[PersonRead]:
+    """List people in the organization.
 
-    Returns every person record scoped to the authenticated user's organization.
+    Returns a paginated list of person records scoped to the authenticated user's organization.
     """
-    return person_service.list_people(db, current_user.org_id)
+    items, total_count = person_service.list_people(
+        db,
+        current_user.org_id,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
+    return PaginatedResponse.from_page(
+        items,
+        total_count,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
 
 
 @router.get("/{person_id}", response_model=PersonRead)

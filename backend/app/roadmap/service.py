@@ -2,6 +2,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.pagination import paginate_query
 from app.course import service as course_service
 from app.department import service as department_service
 from app.roadmap.model import Roadmap, RoadmapItem
@@ -14,9 +15,11 @@ from app.roadmap.schemas import (
 from app.tenancy.scoping import scoped
 
 
-def list_roadmaps(db: Session, org_id: int) -> list[Roadmap]:
+def list_roadmaps(
+    db: Session, org_id: int, *, limit: int = 50, offset: int = 0
+) -> tuple[list[Roadmap], int]:
     stmt = scoped(select(Roadmap), Roadmap, org_id).order_by(Roadmap.name)
-    return list(db.scalars(stmt).all())
+    return paginate_query(db, stmt, limit=limit, offset=offset)
 
 
 def get_roadmap(db: Session, org_id: int, roadmap_id: int) -> Roadmap:
@@ -66,15 +69,20 @@ def update_roadmap(
 
 
 def list_roadmap_items(
-    db: Session, org_id: int, roadmap_id: int
-) -> list[RoadmapItem]:
+    db: Session,
+    org_id: int,
+    roadmap_id: int,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[RoadmapItem], int]:
     get_roadmap(db, org_id, roadmap_id)
     stmt = (
         scoped(select(RoadmapItem), RoadmapItem, org_id)
         .where(RoadmapItem.roadmap_id == roadmap_id)
         .order_by(RoadmapItem.sequence)
     )
-    return list(db.scalars(stmt).all())
+    return paginate_query(db, stmt, limit=limit, offset=offset)
 
 
 def get_roadmap_item(

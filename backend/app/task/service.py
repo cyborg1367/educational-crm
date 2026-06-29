@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.pagination import paginate_query
 from app.activity import service as activity_service
 from app.person import service as person_service
 from app.task.enums import TaskStatus, TaskType
@@ -19,13 +20,15 @@ def list_tasks(
     *,
     assignee_id: int | None = None,
     status: TaskStatus | None = None,
-) -> list[Task]:
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[Task], int]:
     stmt = scoped(select(Task), Task, org_id).order_by(Task.due_date, Task.id)
     if assignee_id is not None:
         stmt = stmt.where(Task.assignee_id == assignee_id)
     if status is not None:
         stmt = stmt.where(Task.status == status)
-    return list(db.scalars(stmt).all())
+    return paginate_query(db, stmt, limit=limit, offset=offset)
 
 
 def get_task(db: Session, org_id: int, task_id: int) -> Task:

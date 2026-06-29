@@ -2,6 +2,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.pagination import paginate_query
 from app.consultation.model import Consultation
 from app.consultation.schemas import ConsultationCreate, ConsultationUpdate
 from app.course import service as course_service
@@ -12,11 +13,13 @@ from app.tenancy.scoping import scoped
 from app.user import service as user_service
 
 
-def list_consultations(db: Session, org_id: int) -> list[Consultation]:
+def list_consultations(
+    db: Session, org_id: int, *, limit: int = 50, offset: int = 0
+) -> tuple[list[Consultation], int]:
     stmt = scoped(select(Consultation), Consultation, org_id).order_by(
         Consultation.id.desc()
     )
-    return list(db.scalars(stmt).all())
+    return paginate_query(db, stmt, limit=limit, offset=offset)
 
 
 def get_consultation(db: Session, org_id: int, consultation_id: int) -> Consultation:

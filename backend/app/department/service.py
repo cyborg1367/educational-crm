@@ -2,15 +2,18 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.pagination import paginate_query
 from app.department.model import Department
 from app.department.schemas import DepartmentCreate, DepartmentUpdate
 from app.tenancy.scoping import scoped
 from app.user import service as user_service
 
 
-def list_departments(db: Session, org_id: int) -> list[Department]:
+def list_departments(
+    db: Session, org_id: int, *, limit: int = 50, offset: int = 0
+) -> tuple[list[Department], int]:
     stmt = scoped(select(Department), Department, org_id).order_by(Department.name)
-    return list(db.scalars(stmt).all())
+    return paginate_query(db, stmt, limit=limit, offset=offset)
 
 
 def get_department(db: Session, org_id: int, department_id: int) -> Department:

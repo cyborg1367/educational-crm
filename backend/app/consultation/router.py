@@ -13,6 +13,7 @@ from app.consultation.schemas import (
 )
 from app.core.db import get_db
 from app.core.openapi import PROTECTED_RESPONSES
+from app.core.pagination import PaginatedResponse, PaginationParams
 from app.user.model import User
 from app.workflow import service as workflow_service
 from app.workflow.schemas import ConsultationOutcomeUpdate
@@ -20,16 +21,28 @@ from app.workflow.schemas import ConsultationOutcomeUpdate
 router = APIRouter(responses=PROTECTED_RESPONSES)
 
 
-@router.get("", response_model=list[ConsultationRead])
+@router.get("", response_model=PaginatedResponse[ConsultationRead])
 def list_consultations(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-) -> list[Consultation]:
-    """List all consultations.
+    pagination: Annotated[PaginationParams, Depends()],
+) -> PaginatedResponse[ConsultationRead]:
+    """List consultations.
 
-    Returns every consultation record in the authenticated user's organization.
+    Returns a paginated list of consultation records in the organization.
     """
-    return consultation_service.list_consultations(db, current_user.org_id)
+    items, total_count = consultation_service.list_consultations(
+        db,
+        current_user.org_id,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
+    return PaginatedResponse.from_page(
+        items,
+        total_count,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
 
 
 @router.get("/{consultation_id}", response_model=ConsultationRead)

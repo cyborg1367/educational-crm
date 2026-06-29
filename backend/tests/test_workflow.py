@@ -53,7 +53,7 @@ def _consultation_done_activities(
     person_id: int,
     consultation_id: int,
 ) -> list:
-    activities = activity_service.list_activities(
+    activities, _ = activity_service.list_activities(
         db_session, org_id, person_id=person_id
     )
     return [
@@ -92,7 +92,7 @@ def test_consultation_outcome_pre_enroll(
         actor_id=admin_user.id,
     )
 
-    enrollments = enrollment_service.list_enrollments(db_session, org_id)
+    enrollments, _ = enrollment_service.list_enrollments(db_session, org_id)
     assert len(enrollments) == 1
     enrollment = enrollments[0]
     assert enrollment.person_id == person.id
@@ -100,7 +100,7 @@ def test_consultation_outcome_pre_enroll(
     assert enrollment.consultation_id == consultation.id
     assert enrollment.status == EnrollmentStatus.pre_enroll
 
-    invoices = finance_service.list_invoices(db_session, org_id)
+    invoices, _ = finance_service.list_invoices(db_session, org_id)
     assert len(invoices) == 1
     invoice = invoices[0]
     assert invoice.enrollment_id == enrollment.id
@@ -138,7 +138,7 @@ def test_consultation_outcome_follow_up(
         actor_id=admin_user.id,
     )
 
-    tasks = task_service.list_tasks(db_session, org_id)
+    tasks, _ = task_service.list_tasks(db_session, org_id)
     assert len(tasks) == 1
     task = tasks[0]
     assert task.type == TaskType.follow_up_registration
@@ -188,14 +188,14 @@ def test_consultation_outcome_refer_other_dept(
         actor_id=admin_user.id,
     )
 
-    journeys = journey_service.list_journeys(db_session, org_id)
+    journeys, _ = journey_service.list_journeys(db_session, org_id)
     target_journeys = [
         j for j in journeys if j.department_id == target_department.id
     ]
     assert len(target_journeys) == 1
     assert target_journeys[0].person_id == person.id
 
-    tasks = task_service.list_tasks(db_session, org_id)
+    tasks, _ = task_service.list_tasks(db_session, org_id)
     assert len(tasks) == 1
     task = tasks[0]
     assert task.type == TaskType.referral
@@ -355,12 +355,12 @@ def test_enrollment_drop(
     )
     assert all(i.status == InstallmentStatus.cancelled for i in refreshed_installments)
 
-    refunds = finance_service.list_refunds(db_session, org_id)
+    refunds, _ = finance_service.list_refunds(db_session, org_id)
     assert len(refunds) == 1
     assert refunds[0].amount == partial_amount
     assert refunds[0].reason == "Student withdrew"
 
-    tasks = task_service.list_tasks(db_session, org_id)
+    tasks, _ = task_service.list_tasks(db_session, org_id)
     enrollment_tasks = [
         t
         for t in tasks
@@ -370,7 +370,7 @@ def test_enrollment_drop(
     assert len(enrollment_tasks) == 1
     assert enrollment_tasks[0].status == TaskStatus.cancelled
 
-    activities = activity_service.list_activities(
+    activities, _ = activity_service.list_activities(
         db_session, org_id, person_id=person.id
     )
     drop_activities = [

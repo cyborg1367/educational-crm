@@ -9,23 +9,35 @@ from app.activity.schemas import ActivityCreate, ActivityRead
 from app.auth.deps import get_current_user
 from app.core.db import get_db
 from app.core.openapi import PROTECTED_RESPONSES
+from app.core.pagination import PaginatedResponse, PaginationParams
 from app.user.model import User
 
 router = APIRouter(responses=PROTECTED_RESPONSES)
 
 
-@router.get("", response_model=list[ActivityRead])
+@router.get("", response_model=PaginatedResponse[ActivityRead])
 def list_activities(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    pagination: Annotated[PaginationParams, Depends()],
     person_id: Annotated[int | None, Query(description="Filter by person ID.")] = None,
-) -> list[Activity]:
+) -> PaginatedResponse[ActivityRead]:
     """List activity timeline entries.
 
-    Returns audit/timeline events for the organization, optionally filtered by person.
+    Returns a paginated list of audit/timeline events, optionally filtered by person.
     """
-    return activity_service.list_activities(
-        db, current_user.org_id, person_id=person_id
+    items, total_count = activity_service.list_activities(
+        db,
+        current_user.org_id,
+        person_id=person_id,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
+    return PaginatedResponse.from_page(
+        items,
+        total_count,
+        limit=pagination.limit,
+        offset=pagination.offset,
     )
 
 

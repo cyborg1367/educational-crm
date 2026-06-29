@@ -2,15 +2,18 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.pagination import paginate_query
 from app.course.model import Course
 from app.course.schemas import CourseCreate, CourseUpdate
 from app.department import service as department_service
 from app.tenancy.scoping import scoped
 
 
-def list_courses(db: Session, org_id: int) -> list[Course]:
+def list_courses(
+    db: Session, org_id: int, *, limit: int = 50, offset: int = 0
+) -> tuple[list[Course], int]:
     stmt = scoped(select(Course), Course, org_id).order_by(Course.title)
-    return list(db.scalars(stmt).all())
+    return paginate_query(db, stmt, limit=limit, offset=offset)
 
 
 def get_course(db: Session, org_id: int, course_id: int) -> Course:

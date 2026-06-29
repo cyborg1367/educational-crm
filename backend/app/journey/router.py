@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.auth.deps import get_current_user
 from app.core.db import get_db
 from app.core.openapi import PROTECTED_RESPONSES
+from app.core.pagination import PaginatedResponse, PaginationParams
 from app.journey import service as journey_service
 from app.journey.model import Journey
 from app.journey.schemas import JourneyCreate, JourneyRead, JourneyUpdate
@@ -14,16 +15,28 @@ from app.user.model import User
 router = APIRouter(responses=PROTECTED_RESPONSES)
 
 
-@router.get("", response_model=list[JourneyRead])
+@router.get("", response_model=PaginatedResponse[JourneyRead])
 def list_journeys(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-) -> list[Journey]:
-    """List all journeys.
+    pagination: Annotated[PaginationParams, Depends()],
+) -> PaginatedResponse[JourneyRead]:
+    """List journeys.
 
-    Returns every student journey in the authenticated user's organization.
+    Returns a paginated list of student journeys in the organization.
     """
-    return journey_service.list_journeys(db, current_user.org_id)
+    items, total_count = journey_service.list_journeys(
+        db,
+        current_user.org_id,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
+    return PaginatedResponse.from_page(
+        items,
+        total_count,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
 
 
 @router.get("/{journey_id}", response_model=JourneyRead)
