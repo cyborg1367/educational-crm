@@ -6,34 +6,79 @@ from pydantic import BaseModel, ConfigDict, Field
 class CourseRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
-    department_id: int
-    title: str
-    description: str | None
-    level: str | None
-    current_price: int
-    duration_sessions: int | None
-    is_active: bool
-    org_id: int
-    created_at: datetime
-    updated_at: datetime
+    id: int = Field(description="Unique course identifier.")
+    department_id: int = Field(description="Department that owns this course.")
+    title: str = Field(description="Course title.")
+    description: str | None = Field(description="Course description.")
+    level: str | None = Field(description="Difficulty or proficiency level.")
+    current_price: int = Field(
+        description="Current list price in Toman.",
+        examples=[1000000],
+    )
+    duration_sessions: int | None = Field(
+        description="Expected number of sessions, if known."
+    )
+    is_active: bool = Field(description="Whether the course is offered.")
+    org_id: int = Field(description="Owning organization. Immutable.")
+    created_at: datetime = Field(description="Record creation timestamp (UTC).")
+    updated_at: datetime = Field(description="Last update timestamp (UTC).")
 
 
 class CourseCreate(BaseModel):
-    department_id: int
-    title: str = Field(min_length=1, max_length=255)
-    description: str | None = None
-    level: str | None = Field(default=None, max_length=100)
-    current_price: int = Field(ge=0)
-    duration_sessions: int | None = Field(default=None, ge=1)
-    is_active: bool = True
+    department_id: int = Field(description="Department that owns this course.")
+    title: str = Field(
+        min_length=1,
+        max_length=255,
+        description="Course title.",
+        examples=["IELTS Preparation"],
+    )
+    description: str | None = Field(default=None, description="Course description.")
+    level: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Difficulty or proficiency level.",
+        examples=["B2"],
+    )
+    current_price: int = Field(
+        ge=0,
+        description="List price in Toman. Must be >= 0.",
+        examples=[1000000],
+    )
+    duration_sessions: int | None = Field(
+        default=None,
+        ge=1,
+        description="Expected number of sessions. Must be > 0 when set.",
+        examples=[24],
+    )
+    is_active: bool = Field(default=True, description="Whether the course is offered.")
 
 
 class CourseUpdate(BaseModel):
-    department_id: int | None = None
-    title: str | None = Field(default=None, min_length=1, max_length=255)
-    description: str | None = None
-    level: str | None = Field(default=None, max_length=100)
-    current_price: int | None = Field(default=None, ge=0)
-    duration_sessions: int | None = Field(default=None, ge=1)
-    is_active: bool | None = None
+    department_id: int | None = Field(
+        default=None,
+        description="Updated owning department.",
+    )
+    title: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=255,
+        description="Updated course title.",
+    )
+    description: str | None = Field(default=None, description="Updated description.")
+    level: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Updated proficiency level.",
+    )
+    current_price: int | None = Field(
+        default=None,
+        ge=0,
+        description="Updated price in Toman. Must be >= 0.",
+        examples=[1200000],
+    )
+    duration_sessions: int | None = Field(
+        default=None,
+        ge=1,
+        description="Updated session count. Must be > 0 when set.",
+    )
+    is_active: bool | None = Field(default=None, description="Updated active flag.")

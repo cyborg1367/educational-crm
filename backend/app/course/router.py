@@ -5,12 +5,13 @@ from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
 from app.core.db import get_db
+from app.core.openapi import PROTECTED_RESPONSES
 from app.course import service as course_service
 from app.course.model import Course
 from app.course.schemas import CourseCreate, CourseRead, CourseUpdate
 from app.user.model import User
 
-router = APIRouter()
+router = APIRouter(responses=PROTECTED_RESPONSES)
 
 
 @router.get("", response_model=list[CourseRead])
@@ -18,6 +19,10 @@ def list_courses(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> list[Course]:
+    """List all courses.
+
+    Returns every course catalog entry in the authenticated user's organization.
+    """
     return course_service.list_courses(db, current_user.org_id)
 
 
@@ -27,6 +32,11 @@ def get_course(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Course:
+    """Get a course by ID.
+
+    Fetches a single course record from the organization.
+    Returns 404 if the course is not found in the org.
+    """
     return course_service.get_course(db, current_user.org_id, course_id)
 
 
@@ -36,6 +46,12 @@ def create_course(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Course:
+    """Create a new course.
+
+    Adds a course to the catalog under a department.
+    Returns 404 if the department is not found.
+    Returns 422 if request validation fails.
+    """
     return course_service.create_course(db, current_user.org_id, body)
 
 
@@ -46,4 +62,10 @@ def update_course(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Course:
+    """Update a course.
+
+    Applies partial updates to an existing course.
+    Returns 404 if the course or department is not found.
+    Returns 422 if request validation fails.
+    """
     return course_service.update_course(db, current_user.org_id, course_id, body)
