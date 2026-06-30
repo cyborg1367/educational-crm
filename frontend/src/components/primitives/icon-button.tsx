@@ -11,10 +11,9 @@ const focusVisibleStyles =
 const disabledStyles =
   "disabled:pointer-events-none disabled:bg-[var(--semantic-color-surface-subtle)] disabled:text-[var(--semantic-color-text-disabled)]";
 
-const buttonVariants = cva(
+const iconButtonVariants = cva(
   [
-    "inline-flex items-center justify-center gap-[var(--semantic-space-inlineGap)] whitespace-nowrap font-[var(--primitive-font-weight-medium)] transition-colors",
-    "[&_svg]:pointer-events-none [&_svg]:shrink-0",
+    "inline-flex shrink-0 items-center justify-center transition-colors",
     focusVisibleStyles,
     disabledStyles,
   ].join(" "),
@@ -44,26 +43,23 @@ const buttonVariants = cva(
       },
       size: {
         sm: [
-          "relative h-[var(--primitive-space-8)] min-h-[var(--primitive-space-10)]",
-          "rounded-[var(--primitive-radius-md)] px-[var(--primitive-space-3)]",
-          "text-[length:var(--primitive-font-size-xs)] leading-[var(--primitive-font-lineHeight-xs)]",
+          "relative size-[var(--primitive-space-8)] min-h-[var(--primitive-space-10)] min-w-[var(--primitive-space-10)]",
+          "rounded-[var(--primitive-radius-md)]",
           "[&_svg]:size-[var(--primitive-space-4)]",
-          "after:pointer-events-none after:absolute after:inset-x-0 after:-inset-y-1",
+          "after:pointer-events-none after:absolute after:-inset-1",
         ].join(" "),
         md: [
-          "h-[var(--primitive-space-10)] rounded-[var(--primitive-radius-md)] px-[var(--primitive-space-4)]",
-          "text-[length:var(--primitive-font-size-sm)] leading-[var(--primitive-font-lineHeight-sm)]",
+          "size-[var(--primitive-space-10)] rounded-[var(--primitive-radius-md)]",
           "[&_svg]:size-[var(--primitive-space-5)]",
         ].join(" "),
         lg: [
-          "h-[var(--primitive-space-12)] rounded-[var(--primitive-radius-md)] px-[var(--primitive-space-6)]",
-          "text-[length:var(--primitive-font-size-base)] leading-[var(--primitive-font-lineHeight-base)]",
+          "size-[var(--primitive-space-12)] rounded-[var(--primitive-radius-md)]",
           "[&_svg]:size-[var(--primitive-space-5)]",
         ].join(" "),
       },
     },
     defaultVariants: {
-      variant: "primary",
+      variant: "ghost",
       size: "md",
     },
   },
@@ -75,14 +71,21 @@ const spinnerSizeByButtonSize = {
   lg: "lg",
 } as const;
 
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
-  asChild?: boolean;
-  loading?: boolean;
-}
+type IconButtonBaseProps = Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  "children" | "aria-label"
+> &
+  VariantProps<typeof iconButtonVariants> & {
+    asChild?: boolean;
+    loading?: boolean;
+    icon: React.ReactNode;
+  };
 
-const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+export type IconButtonProps = IconButtonBaseProps & {
+  "aria-label": string;
+};
+
+const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
   (
     {
       className,
@@ -91,7 +94,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       asChild = false,
       loading = false,
       disabled,
-      children,
+      icon,
+      "aria-label": ariaLabel,
       ...props
     },
     ref,
@@ -102,31 +106,30 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     return (
       <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
+        className={cn(iconButtonVariants({ variant, size, className }))}
         ref={ref}
+        type={props.type ?? "button"}
         disabled={disabled || loading}
         aria-busy={loading || undefined}
+        aria-label={ariaLabel}
         {...props}
       >
         {loading ? (
-          <>
-            <Spinner
-              size={spinnerSize}
-              className={
-                variant === "primary" || variant === "destructive"
-                  ? "border-[var(--semantic-color-text-inverse)] border-t-transparent"
-                  : undefined
-              }
-            />
-            <span className="sr-only">{children}</span>
-          </>
+          <Spinner
+            size={spinnerSize}
+            className={
+              variant === "primary" || variant === "destructive"
+                ? "border-[var(--semantic-color-text-inverse)] border-t-transparent"
+                : undefined
+            }
+          />
         ) : (
-          children
+          icon
         )}
       </Comp>
     );
   },
 );
-Button.displayName = "Button";
+IconButton.displayName = "IconButton";
 
-export { Button, buttonVariants };
+export { IconButton, iconButtonVariants };
