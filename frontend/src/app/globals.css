@@ -75,3 +75,77 @@ body {
   animation: confirm-dialog-fade-scale-out var(--primitive-motion-duration-base)
     var(--primitive-motion-easing-standard);
 }
+
+/* Panel drawer — slide from inline-end per 04-design-system.md §6 */
+@keyframes panel-drawer-slide-in-rtl {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes panel-drawer-slide-out-rtl {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes panel-drawer-slide-in-ltr {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes panel-drawer-slide-out-ltr {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+html[dir="rtl"] .panel-drawer-content[data-state="open"] {
+  animation: panel-drawer-slide-in-rtl var(--primitive-motion-duration-base)
+    var(--primitive-motion-easing-standard);
+}
+
+html[dir="rtl"] .panel-drawer-content[data-state="closed"] {
+  animation: panel-drawer-slide-out-rtl var(--primitive-motion-duration-base)
+    var(--primitive-motion-easing-standard);
+}
+
+html[dir="ltr"] .panel-drawer-content[data-state="open"] {
+  animation: panel-drawer-slide-in-ltr var(--primitive-motion-duration-base)
+    var(--primitive-motion-easing-standard);
+}
+
+html[dir="ltr"] .panel-drawer-content[data-state="closed"] {
+  animation: panel-drawer-slide-out-ltr var(--primitive-motion-duration-base)
+    var(--primitive-motion-easing-standard);
+}
+
+/* Toast — slide from edge per 04-design-system.md §6 */
+@keyframes toast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--primitive-space-4));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast-item {
+  animation: toast-slide-in var(--primitive-motion-duration-base)
+    var(--primitive-motion-easing-standard);
+}

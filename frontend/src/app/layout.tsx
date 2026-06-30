@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ToastProvider } from "@/components/feedback";
 
 import "./globals.css";
 
@@ -17,7 +18,9 @@ export default function RootLayout({
   return (
     <html lang="fa" dir="rtl" className="h-full antialiased">
       <body className="min-h-full flex flex-col font-sans">
-        <TooltipProvider>{children}</TooltipProvider>
+        <TooltipProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </TooltipProvider>
       </body>
     </html>
   );
