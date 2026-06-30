@@ -114,3 +114,33 @@ export type LocaleConfig = typeof localeConfig;
 `,
 );
 console.log(`Wrote ${localeOutputPath}`);
+
+const statusMapOutputPath = join(__dirname, "../src/generated/status-map.ts");
+const statusMapEntries = Object.entries(tokens.semantic.statusMap).filter(
+  ([key]) => !key.startsWith("$"),
+);
+const statusMapObject = Object.fromEntries(statusMapEntries);
+
+writeFileSync(
+  statusMapOutputPath,
+  `/* Auto-generated from docs/frontend/tokens.json — do not edit */
+export const statusMap = ${JSON.stringify(statusMapObject, null, 2)} as const;
+
+/** Backend enum values that receive the high-urgency leading dot (03-design-tokens.md §1.2). */
+export const highUrgencyStatusValues = ["dropped", "overdue"] as const;
+
+export type StatusMapKey = keyof typeof statusMap;
+
+/** Convert a semantic status token path to a CSS custom property reference. */
+export function statusTokenToCssVar(tokenPath: string): string {
+  const cssKey = tokenPath.replace(/^color\\.status\\./, "semantic.color.status.");
+  return \`var(--\${cssKey.replace(/\\./g, "-")})\`;
+}
+
+export function lookupStatusToken(domain: string, value: string): string | undefined {
+  const key = \`\${domain}.\${value}\`;
+  return statusMap[key as StatusMapKey];
+}
+`,
+);
+console.log(`Wrote ${statusMapOutputPath}`);
