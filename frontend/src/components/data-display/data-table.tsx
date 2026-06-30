@@ -4,6 +4,7 @@ import * as React from "react";
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { TableRowSkeleton } from "@/components/feedback/skeleton";
 import { Spinner } from "@/components/primitives/spinner";
 import { focusVisibleStyles } from "@/components/form/control-styles";
 import { formatCount } from "@/lib/locale/number";
@@ -289,29 +290,11 @@ function DataTable<T>({
           <tbody>
             {loading ? (
               Array.from({ length: skeletonRowCount }).map((_, rowIndex) => (
-                <tr
+                <TableRowSkeleton
                   key={`skeleton-${rowIndex}`}
-                  className="border-b border-[var(--semantic-color-surface-border)] last:border-b-0"
-                >
-                  {rowSelectable ? (
-                    <td className="px-[var(--primitive-space-3)] py-[var(--primitive-space-3)]">
-                      <div className="size-[var(--primitive-space-4)] animate-pulse rounded-[var(--primitive-radius-sm)] bg-[var(--semantic-color-surface-subtle)]" />
-                    </td>
-                  ) : null}
-                  {columns.map((column) => (
-                    <td
-                      key={column.key}
-                      className="px-[var(--primitive-space-4)] py-[var(--primitive-space-3)]"
-                    >
-                      <div
-                        className={cn(
-                          "h-[var(--primitive-space-4)] animate-pulse rounded-[var(--primitive-radius-sm)] bg-[var(--semantic-color-surface-subtle)]",
-                          column.align === "end" ? "ms-auto w-3/4" : "w-full",
-                        )}
-                      />
-                    </td>
-                  ))}
-                </tr>
+                  columns={columns.length}
+                  rowSelectable={rowSelectable}
+                />
               ))
             ) : displayItems.length === 0 ? (
               <tr>

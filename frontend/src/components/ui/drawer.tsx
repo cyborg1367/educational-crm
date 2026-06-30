@@ -5,12 +5,16 @@ import { Drawer as DrawerPrimitive } from "vaul";
 
 import { cn } from "@/lib/utils";
 
+type DrawerSide = "bottom" | "inline-end";
+
 const Drawer = ({
   shouldScaleBackground = true,
+  direction = "bottom",
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
   <DrawerPrimitive.Root
     shouldScaleBackground={shouldScaleBackground}
+    direction={direction}
     {...props}
   />
 );
@@ -26,27 +30,48 @@ const DrawerOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DrawerPrimitive.Overlay
     ref={ref}
-    className={cn("fixed inset-0 z-[var(--primitive-zIndex-drawer)] bg-black/40", className)}
+    className={cn(
+      "fixed inset-0 z-[var(--primitive-zIndex-drawer)] bg-black/40",
+      className,
+    )}
     {...props}
   />
 ));
 DrawerOverlay.displayName = DrawerPrimitive.Overlay.displayName;
 
+type DrawerContentProps = React.ComponentPropsWithoutRef<
+  typeof DrawerPrimitive.Content
+> & {
+  side?: DrawerSide;
+};
+
 const DrawerContent = React.forwardRef<
   React.ComponentRef<typeof DrawerPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  DrawerContentProps
+>(({ className, children, side = "bottom", ...props }, ref) => (
   <DrawerPortal>
     <DrawerOverlay />
     <DrawerPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed inset-x-0 bottom-0 z-[var(--primitive-zIndex-drawer)] mt-24 flex h-auto flex-col rounded-t-[var(--primitive-radius-lg)] border border-border bg-card shadow-[var(--primitive-elevation-3)]",
+        side === "inline-end"
+          ? [
+              "panel-drawer-content fixed inset-y-0 inset-inline-end-0 z-[var(--primitive-zIndex-drawer)]",
+              "flex h-full w-full flex-col border border-[var(--semantic-color-surface-border)]",
+              "bg-[var(--semantic-color-surface-card)] shadow-[var(--primitive-elevation-3)]",
+              "rounded-s-[var(--primitive-radius-lg)]",
+            ].join(" ")
+          : [
+              "fixed inset-x-0 bottom-0 z-[var(--primitive-zIndex-drawer)] mt-24 flex h-auto flex-col",
+              "rounded-t-[var(--primitive-radius-lg)] border border-border bg-card shadow-[var(--primitive-elevation-3)]",
+            ].join(" "),
         className,
       )}
       {...props}
     >
-      <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
+      {side === "bottom" ? (
+        <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
+      ) : null}
       {children}
     </DrawerPrimitive.Content>
   </DrawerPortal>
