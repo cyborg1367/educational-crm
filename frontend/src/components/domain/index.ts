@@ -15,3 +15,8 @@ export {
   type CascadeConsequenceListProps,
 } from "./cascade-consequence-list";
 export { Stepper, type StepperProps, type StepperStep } from "./stepper";
+export { AISummaryPanel, type AISummaryPanelProps } from "./ai-summary-panel";
+export {
+  StaleLeadIndicator,
+  type StaleLeadIndicatorProps,
+} from "./stale-lead-indicator";

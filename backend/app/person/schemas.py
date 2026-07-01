@@ -62,6 +62,10 @@ class PersonUpdate(BaseModel):
         description="Updated phone. Unique per org when set.",
     )
     email: EmailStr | None = Field(default=None, description="Updated email address.")
+    status: PersonStatus | None = Field(
+        default=None,
+        description="Person lifecycle status. Optional — omit to leave unchanged.",
+    )
     source: str | None = Field(
         default=None,
         max_length=255,
