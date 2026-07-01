@@ -1,8 +1,6 @@
 "use client";
 
 import * as React from "react";
-import dayjs from "dayjs";
-import jalaliday from "jalaliday";
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { TextInput } from "@/components/form/text-input";
@@ -16,73 +14,19 @@ import {
   toStorageDate,
   type StorageDate,
 } from "@/lib/locale/date";
+import {
+  buildMonthGrid,
+  currentJalaliMonth,
+  formatJalaliMonthTitle,
+  JALALI_WEEKDAY_LABELS,
+  shiftJalaliMonth,
+  storageToJalaliMonth,
+  type JalaliMonth,
+} from "@/lib/locale/jalali-month";
 import { toPersianDigits } from "@/lib/locale/number";
 import { cn } from "@/lib/utils";
 
-dayjs.extend(jalaliday);
-
 const JALALI_DATE = /^\d{4}\/\d{1,2}\/\d{1,2}$/;
-const WEEKDAY_LABELS = ["ش", "ی", "د", "س", "چ", "پ", "ج"];
-
-type JalaliMonth = {
-  year: number;
-  month: number;
-};
-
-function storageToJalaliMonth(value: StorageDate): JalaliMonth {
-  const jalali = dayjs(value).calendar("jalali");
-  return { year: jalali.year(), month: jalali.month() + 1 };
-}
-
-function currentJalaliMonth(): JalaliMonth {
-  const jalali = dayjs().calendar("jalali");
-  return { year: jalali.year(), month: jalali.month() + 1 };
-}
-
-function shiftJalaliMonth(
-  { year, month }: JalaliMonth,
-  delta: number,
-): JalaliMonth {
-  const anchor = dayjs(
-    `${year}/${month}/1`,
-    { jalali: true } as dayjs.OptionType,
-  ).add(delta, "month");
-  const jalali = anchor.calendar("jalali");
-  return { year: jalali.year(), month: jalali.month() + 1 };
-}
-
-function buildMonthGrid({ year, month }: JalaliMonth) {
-  const firstOfMonth = dayjs(
-    `${year}/${month}/1`,
-    { jalali: true } as dayjs.OptionType,
-  );
-  const daysInMonth = firstOfMonth.daysInMonth();
-  const startOffset = (firstOfMonth.day() + 1) % 7;
-  const cells: Array<{ day: number; storageDate: StorageDate } | null> = [];
-
-  for (let i = 0; i < startOffset; i++) {
-    cells.push(null);
-  }
-  for (let day = 1; day <= daysInMonth; day++) {
-    const displayDate = `${year}/${month}/${day}`;
-    cells.push({
-      day,
-      storageDate: toStorageDate(displayDate),
-    });
-  }
-
-  return cells;
-}
-
-function formatJalaliMonthTitle({ year, month }: JalaliMonth): string {
-  const label = dayjs(
-    `${year}/${month}/1`,
-    { jalali: true } as dayjs.OptionType,
-  )
-    .calendar("jalali")
-    .format("MMMM YYYY");
-  return toPersianDigits(label);
-}
 
 export type DatePickerProps = {
   id?: string;
@@ -224,7 +168,7 @@ function DatePicker({
         </div>
 
         <div className="grid grid-cols-7 gap-[var(--primitive-space-1)] text-center">
-          {WEEKDAY_LABELS.map((label) => (
+          {JALALI_WEEKDAY_LABELS.map((label) => (
             <span
               key={label}
               className="py-[var(--primitive-space-1)] text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]"
