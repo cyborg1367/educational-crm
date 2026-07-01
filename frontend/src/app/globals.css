@@ -43,6 +43,11 @@ body {
   line-height: var(--primitive-font-lineHeight-base);
 }
 
+/* Directional icons mirror with reading direction — 04-design-system.md §4 */
+html[dir="rtl"] .icon-mirror-rtl {
+  transform: scaleX(-1);
+}
+
 /* ConfirmDialog — fade+scale per 04-design-system.md §6 (same motion for tier 2 and 3). */
 @keyframes confirm-dialog-fade-scale-in {
   from {
@@ -130,6 +135,63 @@ html[dir="ltr"] .panel-drawer-content[data-state="open"] {
 
 html[dir="ltr"] .panel-drawer-content[data-state="closed"] {
   animation: panel-drawer-slide-out-ltr var(--primitive-motion-duration-base)
+    var(--primitive-motion-easing-standard);
+}
+
+/* Shell nav drawer — slides from inline-start (sidebar position). */
+@keyframes panel-drawer-start-slide-in-rtl {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes panel-drawer-start-slide-out-rtl {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes panel-drawer-start-slide-in-ltr {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes panel-drawer-start-slide-out-ltr {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+html[dir="rtl"] .panel-drawer-content-start[data-state="open"] {
+  animation: panel-drawer-start-slide-in-rtl var(--primitive-motion-duration-base)
+    var(--primitive-motion-easing-standard);
+}
+
+html[dir="rtl"] .panel-drawer-content-start[data-state="closed"] {
+  animation: panel-drawer-start-slide-out-rtl var(--primitive-motion-duration-base)
+    var(--primitive-motion-easing-standard);
+}
+
+html[dir="ltr"] .panel-drawer-content-start[data-state="open"] {
+  animation: panel-drawer-start-slide-in-ltr var(--primitive-motion-duration-base)
+    var(--primitive-motion-easing-standard);
+}
+
+html[dir="ltr"] .panel-drawer-content-start[data-state="closed"] {
+  animation: panel-drawer-start-slide-out-ltr var(--primitive-motion-duration-base)
     var(--primitive-motion-easing-standard);
 }
 
