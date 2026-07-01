@@ -1,6 +1,7 @@
 import dayjs from "dayjs";
 import jalaliday from "jalaliday";
 import { localeConfig } from "@/lib/locale/config";
+import { toPersianDigits } from "@/lib/locale/number";
 
 dayjs.extend(jalaliday);
 
@@ -27,7 +28,9 @@ export function formatDateDisplay(
   if (localeConfig.calendar !== "jalali") {
     return storageDate;
   }
-  return dayjs(storageDate).calendar("jalali").format(format);
+  return toPersianDigits(
+    dayjs(storageDate).calendar("jalali").format(format),
+  );
 }
 
 /**
@@ -59,7 +62,7 @@ export function formatDateTimeDisplay(
   if (localeConfig.calendar !== "jalali") {
     return d.format(format);
   }
-  return d.calendar("jalali").format(format);
+  return toPersianDigits(d.calendar("jalali").format(format));
 }
 
 /** Today as Gregorian storage date */
@@ -72,5 +75,5 @@ export function todayDisplay(): DisplayDate {
   if (localeConfig.calendar !== "jalali") {
     return todayStorage();
   }
-  return dayjs().calendar("jalali").format("YYYY/MM/DD");
+  return toPersianDigits(dayjs().calendar("jalali").format("YYYY/MM/DD"));
 }
