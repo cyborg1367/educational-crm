@@ -5,7 +5,7 @@ import { Drawer as DrawerPrimitive } from "vaul";
 
 import { cn } from "@/lib/utils";
 
-type DrawerSide = "bottom" | "inline-end";
+type DrawerSide = "bottom" | "inline-end" | "inline-start";
 
 const Drawer = ({
   shouldScaleBackground = true,
@@ -61,10 +61,17 @@ const DrawerContent = React.forwardRef<
               "bg-[var(--semantic-color-surface-card)] shadow-[var(--primitive-elevation-3)]",
               "rounded-s-[var(--primitive-radius-lg)]",
             ].join(" ")
-          : [
-              "fixed inset-x-0 bottom-0 z-[var(--primitive-zIndex-drawer)] mt-24 flex h-auto flex-col",
-              "rounded-t-[var(--primitive-radius-lg)] border border-border bg-card shadow-[var(--primitive-elevation-3)]",
-            ].join(" "),
+          : side === "inline-start"
+            ? [
+                "panel-drawer-content-start fixed inset-y-0 inset-inline-start-0 z-[var(--primitive-zIndex-drawer)]",
+                "flex h-full w-full flex-col border border-[var(--semantic-color-surface-border)]",
+                "bg-[var(--semantic-color-surface-card)] shadow-[var(--primitive-elevation-3)]",
+                "rounded-e-[var(--primitive-radius-lg)]",
+              ].join(" ")
+            : [
+                "fixed inset-x-0 bottom-0 z-[var(--primitive-zIndex-drawer)] mt-24 flex h-auto flex-col",
+                "rounded-t-[var(--primitive-radius-lg)] border border-border bg-card shadow-[var(--primitive-elevation-3)]",
+              ].join(" "),
         className,
       )}
       {...props}
