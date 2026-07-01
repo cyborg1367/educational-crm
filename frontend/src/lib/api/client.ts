@@ -1,4 +1,5 @@
 import type { ApiError } from "@/lib/api/error";
+import { getAccessToken } from "@/lib/api/auth-token";
 
 import { API_BASE_URL } from "./config";
 
@@ -24,7 +25,7 @@ export async function fetchJson<T>(
   path: string,
   options: FetchJsonOptions = {},
 ): Promise<T> {
-  const { method = "GET", body, token } = options;
+  const { method = "GET", body, token = getAccessToken() } = options;
   const headers: Record<string, string> = {
     Accept: "application/json",
   };

@@ -95,6 +95,85 @@ export type TaskRead = {
   completed_at: string | null;
 };
 
+export type PersonStatus =
+  | "prospect"
+  | "lead"
+  | "student"
+  | "dormant"
+  | "alumni";
+
+export type PersonRead = {
+  id: number;
+  full_name: string;
+  phone: string | null;
+  email: string | null;
+  status: PersonStatus;
+  source: string | null;
+  notes: string | null;
+  org_id: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PersonCreate = {
+  full_name: string;
+  phone?: string | null;
+  email?: string | null;
+  source?: string | null;
+  notes?: string | null;
+};
+
+export type PersonUpdate = {
+  full_name?: string;
+  phone?: string | null;
+  email?: string | null;
+  status?: PersonStatus;
+  source?: string | null;
+  notes?: string | null;
+};
+
+export type JourneyStatus = "active" | "on_hold" | "completed" | "dropped";
+
+export type JourneyRead = {
+  id: number;
+  person_id: number;
+  department_id: number;
+  owner_id: number | null;
+  roadmap_id: number | null;
+  status: JourneyStatus;
+  org_id: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EnrollmentStatus = "pre_enroll" | "active" | "completed" | "dropped";
+
+export type EnrollmentRead = {
+  id: number;
+  person_id: number;
+  class_id: number;
+  consultation_id: number | null;
+  journey_id: number | null;
+  status: EnrollmentStatus;
+  price_snapshot: number;
+  discount_snapshot: number;
+  final_amount: number;
+  start_date: StorageDate | null;
+  org_id: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DepartmentRead = {
+  id: number;
+  name: string;
+  manager_id: number | null;
+  is_active: boolean;
+  org_id: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type RevenueMonth = {
   month: string;
   amount: number;
