@@ -306,6 +306,68 @@ export type AttendanceRead = {
   updated_at: string;
 };
 
+export type AttendanceCreate = {
+  enrollment_id: number;
+  session_date: StorageDate;
+  present: boolean;
+  notes?: string | null;
+};
+
+export type AttendanceUpdate = {
+  present?: boolean;
+  notes?: string | null;
+};
+
+export type ConsultationOutcome =
+  | "pre_enroll"
+  | "follow_up"
+  | "refer_other_dept"
+  | "not_suitable"
+  | "closed";
+
+export type ConsultationRead = {
+  id: number;
+  person_id: number;
+  department_id: number;
+  consultant_id: number;
+  journey_id: number | null;
+  current_level: string | null;
+  need: string | null;
+  goal: string | null;
+  decision: string | null;
+  recommended_course_id: number | null;
+  outcome: ConsultationOutcome | null;
+  refer_to_department_id: number | null;
+  next_action: string | null;
+  next_action_date: StorageDate | null;
+  notes: string | null;
+  org_id: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ConsultationUpdate = {
+  refer_to_department_id?: number | null;
+  notes?: string | null;
+};
+
+export type ConsultationOutcomeUpdate = {
+  outcome: ConsultationOutcome;
+  class_id?: number | null;
+};
+
+export type UserRead = {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  department_id: number | null;
+  is_active: boolean;
+  org_id: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type EnrollmentCreate = {
   person_id: number;
   class_id: number;

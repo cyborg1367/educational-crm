@@ -12,6 +12,7 @@ import type { PaginatedResponse } from "@/components/data-display/types";
 import {
   AISummaryPanel,
   StaleLeadIndicator,
+  StatusAction,
   StatusBadge,
 } from "@/components/domain";
 import { AppDrawer, ErrorState, useToast } from "@/components/feedback";
@@ -33,9 +34,13 @@ import {
   listTasks,
   updatePerson,
 } from "@/lib/api/people";
+import { listConsultations } from "@/lib/api/consultations";
+import { getCourse } from "@/lib/api/finance";
 import { canManageEnrollments } from "@/lib/auth/role";
 import type {
+  ConsultationRead,
   CourseClassRead,
+  CourseRead,
   DepartmentRead,
   EnrollmentRead,
   JourneyRead,
@@ -89,6 +94,12 @@ export default function PersonDetailPage() {
   const [tasks, setTasks] = React.useState<TaskRead[]>([]);
   const [departments, setDepartments] = React.useState<DepartmentRead[]>([]);
   const [classes, setClasses] = React.useState<CourseClassRead[]>([]);
+  const [consultations, setConsultations] = React.useState<ConsultationRead[]>(
+    [],
+  );
+  const [coursesById, setCoursesById] = React.useState<Map<number, CourseRead>>(
+    new Map(),
+  );
   const [tabLoading, setTabLoading] = React.useState(false);
 
   const [editOpen, setEditOpen] = React.useState(false);
@@ -142,6 +153,14 @@ export default function PersonDetailPage() {
     [tasks, personId],
   );
 
+  const personConsultations = React.useMemo(
+    () =>
+      consultations
+        .filter((c) => c.person_id === personId)
+        .sort((a, b) => b.created_at.localeCompare(a.created_at)),
+    [consultations, personId],
+  );
+
   const currentJourney = React.useMemo(() => {
     const active = personJourneys.find((j) => j.status === "active");
     if (active) return active;
@@ -183,19 +202,41 @@ export default function PersonDetailPage() {
     if (!person) return;
     setTabLoading(true);
     try {
-      const [journeyRes, enrollmentRes, taskRes, deptRes, classRes] =
+      const [journeyRes, enrollmentRes, taskRes, deptRes, classRes, consultRes] =
         await Promise.all([
           listJourneys({ limit: 500 }),
           listEnrollments({ limit: 500 }),
           listTasks({ limit: 500 }),
           listDepartments({ limit: 100 }),
           listClasses({ limit: 500 }),
+          listConsultations({ limit: 500 }),
         ]);
       setJourneys(journeyRes.items);
       setEnrollments(enrollmentRes.items);
       setTasks(taskRes.items);
       setDepartments(deptRes.items);
       setClasses(classRes.items);
+      setConsultations(consultRes.items);
+
+      const courseIds = [
+        ...new Set(
+          consultRes.items
+            .map((c) => c.recommended_course_id)
+            .filter((id): id is number => id != null),
+        ),
+      ];
+      if (courseIds.length > 0) {
+        const courses = await Promise.all(
+          courseIds.map((id) => getCourse(id).catch(() => null)),
+        );
+        const courseMap = new Map<number, CourseRead>();
+        for (const course of courses) {
+          if (course) {
+            courseMap.set(course.id, course);
+          }
+        }
+        setCoursesById(courseMap);
+      }
     } catch {
       // Tab-level errors handled per tab via empty states
     } finally {
@@ -309,6 +350,56 @@ export default function PersonDetailPage() {
                   <KeyValueRow label="تلفن" value={person.phone} />
                   <KeyValueRow label="ایمیل" value={person.email} />
                 </dl>
+
+                <div className="flex flex-col gap-[var(--primitive-space-3)]">
+                  <h2 className="text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-primary)]">
+                    مشاوره‌ها
+                  </h2>
+                  {tabLoading ? (
+                    <BlockSkeleton height="120px" width="100%" />
+                  ) : personConsultations.length === 0 ? (
+                    <p className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
+                      مشاوره‌ای ثبت نشده است
+                    </p>
+                  ) : (
+                    <div className="flex flex-col gap-[var(--primitive-space-3)]">
+                      {personConsultations.map((consultation) => (
+                        <div
+                          key={consultation.id}
+                          className="flex flex-wrap items-center justify-between gap-[var(--primitive-space-3)] rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] px-[var(--primitive-space-4)] py-[var(--primitive-space-3)]"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)]">
+                              مشاوره #{consultation.id}
+                            </p>
+                            <p className="mt-[var(--primitive-space-1)] text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]">
+                              {consultation.goal ?? "—"}
+                              {consultation.recommended_course_id != null
+                                ? ` · ${
+                                    coursesById.get(
+                                      consultation.recommended_course_id,
+                                    )?.title ?? "دوره"
+                                  }`
+                                : ""}
+                            </p>
+                          </div>
+                          <StatusAction
+                            entity="consultation"
+                            outcome={consultation.outcome}
+                            onAction={() => {
+                              if (consultation.outcome === null) {
+                                router.push(
+                                  `/people/${person.id}/consultations/${consultation.id}`,
+                                );
+                              }
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <AISummaryPanel />
               </div>
             ),

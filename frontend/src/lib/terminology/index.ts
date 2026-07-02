@@ -1,4 +1,9 @@
-import type { PersonStatus, TaskType } from "@/lib/api/types";
+import type {
+  ClassStatus,
+  ConsultationOutcome,
+  PersonStatus,
+  TaskType,
+} from "@/lib/api/types";
 
 /** Persian display labels — docs/frontend/02-ux-guidelines-design-principles.md §4 */
 const TERMINOLOGY: Record<string, string> = {
@@ -15,6 +20,16 @@ const TERMINOLOGY: Record<string, string> = {
   completed: "تکمیل‌شده",
   dropped: "انصراف",
 
+  // Class.status
+  planned: "برنامه‌ریزی‌شده",
+  cancelled: "لغو‌شده",
+
+  // Consultation.outcome
+  follow_up: "پیگیری",
+  refer_other_dept: "ارجاع به بخش دیگر",
+  not_suitable: "مناسب نیست",
+  closed: "بسته شد",
+
   // Journey.status
   on_hold: "معلق",
 
@@ -29,7 +44,6 @@ const TERMINOLOGY: Record<string, string> = {
   // Task.status
   open: "باز",
   done: "انجام‌شده",
-  cancelled: "لغو‌شده",
 };
 
 export function terminologyLabel(value: string): string {
@@ -42,6 +56,24 @@ export const PERSON_STATUS_OPTIONS: { value: PersonStatus; label: string }[] = [
   { value: "student", label: terminologyLabel("student") },
   { value: "dormant", label: terminologyLabel("dormant") },
   { value: "alumni", label: terminologyLabel("alumni") },
+];
+
+export const CLASS_STATUS_OPTIONS: { value: ClassStatus; label: string }[] = [
+  { value: "planned", label: terminologyLabel("planned") },
+  { value: "active", label: terminologyLabel("active") },
+  { value: "completed", label: terminologyLabel("completed") },
+  { value: "cancelled", label: terminologyLabel("cancelled") },
+];
+
+export const CONSULTATION_OUTCOME_OPTIONS: {
+  value: ConsultationOutcome;
+  label: string;
+}[] = [
+  { value: "pre_enroll", label: terminologyLabel("pre_enroll") },
+  { value: "follow_up", label: terminologyLabel("follow_up") },
+  { value: "refer_other_dept", label: terminologyLabel("refer_other_dept") },
+  { value: "not_suitable", label: terminologyLabel("not_suitable") },
+  { value: "closed", label: terminologyLabel("closed") },
 ];
 
 export function taskTypeLabel(type: TaskType): string {

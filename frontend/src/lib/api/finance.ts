@@ -1,6 +1,8 @@
 import { fetchJson } from "@/lib/api/client";
 import type {
+  AttendanceCreate,
   AttendanceRead,
+  AttendanceUpdate,
   CourseClassRead,
   CourseRead,
   EnrollmentCreate,
@@ -152,6 +154,20 @@ export function listAttendances(
       enrollment_id: params.enrollment_id,
     })}`,
   );
+}
+
+export function createAttendance(body: AttendanceCreate): Promise<AttendanceRead> {
+  return fetchJson<AttendanceRead>("/attendances", { method: "POST", body });
+}
+
+export function updateAttendance(
+  id: number,
+  body: AttendanceUpdate,
+): Promise<AttendanceRead> {
+  return fetchJson<AttendanceRead>(`/attendances/${id}`, {
+    method: "PATCH",
+    body,
+  });
 }
 
 export function listTasks(
