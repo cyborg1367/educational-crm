@@ -8,7 +8,7 @@ import { FormField } from "@/components/form/form-field";
 import { TextInput } from "@/components/form/text-input";
 import { Button } from "@/components/ui/button";
 import { API_BASE_URL } from "@/lib/api/config";
-import { setAccessToken } from "@/lib/api/auth-token";
+import { getAccessToken, setAccessToken } from "@/lib/api/auth-token";
 import type { ApiError } from "@/lib/api/error";
 import { toApiError } from "@/lib/api/errors";
 
@@ -19,10 +19,21 @@ type TokenResponse = {
 
 export default function LoginPage() {
   const router = useRouter();
+  const nextPathRef = React.useRef<string>("/dashboard");
   const [email, setEmail] = React.useState("admin@example.com");
   const [password, setPassword] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<ApiError | null>(null);
+
+  React.useEffect(() => {
+    const nextPath = new URLSearchParams(window.location.search).get("next");
+    if (nextPath) {
+      nextPathRef.current = nextPath;
+    }
+    if (getAccessToken()) {
+      router.replace(nextPathRef.current);
+    }
+  }, [router]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -48,7 +59,7 @@ export default function LoginPage() {
 
       const data = (await response.json()) as TokenResponse;
       setAccessToken(data.access_token);
-      router.push("/people");
+      router.push(nextPathRef.current);
     } catch (err) {
       setError(toApiError(err, "ورود ناموفق بود"));
     } finally {

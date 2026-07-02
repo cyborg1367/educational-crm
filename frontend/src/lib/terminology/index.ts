@@ -76,6 +76,15 @@ export const CONSULTATION_OUTCOME_OPTIONS: {
   { value: "closed", label: terminologyLabel("closed") },
 ];
 
+export const TASK_TYPE_LABELS: Record<TaskType, string> = {
+  follow_up_registration: terminologyLabel("follow_up_registration"),
+  follow_up_payment: terminologyLabel("follow_up_payment"),
+  referral: terminologyLabel("referral"),
+  post_course_review: terminologyLabel("post_course_review"),
+  dormant_follow_up: terminologyLabel("dormant_follow_up"),
+  other: terminologyLabel("other"),
+};
+
 export function taskTypeLabel(type: TaskType): string {
-  return terminologyLabel(type);
+  return TASK_TYPE_LABELS[type];
 }
