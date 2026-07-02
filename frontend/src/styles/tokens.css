@@ -44,7 +44,7 @@
   --primitive-color-blue-500: #3B82F6;
   --primitive-color-blue-600: #2563EB;
   --primitive-color-blue-700: #1D4ED8;
-  --primitive-font-family-base: 'Vazirmatn', 'Segoe UI', Tahoma, sans-serif;
+  --primitive-font-family-base: 'Vazirmatn', Tahoma, sans-serif;
   --primitive-font-size-xs: 12px;
   --primitive-font-size-sm: 14px;
   --primitive-font-size-base: 16px;

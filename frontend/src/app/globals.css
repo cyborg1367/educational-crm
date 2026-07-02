@@ -2,8 +2,10 @@
 @import "../styles/tokens.css";
 
 @font-face {
-  font-family: Vazirmatn;
-  src: url("/fonts/Vazirmatn-Variable.woff2") format("woff2");
+  font-family: "Vazirmatn";
+  src:
+    url("/fonts/Vazirmatn-Variable.woff2") format("woff2 supports variations"),
+    url("/fonts/Vazirmatn-Variable.woff2") format("woff2-variations");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
@@ -32,13 +34,19 @@
   --radius-sm: var(--primitive-radius-sm);
   --radius-md: var(--primitive-radius-md);
   --radius-lg: var(--primitive-radius-lg);
-  --font-sans: var(--primitive-font-family-base);
+  --font-sans: "Vazirmatn", Tahoma, sans-serif;
+}
+
+html,
+body {
+  font-family: "Vazirmatn", Tahoma, sans-serif;
+  letter-spacing: 0;
+  word-spacing: normal;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--primitive-font-family-base);
   font-size: var(--primitive-font-size-base);
   line-height: var(--primitive-font-lineHeight-base);
 }

@@ -32,6 +32,7 @@ from app.finance.router import (
     router as invoices_router,
 )
 from app.journey.router import router as journeys_router
+from app.organization.router import router as organizations_router
 from app.person.router import router as people_router
 from app.reports.router import router as reports_router
 from app.roadmap.router import router as roadmaps_router
@@ -71,6 +72,7 @@ app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(LoginEmailMiddleware)
 
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
+app.include_router(organizations_router, prefix="/organizations", tags=["Organizations"])
 app.include_router(users_router, prefix="/users", tags=["Users"])
 app.include_router(people_router, prefix="/people", tags=["People"])
 app.include_router(departments_router, prefix="/departments", tags=["Departments"])

@@ -1,11 +1,11 @@
 import { fetchJson } from "@/lib/api/client";
 import type {
+  DepartmentCreate,
+  DepartmentRead,
   PaginatedResponse,
-  UserCreate,
-  UserRead,
 } from "@/lib/api/types";
 
-const DEFAULT_LIMIT = 200;
+const DEFAULT_LIMIT = 50;
 
 function buildQuery(
   params: Record<string, string | number | undefined>,
@@ -20,24 +20,16 @@ function buildQuery(
   return qs ? `?${qs}` : "";
 }
 
-export function listUsers(
+export function listDepartments(
   params: { limit?: number; offset?: number } = {},
-): Promise<PaginatedResponse<UserRead>> {
+): Promise<PaginatedResponse<DepartmentRead>> {
   const limit = params.limit ?? DEFAULT_LIMIT;
   const offset = params.offset ?? 0;
-  return fetchJson<PaginatedResponse<UserRead>>(
-    `/users${buildQuery({ limit, offset })}`,
-  );
+  return fetchJson(`/departments${buildQuery({ limit, offset })}`);
 }
 
-export function getUser(id: number): Promise<UserRead> {
-  return fetchJson<UserRead>(`/users/${id}`);
-}
-
-export function getMe(): Promise<UserRead> {
-  return fetchJson<UserRead>("/auth/me");
-}
-
-export function createUser(body: UserCreate): Promise<UserRead> {
-  return fetchJson<UserRead>("/users", { method: "POST", body });
+export function createDepartment(
+  body: DepartmentCreate,
+): Promise<DepartmentRead> {
+  return fetchJson<DepartmentRead>("/departments", { method: "POST", body });
 }

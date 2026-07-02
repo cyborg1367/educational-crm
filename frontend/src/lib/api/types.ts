@@ -174,6 +174,14 @@ export type DepartmentRead = {
   updated_at: string;
 };
 
+export type OrganizationRead = {
+  id: number;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type RevenueMonth = {
   month: string;
   amount: number;
@@ -227,6 +235,83 @@ export type CourseRead = {
   org_id: number;
   created_at: string;
   updated_at: string;
+};
+
+export type CourseCreate = {
+  department_id: number;
+  title: string;
+  description?: string | null;
+  level?: string | null;
+  current_price: number;
+  duration_sessions?: number | null;
+  is_active?: boolean;
+};
+
+export type RoadmapRead = {
+  id: number;
+  department_id: number;
+  name: string;
+  is_active: boolean;
+  org_id: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RoadmapCreate = {
+  department_id: number;
+  name: string;
+  is_active?: boolean;
+};
+
+export type RoadmapUpdate = {
+  department_id?: number | null;
+  name?: string | null;
+  is_active?: boolean | null;
+};
+
+export type RoadmapItemRead = {
+  id: number;
+  roadmap_id: number;
+  title: string;
+  sequence: number;
+  course_id: number | null;
+  org_id: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RoadmapItemCreate = {
+  title: string;
+  sequence: number;
+  course_id?: number | null;
+};
+
+export type RoadmapItemUpdate = {
+  title?: string | null;
+  sequence?: number | null;
+  course_id?: number | null;
+};
+
+export type DepartmentCreate = {
+  name: string;
+  manager_id?: number | null;
+  is_active?: boolean;
+};
+
+export type UserRole =
+  | "admin"
+  | "admission"
+  | "finance"
+  | "teacher"
+  | "department_manager";
+
+export type UserCreate = {
+  name: string;
+  email: string;
+  password: string;
+  role: UserRole;
+  department_id?: number | null;
+  is_active?: boolean;
 };
 
 export type InvoiceStatus = "open" | "partially_paid" | "paid" | "void";
@@ -360,7 +445,7 @@ export type UserRead = {
   id: number;
   name: string;
   email: string;
-  role: string;
+  role: UserRole;
   department_id: number | null;
   is_active: boolean;
   org_id: number;

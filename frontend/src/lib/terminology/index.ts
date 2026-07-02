@@ -3,6 +3,7 @@ import type {
   ConsultationOutcome,
   PersonStatus,
   TaskType,
+  UserRole,
 } from "@/lib/api/types";
 
 /** Persian display labels — docs/frontend/02-ux-guidelines-design-principles.md §4 */
@@ -44,6 +45,13 @@ const TERMINOLOGY: Record<string, string> = {
   // Task.status
   open: "باز",
   done: "انجام‌شده",
+
+  // User.role
+  admin: "مدیر",
+  admission: "پذیرش",
+  department_manager: "مدیر دپارتمان",
+  finance: "مالی",
+  teacher: "مدرس",
 };
 
 export function terminologyLabel(value: string): string {
@@ -87,4 +95,16 @@ export const TASK_TYPE_LABELS: Record<TaskType, string> = {
 
 export function taskTypeLabel(type: TaskType): string {
   return TASK_TYPE_LABELS[type];
+}
+
+export const USER_ROLE_OPTIONS: { value: UserRole; label: string }[] = [
+  { value: "admin", label: terminologyLabel("admin") },
+  { value: "admission", label: terminologyLabel("admission") },
+  { value: "department_manager", label: terminologyLabel("department_manager") },
+  { value: "finance", label: terminologyLabel("finance") },
+  { value: "teacher", label: terminologyLabel("teacher") },
+];
+
+export function userRoleLabel(role: UserRole): string {
+  return terminologyLabel(role);
 }
