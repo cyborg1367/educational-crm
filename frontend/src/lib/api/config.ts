@@ -9,7 +9,10 @@ export function shouldUseMockApi(override?: boolean): boolean {
   return process.env.NEXT_PUBLIC_USE_MOCK_API !== "false";
 }
 
+const defaultApiBaseUrl =
+  process.env.NODE_ENV === "production" ? "/api" : "http://localhost:8000";
+
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   process.env.NEXT_PUBLIC_API_URL ??
-  "http://localhost:8000";
+  defaultApiBaseUrl;
