@@ -1,7 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.core.validators import normalize_staff_email
 from app.user.enums import UserRole
 
 
@@ -20,7 +21,7 @@ class UserRead(BaseModel):
 
     id: int = Field(description="Unique user identifier.")
     name: str = Field(description="Staff display name.")
-    email: EmailStr = Field(description="Login email. Unique per org.")
+    email: str = Field(description="Login email. Unique per org.")
     role: UserRole = Field(description="Staff role (admin, teacher, consultant, etc.).")
     department_id: int | None = Field(
         description="Primary department assignment, if any."
@@ -38,9 +39,9 @@ class UserCreate(BaseModel):
         description="Staff display name.",
         examples=["Sara Mohammadi"],
     )
-    email: EmailStr = Field(
+    email: str = Field(
         description="Login email. Unique per org.",
-        examples=["sara@example.com"],
+        examples=["admin@crm.local"],
     )
     password: str = Field(
         min_length=8,
@@ -54,6 +55,11 @@ class UserCreate(BaseModel):
     )
     is_active: bool = Field(default=True, description="Whether the account is active.")
 
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        return normalize_staff_email(value)
+
 
 class UserUpdate(BaseModel):
     name: str | None = Field(
@@ -62,7 +68,7 @@ class UserUpdate(BaseModel):
         max_length=255,
         description="Updated display name.",
     )
-    email: EmailStr | None = Field(
+    email: str | None = Field(
         default=None,
         description="Updated email. Unique per org.",
     )
@@ -78,3 +84,10 @@ class UserUpdate(BaseModel):
         description="Updated department assignment.",
     )
     is_active: bool | None = Field(default=None, description="Updated active flag.")
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return normalize_staff_email(value)

@@ -1,15 +1,22 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.core.validators import normalize_staff_email
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr = Field(
+    email: str = Field(
         description="Staff user email address.",
-        examples=["admin@example.com"],
+        examples=["admin@crm.local"],
     )
     password: str = Field(
         min_length=1,
         description="Account password.",
     )
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        return normalize_staff_email(value)
 
 
 class TokenResponse(BaseModel):

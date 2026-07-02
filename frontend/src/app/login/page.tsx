@@ -11,16 +11,32 @@ import { API_BASE_URL } from "@/lib/api/config";
 import { getAccessToken, setAccessToken } from "@/lib/api/auth-token";
 import type { ApiError } from "@/lib/api/error";
 import { toApiError } from "@/lib/api/errors";
+import { getMe } from "@/lib/api/users";
+import { setCurrentRole } from "@/lib/auth/role";
 
 type TokenResponse = {
   access_token: string;
   token_type: string;
 };
 
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) {
+      return null;
+    }
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const json = atob(normalized);
+    return JSON.parse(json) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const nextPathRef = React.useRef<string>("/dashboard");
-  const [email, setEmail] = React.useState("admin@example.com");
+  const [email, setEmail] = React.useState("admin@crm.local");
   const [password, setPassword] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<ApiError | null>(null);
@@ -59,10 +75,16 @@ export default function LoginPage() {
 
       const data = (await response.json()) as TokenResponse;
       setAccessToken(data.access_token);
+
+      decodeJwtPayload(data.access_token);
+
+      const me = await getMe();
+      setCurrentRole(me.role);
+
       if (typeof window !== "undefined") {
         window.localStorage.setItem("crm_profile_email", email.trim());
       }
-      router.push(nextPathRef.current);
+      router.push("/dashboard");
     } catch (err) {
       setError(toApiError(err, "ورود ناموفق بود"));
     } finally {
@@ -88,7 +110,9 @@ export default function LoginPage() {
 
           <FormField label="ایمیل" required>
             <TextInput
-              type="email"
+              type="text"
+              inputMode="email"
+              autoCapitalize="none"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
