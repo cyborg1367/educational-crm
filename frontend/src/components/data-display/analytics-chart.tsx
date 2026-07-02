@@ -44,14 +44,21 @@ export type AnalyticsChartProps = {
   height?: number;
 };
 
+function formatAxisTick(value: number, valueFormat: AnalyticsValueFormat): string {
+  if (valueFormat === "toman") {
+    return formatToman(Math.floor(value));
+  }
+  return formatCount(Math.round(value));
+}
+
 function formatChartValue(
   value: number,
   valueFormat: AnalyticsValueFormat,
 ): string {
   if (valueFormat === "toman") {
-    return formatToman(value, { suffix: true });
+    return formatToman(Math.floor(Number(value)), { suffix: true });
   }
-  return formatCount(value);
+  return formatCount(Math.round(Number(value)));
 }
 
 function ChartTooltip({
@@ -190,11 +197,7 @@ function LineChartView({
         />
         <YAxis
           orientation="right"
-          tickFormatter={(value: number) =>
-            data.valueFormat === "toman"
-              ? formatToman(value)
-              : formatCount(value)
-          }
+          tickFormatter={(value: number) => formatAxisTick(value, data.valueFormat)}
           tick={{
             fill: "var(--semantic-color-text-secondary)",
             fontSize: 12,
@@ -259,11 +262,7 @@ function BarChartView({
         />
         <YAxis
           orientation="right"
-          tickFormatter={(value: number) =>
-            data.valueFormat === "toman"
-              ? formatToman(value)
-              : formatCount(value)
-          }
+          tickFormatter={(value: number) => formatAxisTick(value, data.valueFormat)}
           tick={{
             fill: "var(--semantic-color-text-secondary)",
             fontSize: 12,
