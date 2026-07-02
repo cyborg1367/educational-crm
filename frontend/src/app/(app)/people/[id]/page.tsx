@@ -33,6 +33,7 @@ import {
   listTasks,
   updatePerson,
 } from "@/lib/api/people";
+import { canManageEnrollments } from "@/lib/auth/role";
 import type {
   CourseClassRead,
   DepartmentRead,
@@ -74,6 +75,7 @@ export default function PersonDetailPage() {
   const router = useRouter();
   const { toast } = useToast();
   const personId = Number(params.id);
+  const canEnroll = canManageEnrollments();
 
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<ApiError | null>(null);
@@ -351,7 +353,22 @@ export default function PersonDetailPage() {
             id: "enrollments",
             label: "ثبت‌نام‌ها",
             content: (
-              <DataTable
+              <div className="flex flex-col gap-[var(--primitive-space-4)]">
+                {canEnroll ? (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      onClick={() =>
+                        router.push(`/enrollments/new?person_id=${person.id}`)
+                      }
+                    >
+                      ثبت‌نام جدید
+                    </Button>
+                  </div>
+                ) : null}
+                <DataTable
                 columns={[
                   {
                     key: "class_name",
@@ -381,6 +398,7 @@ export default function PersonDetailPage() {
                 onRowClick={(row) => router.push(`/enrollments/${row.id}`)}
                 emptyMessage="ثبت‌نامی یافت نشد"
               />
+              </div>
             ),
           },
           {

@@ -214,3 +214,109 @@ export type CollectionRate = {
   collection_rate_percent: number;
   pending_amount: number;
 };
+
+export type CourseRead = {
+  id: number;
+  department_id: number;
+  title: string;
+  description: string | null;
+  level: string | null;
+  current_price: number;
+  duration_sessions: number | null;
+  is_active: boolean;
+  org_id: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type InvoiceStatus = "open" | "partially_paid" | "paid" | "void";
+
+export type InvoiceRead = {
+  id: number;
+  enrollment_id: number;
+  total_amount: number;
+  status: InvoiceStatus;
+  org_id: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type InvoiceDetailRead = InvoiceRead & {
+  installments: InstallmentRead[];
+};
+
+export type InstallmentPlanItem = {
+  sequence: number;
+  amount: number;
+  due_date: StorageDate;
+};
+
+export type InvoiceCreate = {
+  enrollment_id: number;
+  installments: InstallmentPlanItem[];
+};
+
+export type PaymentRead = {
+  id: number;
+  installment_id: number;
+  amount: number;
+  recorded_by: number;
+  payment_date: StorageDate;
+  notes: string | null;
+  org_id: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PaymentCreate = {
+  installment_id: number;
+  amount: number;
+  payment_date?: StorageDate | null;
+  notes?: string | null;
+};
+
+export type RefundRead = {
+  id: number;
+  payment_id: number;
+  amount: number;
+  reason: string;
+  refunded_by: number;
+  refund_date: StorageDate;
+  notes: string | null;
+  org_id: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RefundCreate = {
+  payment_id: number;
+  amount: number;
+  reason: string;
+  notes?: string | null;
+};
+
+export type AttendanceRead = {
+  id: number;
+  enrollment_id: number;
+  session_date: StorageDate;
+  present: boolean;
+  notes: string | null;
+  org_id: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EnrollmentCreate = {
+  person_id: number;
+  class_id: number;
+  consultation_id?: number | null;
+  journey_id?: number | null;
+  discount_snapshot?: number;
+  start_date?: StorageDate | null;
+  status?: EnrollmentStatus;
+};
+
+export type EnrollmentDrop = {
+  reason: string;
+  notes?: string | null;
+};

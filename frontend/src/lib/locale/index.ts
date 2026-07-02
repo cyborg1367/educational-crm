@@ -1,5 +1,6 @@
 export { localeConfig, type LocaleConfig } from "./config";
 export {
+  addDaysToStorageDate,
   formatDateDisplay,
   formatDateTimeDisplay,
   toStorageDate,

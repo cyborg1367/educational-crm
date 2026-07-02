@@ -20,3 +20,7 @@ export {
   StaleLeadIndicator,
   type StaleLeadIndicatorProps,
 } from "./stale-lead-indicator";
+export {
+  PermissionBanner,
+  type PermissionBannerProps,
+} from "./permission-banner";
