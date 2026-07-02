@@ -1,11 +1,11 @@
 import { fetchJson } from "@/lib/api/client";
 import type {
+  CourseCreate,
+  CourseRead,
   PaginatedResponse,
-  UserCreate,
-  UserRead,
 } from "@/lib/api/types";
 
-const DEFAULT_LIMIT = 200;
+const DEFAULT_LIMIT = 50;
 
 function buildQuery(
   params: Record<string, string | number | undefined>,
@@ -20,24 +20,18 @@ function buildQuery(
   return qs ? `?${qs}` : "";
 }
 
-export function listUsers(
+export function listCourses(
   params: { limit?: number; offset?: number } = {},
-): Promise<PaginatedResponse<UserRead>> {
+): Promise<PaginatedResponse<CourseRead>> {
   const limit = params.limit ?? DEFAULT_LIMIT;
   const offset = params.offset ?? 0;
-  return fetchJson<PaginatedResponse<UserRead>>(
-    `/users${buildQuery({ limit, offset })}`,
-  );
+  return fetchJson(`/courses${buildQuery({ limit, offset })}`);
 }
 
-export function getUser(id: number): Promise<UserRead> {
-  return fetchJson<UserRead>(`/users/${id}`);
+export function getCourse(id: number): Promise<CourseRead> {
+  return fetchJson<CourseRead>(`/courses/${id}`);
 }
 
-export function getMe(): Promise<UserRead> {
-  return fetchJson<UserRead>("/auth/me");
-}
-
-export function createUser(body: UserCreate): Promise<UserRead> {
-  return fetchJson<UserRead>("/users", { method: "POST", body });
+export function createCourse(body: CourseCreate): Promise<CourseRead> {
+  return fetchJson<CourseRead>("/courses", { method: "POST", body });
 }

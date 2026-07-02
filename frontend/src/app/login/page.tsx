@@ -59,6 +59,9 @@ export default function LoginPage() {
 
       const data = (await response.json()) as TokenResponse;
       setAccessToken(data.access_token);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("crm_profile_email", email.trim());
+      }
       router.push(nextPathRef.current);
     } catch (err) {
       setError(toApiError(err, "ورود ناموفق بود"));
