@@ -41,7 +41,7 @@ import type {
   PersonRead,
   TaskRead,
 } from "@/lib/api/types";
-import { formatDateDisplay, formatToman } from "@/lib/locale";
+import { formatDateDisplay, formatDateTimeDisplay, formatToman } from "@/lib/locale";
 import {
   fetchLastActivityForPerson,
   isStaleLead,
@@ -334,7 +334,7 @@ export default function PersonDetailPage() {
                     key: "created_at",
                     header: "تاریخ ایجاد",
                     align: "end",
-                    cell: (row) => formatDateDisplay(row.created_at),
+                    cell: (row) => formatDateTimeDisplay(row.created_at, "YYYY/MM/DD"),
                   },
                 ]}
                 data={{

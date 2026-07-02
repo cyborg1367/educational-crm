@@ -31,7 +31,7 @@ import type {
   JourneyRead,
   PersonRead,
 } from "@/lib/api/types";
-import { formatDateDisplay } from "@/lib/locale";
+import { formatDateTimeDisplay } from "@/lib/locale";
 import {
   buildLastActivityMap,
   isStaleLead,
@@ -264,7 +264,7 @@ export default function PeopleListPage() {
                 key: "created_at",
                 header: "تاریخ ثبت",
                 align: "end",
-                cell: (row) => formatDateDisplay(row.created_at),
+                cell: (row) => formatDateTimeDisplay(row.created_at, "YYYY/MM/DD"),
               },
             ]}
             data={tableData}
@@ -309,7 +309,7 @@ export default function PeopleListPage() {
                       ) : null}
                     </>
                   }
-                  meta={formatDateDisplay(person.created_at)}
+                  meta={formatDateTimeDisplay(person.created_at, "YYYY/MM/DD")}
                 />
               ))
             )}
