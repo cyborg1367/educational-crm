@@ -24,6 +24,9 @@ type ConfirmDialogBaseProps = {
   onCancel: () => void;
   confirmVariant?: "primary" | "destructive";
   confirmLoading?: boolean;
+  confirmDisabled?: boolean;
+  /** Extra fields (e.g. reason textarea) rendered before action buttons. */
+  children?: React.ReactNode;
 };
 
 export type ConfirmDialogTier2Props = ConfirmDialogBaseProps & {
@@ -51,6 +54,8 @@ function ConfirmDialog(props: ConfirmDialogProps) {
     onCancel,
     confirmVariant = "destructive",
     confirmLoading = false,
+    confirmDisabled = false,
+    children,
     tier,
   } = props;
 
@@ -107,6 +112,8 @@ function ConfirmDialog(props: ConfirmDialogProps) {
           <CascadeConsequenceList consequences={props.consequences} />
         ) : null}
 
+        {children}
+
         <div className="flex w-full items-center justify-between gap-[var(--semantic-space-inlineGap)]">
           <Button
             type="button"
@@ -121,6 +128,7 @@ function ConfirmDialog(props: ConfirmDialogProps) {
             variant={confirmVariant}
             onClick={handleConfirm}
             loading={confirmLoading}
+            disabled={confirmDisabled}
           >
             {confirmLabel}
           </Button>

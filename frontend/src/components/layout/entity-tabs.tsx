@@ -90,6 +90,14 @@ function EntityTabs({
     return null;
   }
 
+  if (tabs.length === 1) {
+    return (
+      <div className={cn("flex flex-col", className)}>
+        <div className="py-[var(--primitive-space-6)]">{tabs[0]?.content}</div>
+      </div>
+    );
+  }
+
   return (
     <div className={cn("flex flex-col", className)}>
       <div
