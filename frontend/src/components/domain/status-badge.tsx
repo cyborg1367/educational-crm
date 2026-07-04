@@ -6,6 +6,7 @@ import {
   lookupStatusToken,
   statusTokenToCssVar,
 } from "@/generated/status-map";
+import { statusDisplayLabel } from "@/lib/terminology";
 import { cn } from "@/lib/utils";
 
 export type StatusBadgeDomain =
@@ -29,12 +30,9 @@ const NEUTRAL_FALLBACK_CLASSES = [
   "text-[var(--semantic-color-text-secondary)]",
 ].join(" ");
 
-function formatStatusLabel(value: string): string {
-  return value.replace(/_/g, " ");
-}
-
 function StatusBadge({ domain, value, className }: StatusBadgeProps) {
   const tokenPath = lookupStatusToken(domain, value);
+  const displayLabel = statusDisplayLabel(domain, value);
   const isHighUrgency = (highUrgencyStatusValues as readonly string[]).includes(
     value,
   );
@@ -69,7 +67,7 @@ function StatusBadge({ domain, value, className }: StatusBadgeProps) {
           className="size-[6px] shrink-0 rounded-[var(--primitive-radius-full)] bg-[var(--semantic-confirmationTier-tier3-accent)]"
         />
       ) : null}
-      {formatStatusLabel(value)}
+      {displayLabel}
     </Badge>
   );
 }

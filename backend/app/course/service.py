@@ -10,9 +10,16 @@ from app.tenancy.scoping import scoped
 
 
 def list_courses(
-    db: Session, org_id: int, *, limit: int = 50, offset: int = 0
+    db: Session,
+    org_id: int,
+    *,
+    is_active: bool | None = None,
+    limit: int = 50,
+    offset: int = 0,
 ) -> tuple[list[Course], int]:
     stmt = scoped(select(Course), Course, org_id).order_by(Course.title)
+    if is_active is not None:
+        stmt = stmt.where(Course.is_active == is_active)
     return paginate_query(db, stmt, limit=limit, offset=offset)
 
 

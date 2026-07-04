@@ -13,7 +13,7 @@ import { toApiError } from "@/lib/api/errors";
 import type { ApiError } from "@/lib/api/error";
 import { getCourse, listClasses } from "@/lib/api/finance";
 import { listUsers } from "@/lib/api/users";
-import type { CourseClassRead, CourseRead, UserRead } from "@/lib/api/types";
+import type { CourseClassRead, CourseRead, ClassStatus, UserRead } from "@/lib/api/types";
 import { formatDateDisplay } from "@/lib/locale";
 import { CLASS_STATUS_OPTIONS } from "@/lib/terminology";
 
@@ -56,7 +56,11 @@ export default function ClassesListPage() {
     setError(null);
     try {
       const [classRes, usersRes] = await Promise.all([
-        listClasses({ limit: PAGE_LIMIT, offset }),
+        listClasses({
+          limit: PAGE_LIMIT,
+          offset,
+          status: statusFilter as ClassStatus | undefined,
+        }),
         listUsers({ limit: 500 }),
       ]);
       setClassesPage(classRes);
@@ -78,26 +82,23 @@ export default function ClassesListPage() {
     } finally {
       setLoading(false);
     }
-  }, [offset]);
+  }, [offset, statusFilter]);
 
   React.useEffect(() => {
     void loadData();
   }, [loadData]);
 
   const rows: ClassRow[] = React.useMemo(() => {
-    return classesPage.items
-      .filter((cls) => !statusFilter || cls.status === statusFilter)
-      .map((cls) => ({
-        ...cls,
-        course_name: coursesById.get(cls.course_id)?.title ?? "—",
-        teacher_name: usersById.get(cls.teacher_id)?.name ?? "—",
-      }));
-  }, [classesPage.items, statusFilter, coursesById, usersById]);
+    return classesPage.items.map((cls) => ({
+      ...cls,
+      course_name: coursesById.get(cls.course_id)?.title ?? "—",
+      teacher_name: usersById.get(cls.teacher_id)?.name ?? "—",
+    }));
+  }, [classesPage.items, coursesById, usersById]);
 
   const tableData: PaginatedResponse<ClassRow> = {
     ...classesPage,
     items: rows,
-    total_count: statusFilter ? rows.length : classesPage.total_count,
   };
 
   const facets = React.useMemo(

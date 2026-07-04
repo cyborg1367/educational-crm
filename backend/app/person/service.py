@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import ConflictError, NotFoundError
 from app.core.pagination import paginate_query
+from app.person.enums import PersonStatus
 from app.person.model import Person
 from app.person.schemas import PersonCreate, PersonUpdate
 from app.tenancy.scoping import scoped
@@ -17,9 +18,16 @@ def _phone_taken(db: Session, org_id: int, phone: str, exclude_id: int | None = 
 
 
 def list_people(
-    db: Session, org_id: int, *, limit: int = 50, offset: int = 0
+    db: Session,
+    org_id: int,
+    *,
+    status: PersonStatus | None = None,
+    limit: int = 50,
+    offset: int = 0,
 ) -> tuple[list[Person], int]:
     stmt = scoped(select(Person), Person, org_id).order_by(Person.full_name)
+    if status is not None:
+        stmt = stmt.where(Person.status == status)
     return paginate_query(db, stmt, limit=limit, offset=offset)
 
 

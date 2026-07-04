@@ -19,6 +19,8 @@ from app.department import model as _department_model  # noqa: F401
 from app.enrollment import model as _enrollment_model  # noqa: F401
 from app.finance import model as _finance_model  # noqa: F401
 from app.journey import model as _journey_model  # noqa: F401
+from app.journey import service as journey_service
+from app.journey.model import Journey
 from app.organization import model as _organization_model  # noqa: F401
 from app.person import model as _person_model  # noqa: F401
 from app.roadmap import model as _roadmap_model  # noqa: F401
@@ -387,6 +389,31 @@ def seed_consultations(db, people: list[Person], departments: dict[str, Departme
     return consultations
 
 
+def seed_journeys(db) -> int:
+    consultations = list(
+        db.scalars(
+            select(Consultation).where(Consultation.org_id == ORG_ID).order_by(Consultation.id)
+        ).all()
+    )
+    created = 0
+    for consultation in consultations:
+        existing = db.scalars(
+            select(Journey).where(
+                Journey.org_id == ORG_ID,
+                Journey.person_id == consultation.person_id,
+                Journey.department_id == consultation.department_id,
+            )
+        ).first()
+        if existing is not None:
+            continue
+        journey_service.get_or_create_journey(
+            db, ORG_ID, consultation.person_id, consultation.department_id
+        )
+        created += 1
+    print(f"  created {created} journeys")
+    return created
+
+
 def seed_enrollments(
     db,
     people: list[Person],
@@ -678,7 +705,8 @@ def main() -> None:
             return
 
         if _already_seeded(db):
-            print("Seed data already present — skipping.")
+            print("Seed data already present — backfilling journeys…")
+            seed_journeys(db)
             return
 
         print("Seeding users…")
@@ -698,6 +726,9 @@ def main() -> None:
 
         print("Seeding consultations…")
         consultations = seed_consultations(db, people, departments)
+
+        print("Seeding journeys…")
+        seed_journeys(db)
 
         print("Seeding enrollments…")
         enrollments = seed_enrollments(db, people, classes, courses)

@@ -22,9 +22,19 @@ from app.tenancy.scoping import scoped
 
 
 def list_enrollments(
-    db: Session, org_id: int, *, limit: int = 50, offset: int = 0
+    db: Session,
+    org_id: int,
+    *,
+    status: EnrollmentStatus | None = None,
+    class_id: int | None = None,
+    limit: int = 50,
+    offset: int = 0,
 ) -> tuple[list[Enrollment], int]:
     stmt = scoped(select(Enrollment), Enrollment, org_id).order_by(Enrollment.id.desc())
+    if status is not None:
+        stmt = stmt.where(Enrollment.status == status)
+    if class_id is not None:
+        stmt = stmt.where(Enrollment.class_id == class_id)
     return paginate_query(db, stmt, limit=limit, offset=offset)
 
 

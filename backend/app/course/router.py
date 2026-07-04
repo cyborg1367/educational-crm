@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
@@ -20,6 +20,9 @@ def list_courses(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     pagination: Annotated[PaginationParams, Depends()],
+    is_active: Annotated[
+        bool | None, Query(description="Filter by active flag.")
+    ] = None,
 ) -> PaginatedResponse[CourseRead]:
     """List courses.
 
@@ -28,6 +31,7 @@ def list_courses(
     items, total_count = course_service.list_courses(
         db,
         current_user.org_id,
+        is_active=is_active,
         limit=pagination.limit,
         offset=pagination.offset,
     )

@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
@@ -8,6 +8,7 @@ from app.core.db import get_db
 from app.core.openapi import PROTECTED_RESPONSES
 from app.core.pagination import PaginatedResponse, PaginationParams
 from app.person import service as person_service
+from app.person.enums import PersonStatus
 from app.person.model import Person
 from app.person.schemas import PersonCreate, PersonRead, PersonUpdate
 from app.user.model import User
@@ -20,6 +21,9 @@ def list_people(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     pagination: Annotated[PaginationParams, Depends()],
+    status: Annotated[
+        PersonStatus | None, Query(description="Filter by person status.")
+    ] = None,
 ) -> PaginatedResponse[PersonRead]:
     """List people in the organization.
 
@@ -28,6 +32,7 @@ def list_people(
     items, total_count = person_service.list_people(
         db,
         current_user.org_id,
+        status=status,
         limit=pagination.limit,
         offset=pagination.offset,
     )

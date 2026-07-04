@@ -36,11 +36,12 @@ const TERMINOLOGY: Record<string, string> = {
 
   // Task.type
   follow_up_registration: "پیگیری ثبت‌نام",
-  follow_up_payment: "پیگیری پرداخت",
+  pre_enroll_unpaid: "پیش‌ثبت‌نام بدون پرداخت",
+  post_course_consultation: "مشاوره پس از دوره",
+  dormant_followup: "پیگیری غیرفعال",
+  installment_overdue: "اقساط معوق",
   referral: "ارجاع",
-  post_course_review: "بازبینی پس از دوره",
-  dormant_follow_up: "پیگیری غیرفعال",
-  other: "سایر",
+  custom: "سفارشی",
 
   // Task.status
   open: "باز",
@@ -56,6 +57,45 @@ const TERMINOLOGY: Record<string, string> = {
 
 export function terminologyLabel(value: string): string {
   return TERMINOLOGY[value] ?? value.replace(/_/g, " ");
+}
+
+/** Domain-scoped status labels for StatusBadge — keyed as `{domain}.{value}`. */
+export const STATUS_DISPLAY_LABELS: Record<string, string> = {
+  "person.prospect": "احتمالی",
+  "person.lead": "سرنخ",
+  "person.student": "دانش‌آموز",
+  "person.dormant": "غیرفعال",
+  "person.alumni": "فارغ‌التحصیل",
+  "enrollment.pre_enroll": "پیش‌ثبت‌نام",
+  "enrollment.active": "فعال",
+  "enrollment.completed": "تکمیل‌شده",
+  "enrollment.dropped": "انصراف",
+  "invoice.open": "باز",
+  "invoice.partially_paid": "پرداخت جزئی",
+  "invoice.paid": "پرداخت‌شده",
+  "invoice.void": "باطل",
+  "installment.pending": "در انتظار",
+  "installment.partially_paid": "پرداخت جزئی",
+  "installment.paid": "پرداخت‌شده",
+  "installment.overdue": "معوق",
+  "installment.cancelled": "لغو‌شده",
+  "task.open": "باز",
+  "task.done": "انجام‌شده",
+  "task.cancelled": "لغو‌شده",
+  "class.planned": "برنامه‌ریزی‌شده",
+  "class.active": "فعال",
+  "class.completed": "تکمیل‌شده",
+  "class.cancelled": "لغو‌شده",
+  "journey.active": "فعال",
+  "journey.completed": "تکمیل‌شده",
+};
+
+export function statusDisplayLabel(domain: string, value: string): string {
+  const label = STATUS_DISPLAY_LABELS[`${domain}.${value}`];
+  if (label) {
+    return label;
+  }
+  return value.replace(/_/g, " ") || value;
 }
 
 export const PERSON_STATUS_OPTIONS: { value: PersonStatus; label: string }[] = [
@@ -86,11 +126,12 @@ export const CONSULTATION_OUTCOME_OPTIONS: {
 
 export const TASK_TYPE_LABELS: Record<TaskType, string> = {
   follow_up_registration: terminologyLabel("follow_up_registration"),
-  follow_up_payment: terminologyLabel("follow_up_payment"),
+  pre_enroll_unpaid: terminologyLabel("pre_enroll_unpaid"),
+  post_course_consultation: terminologyLabel("post_course_consultation"),
+  dormant_followup: terminologyLabel("dormant_followup"),
+  installment_overdue: terminologyLabel("installment_overdue"),
   referral: terminologyLabel("referral"),
-  post_course_review: terminologyLabel("post_course_review"),
-  dormant_follow_up: terminologyLabel("dormant_follow_up"),
-  other: terminologyLabel("other"),
+  custom: terminologyLabel("custom"),
 };
 
 export function taskTypeLabel(type: TaskType): string {

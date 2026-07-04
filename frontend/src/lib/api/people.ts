@@ -3,12 +3,27 @@ import type {
   PaginatedResponse,
   PersonCreate,
   PersonRead,
+  PersonStatus,
   PersonUpdate,
 } from "@/lib/api/types";
 
 const DEFAULT_LIMIT = 50;
 
+function buildQuery(
+  params: Record<string, string | number | undefined>,
+): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) {
+      search.set(key, String(value));
+    }
+  }
+  const qs = search.toString();
+  return qs ? `?${qs}` : "";
+}
+
 export type ListPeopleParams = {
+  status?: PersonStatus;
   limit?: number;
   offset?: number;
 };
@@ -19,7 +34,7 @@ export function listPeople(
   const limit = params.limit ?? DEFAULT_LIMIT;
   const offset = params.offset ?? 0;
   return fetchJson<PaginatedResponse<PersonRead>>(
-    `/people?limit=${limit}&offset=${offset}`,
+    `/people${buildQuery({ limit, offset, status: params.status })}`,
   );
 }
 
@@ -47,11 +62,23 @@ export function listJourneys(
 }
 
 export function listEnrollments(
-  params: { limit?: number; offset?: number } = {},
+  params: {
+    status?: import("@/lib/api/types").EnrollmentStatus;
+    class_id?: number;
+    limit?: number;
+    offset?: number;
+  } = {},
 ): Promise<PaginatedResponse<import("@/lib/api/types").EnrollmentRead>> {
   const limit = params.limit ?? 200;
   const offset = params.offset ?? 0;
-  return fetchJson(`/enrollments?limit=${limit}&offset=${offset}`);
+  return fetchJson(
+    `/enrollments${buildQuery({
+      limit,
+      offset,
+      status: params.status,
+      class_id: params.class_id,
+    })}`,
+  );
 }
 
 export function listTasks(
@@ -63,11 +90,17 @@ export function listTasks(
 }
 
 export function listClasses(
-  params: { limit?: number; offset?: number } = {},
+  params: {
+    status?: import("@/lib/api/types").ClassStatus;
+    limit?: number;
+    offset?: number;
+  } = {},
 ): Promise<PaginatedResponse<import("@/lib/api/types").CourseClassRead>> {
   const limit = params.limit ?? 200;
   const offset = params.offset ?? 0;
-  return fetchJson(`/classes?limit=${limit}&offset=${offset}`);
+  return fetchJson(
+    `/classes${buildQuery({ limit, offset, status: params.status })}`,
+  );
 }
 
 export function listDepartments(

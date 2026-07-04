@@ -82,7 +82,11 @@ export default function CoursesListPage() {
     setError(null);
     try {
       const [courses, deptRes] = await Promise.all([
-        listCourses({ limit: PAGE_LIMIT, offset }),
+        listCourses({
+          limit: PAGE_LIMIT,
+          offset,
+          is_active: activeOnly ? true : undefined,
+        }),
         listDepartments({ limit: 100 }),
       ]);
       setCoursesPage(courses);
@@ -92,7 +96,7 @@ export default function CoursesListPage() {
     } finally {
       setLoading(false);
     }
-  }, [offset]);
+  }, [offset, activeOnly]);
 
   React.useEffect(() => {
     void loadData();
@@ -106,9 +110,6 @@ export default function CoursesListPage() {
   const rows: CourseRow[] = React.useMemo(() => {
     return coursesPage.items
       .filter((course) => {
-        if (activeOnly && !course.is_active) {
-          return false;
-        }
         if (departmentFilter) {
           return course.department_id === Number(departmentFilter);
         }
@@ -118,14 +119,11 @@ export default function CoursesListPage() {
         ...course,
         department_name: departmentById.get(course.department_id) ?? "—",
       }));
-  }, [coursesPage.items, activeOnly, departmentFilter, departmentById]);
+  }, [coursesPage.items, departmentFilter, departmentById]);
 
-  const tableData: PaginatedResponse<CourseRow> = {
-    ...coursesPage,
-    items: rows,
-    total_count:
-      activeOnly || departmentFilter ? rows.length : coursesPage.total_count,
-  };
+  const tableData: PaginatedResponse<CourseRow> = departmentFilter
+    ? { ...coursesPage, items: rows, total_count: rows.length }
+    : { ...coursesPage, items: rows };
 
   const facets = React.useMemo(
     () => [
