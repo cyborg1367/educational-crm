@@ -9,9 +9,13 @@ import {
   StaleLeadIndicator,
   StatusBadge,
 } from "@/components/domain";
-import { AppDrawer, ErrorState, useToast } from "@/components/feedback";
-import { FormField } from "@/components/form/form-field";
-import { TextInput } from "@/components/form/text-input";
+import {
+  emptyPersonFormState,
+  personFormStateToCreateBody,
+  type PersonFormState,
+} from "@/components/domain/person-form-fields";
+import { PersonFormDialog } from "@/components/domain/person-form-dialog";
+import { ErrorState, useToast } from "@/components/feedback";
 import { FilterBar, type FilterValues } from "@/components/layout";
 import { ListPageSkeleton } from "@/components/skeletons";
 import { Avatar } from "@/components/primitives/avatar";
@@ -75,9 +79,9 @@ export default function PeopleListPage() {
 
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
-  const [formFullName, setFormFullName] = React.useState("");
-  const [formPhone, setFormPhone] = React.useState("");
-  const [formEmail, setFormEmail] = React.useState("");
+  const [formState, setFormState] = React.useState<PersonFormState>(
+    emptyPersonFormState,
+  );
   const [formError, setFormError] = React.useState<ApiError | null>(null);
   const [fieldError, setFieldError] = React.useState<ApiFieldError | null>(null);
 
@@ -207,26 +211,20 @@ export default function PeopleListPage() {
   );
 
   const resetForm = () => {
-    setFormFullName("");
-    setFormPhone("");
-    setFormEmail("");
+    setFormState(emptyPersonFormState());
     setFormError(null);
     setFieldError(null);
   };
 
   const handleCreate = async () => {
-    if (!formFullName.trim()) {
+    if (!formState.fullName.trim() || !formState.phone.trim()) {
       return;
     }
     setSubmitting(true);
     setFormError(null);
     setFieldError(null);
     try {
-      const created = await createPerson({
-        full_name: formFullName.trim(),
-        phone: formPhone.trim() || null,
-        email: formEmail.trim() || null,
-      });
+      const created = await createPerson(personFormStateToCreateBody(formState));
       toast({ variant: "success", title: "شخص جدید ثبت شد" });
       setDrawerOpen(false);
       resetForm();
@@ -357,49 +355,21 @@ export default function PeopleListPage() {
         }
       />
 
-      <AppDrawer
+      <PersonFormDialog
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
-        mode="form"
         title="افزودن شخص"
+        state={formState}
+        onChange={(patch) => setFormState((prev) => ({ ...prev, ...patch }))}
         onSubmit={handleCreate}
         submitLabel="ثبت"
         submitLoading={submitting}
-        submitDisabled={!formFullName.trim()}
-      >
-        {formError ? <ErrorState error={formError} className="py-[var(--primitive-space-4)]" /> : null}
-        <div className="flex flex-col gap-[var(--primitive-space-4)]">
-          <FormField
-            label="نام کامل"
-            required
-            error={fieldError?.field === "full_name" ? fieldError : null}
-          >
-            <TextInput
-              value={formFullName}
-              onChange={(e) => setFormFullName(e.target.value)}
-            />
-          </FormField>
-          <FormField
-            label="تلفن"
-            error={fieldError?.field === "phone" ? fieldError : null}
-          >
-            <TextInput
-              value={formPhone}
-              onChange={(e) => setFormPhone(e.target.value)}
-            />
-          </FormField>
-          <FormField
-            label="ایمیل"
-            error={fieldError?.field === "email" ? fieldError : null}
-          >
-            <TextInput
-              type="email"
-              value={formEmail}
-              onChange={(e) => setFormEmail(e.target.value)}
-            />
-          </FormField>
-        </div>
-      </AppDrawer>
+        submitDisabled={
+          !formState.fullName.trim() || !formState.phone.trim()
+        }
+        fieldError={fieldError}
+        formError={formError}
+      />
     </>
   );
 }

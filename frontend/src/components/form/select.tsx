@@ -10,6 +10,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useDialogPortalContainer } from "@/components/ui/dialog-portal-context";
 import { cn } from "@/lib/utils";
 
 export type SelectOption = {
@@ -52,6 +53,7 @@ function Select({
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const listId = React.useId();
+  const portalContainer = useDialogPortalContainer();
 
   const selected = options.find((option) => option.value === value);
   const normalizedQuery = query.trim().toLowerCase();
@@ -70,6 +72,7 @@ function Select({
 
   return (
     <Popover
+      modal={false}
       open={open}
       onOpenChange={(nextOpen) => {
         setOpen(nextOpen);
@@ -101,6 +104,7 @@ function Select({
 
       <PopoverContent
         align="start"
+        container={portalContainer}
         className="w-[var(--radix-popover-trigger-width)] p-[var(--primitive-space-2)]"
       >
         {searchable ? (

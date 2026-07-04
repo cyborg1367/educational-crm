@@ -4,6 +4,7 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.activity import service as activity_service
 from app.course_class.model import CourseClass
 from app.enrollment import service as enrollment_service
 from app.enrollment.enums import EnrollmentStatus
@@ -12,6 +13,57 @@ from app.organization.model import Organization
 from app.person import service as person_service
 from app.person.model import Person
 from app.person.schemas import PersonCreate
+from app.user.model import User
+
+
+def test_create_person_logs_person_created_activity(
+    db_session: Session,
+    org_id: int,
+    admin_user: User,
+) -> None:
+    person = person_service.create_person(
+        db_session,
+        org_id,
+        PersonCreate(
+            full_name="New Lead",
+            phone="09121112233",
+            source="website",
+        ),
+        actor_id=admin_user.id,
+    )
+
+    activities, total = activity_service.list_activities(
+        db_session, org_id, person_id=person.id
+    )
+    assert total == 1
+    assert activities[0].action == "person_created"
+    assert activities[0].actor_id == admin_user.id
+    assert activities[0].payload == {"status": "prospect", "source": "website"}
+
+
+def test_delete_person_removes_record_and_timeline(
+    db_session: Session,
+    org_id: int,
+    admin_user: User,
+) -> None:
+    person = person_service.create_person(
+        db_session,
+        org_id,
+        PersonCreate(full_name="To Delete", phone="09123334455"),
+        actor_id=admin_user.id,
+    )
+
+    person_service.delete_person(db_session, org_id, person.id)
+
+    with pytest.raises(HTTPException) as exc_info:
+        person_service.get_person(db_session, org_id, person.id)
+    assert exc_info.value.status_code == 404
+
+    activities, total = activity_service.list_activities(
+        db_session, org_id, person_id=person.id
+    )
+    assert total == 0
+    assert activities == []
 
 
 def _create_second_org(db_session: Session) -> int:

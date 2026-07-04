@@ -21,7 +21,7 @@ services:
       DATABASE_URL: postgresql+psycopg2://crm:crm@postgres:5432/crm
       SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
       ENVIRONMENT: ${ENVIRONMENT:-development}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://127.0.0.1}
       RATE_LIMIT_STORAGE_URI: ${RATE_LIMIT_STORAGE_URI:-memory://}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
       PRE_ENROLL_FOLLOWUP_DAYS: ${PRE_ENROLL_FOLLOWUP_DAYS:-3}
@@ -36,9 +36,9 @@ services:
       dockerfile: ./frontend/Dockerfile
       args:
         NEXT_PUBLIC_USE_MOCK_API: "false"
-        NEXT_PUBLIC_API_URL: http://localhost/api
+        NEXT_PUBLIC_API_URL: /api
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost/api
+      NEXT_PUBLIC_API_URL: /api
       NEXT_PUBLIC_USE_MOCK_API: "false"
       NODE_ENV: production
 

@@ -1,32 +1,39 @@
 "use client";
 
 import * as React from "react";
-import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar } from "lucide-react";
 
+import { Select } from "@/components/form/select";
 import { TextInput } from "@/components/form/text-input";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useDialogPortalContainer } from "@/components/ui/dialog-portal-context";
 import {
   formatDateDisplay,
   toStorageDate,
   type StorageDate,
 } from "@/lib/locale/date";
 import {
+  buildJalaliYearRange,
   buildMonthGrid,
   currentJalaliMonth,
-  formatJalaliMonthTitle,
   JALALI_WEEKDAY_LABELS,
-  shiftJalaliMonth,
   storageToJalaliMonth,
   type JalaliMonth,
 } from "@/lib/locale/jalali-month";
+import { PERSIAN_MONTHS } from "@/lib/locale/persian-months";
 import { toPersianDigits } from "@/lib/locale/number";
 import { cn } from "@/lib/utils";
 
 const JALALI_DATE = /^\d{4}\/\d{1,2}\/\d{1,2}$/;
+
+const MONTH_OPTIONS = PERSIAN_MONTHS.map((label, index) => ({
+  value: String(index + 1),
+  label,
+}));
 
 export type DatePickerProps = {
   id?: string;
@@ -37,6 +44,10 @@ export type DatePickerProps = {
   error?: boolean;
   inputSize?: "md" | "lg";
   className?: string;
+  /** Earliest selectable Jalali year in the calendar header (default 1300). */
+  minYear?: number;
+  /** Latest selectable Jalali year in the calendar header (default current + 10). */
+  maxYear?: number;
   "aria-describedby"?: string;
   "aria-invalid"?: boolean;
   "aria-required"?: boolean;
@@ -51,14 +62,30 @@ function DatePicker({
   error = false,
   inputSize = "md",
   className,
+  minYear,
+  maxYear,
   ...ariaProps
 }: DatePickerProps) {
+  const currentMonth = currentJalaliMonth();
+  const resolvedMinYear = minYear ?? 1300;
+  const resolvedMaxYear = maxYear ?? currentMonth.year + 10;
+
   const [open, setOpen] = React.useState(false);
   const [displayValue, setDisplayValue] = React.useState(() =>
     value ? formatDateDisplay(value) : "",
   );
   const [viewMonth, setViewMonth] = React.useState<JalaliMonth>(() =>
-    value ? storageToJalaliMonth(value) : currentJalaliMonth(),
+    value ? storageToJalaliMonth(value) : currentMonth,
+  );
+  const portalContainer = useDialogPortalContainer();
+
+  const yearOptions = React.useMemo(
+    () =>
+      buildJalaliYearRange(resolvedMinYear, resolvedMaxYear).map((year) => ({
+        value: String(year),
+        label: toPersianDigits(String(year)),
+      })),
+    [resolvedMinYear, resolvedMaxYear],
   );
 
   React.useEffect(() => {
@@ -98,7 +125,7 @@ function DatePicker({
   const monthCells = buildMonthGrid(viewMonth);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover modal={false} open={open} onOpenChange={setOpen}>
       <div className={cn("relative", className)}>
         <TextInput
           id={id}
@@ -136,35 +163,35 @@ function DatePicker({
         </PopoverTrigger>
       </div>
 
-      <PopoverContent className="w-[min(20rem,calc(100vw-2*var(--semantic-space-pageMargin)))] p-[var(--primitive-space-3)]">
-        <div className="mb-[var(--primitive-space-3)] flex items-center justify-between gap-[var(--primitive-space-2)]">
-          <button
-            type="button"
-            className={cn(
-              "inline-flex size-[var(--primitive-space-8)] items-center justify-center rounded-[var(--primitive-radius-md)]",
-              "text-[var(--semantic-color-text-primary)] hover:bg-[var(--primitive-color-neutral-100)]",
-              "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--semantic-color-action-focusRing)]",
-            )}
-            aria-label="ماه قبل"
-            onClick={() => setViewMonth((current) => shiftJalaliMonth(current, -1))}
-          >
-            <ChevronRight className="size-[var(--primitive-space-4)]" />
-          </button>
-          <span className="text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)]">
-            {formatJalaliMonthTitle(viewMonth)}
-          </span>
-          <button
-            type="button"
-            className={cn(
-              "inline-flex size-[var(--primitive-space-8)] items-center justify-center rounded-[var(--primitive-radius-md)]",
-              "text-[var(--semantic-color-text-primary)] hover:bg-[var(--primitive-color-neutral-100)]",
-              "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--semantic-color-action-focusRing)]",
-            )}
-            aria-label="ماه بعد"
-            onClick={() => setViewMonth((current) => shiftJalaliMonth(current, 1))}
-          >
-            <ChevronLeft className="size-[var(--primitive-space-4)]" />
-          </button>
+      <PopoverContent
+        container={portalContainer}
+        className="w-[min(20rem,calc(100vw-2*var(--semantic-space-pageMargin)))] p-[var(--primitive-space-3)]"
+      >
+        <div className="mb-[var(--primitive-space-3)] grid grid-cols-2 gap-[var(--primitive-space-2)]">
+          <Select
+            searchable
+            searchPlaceholder="جستجوی سال…"
+            options={yearOptions}
+            value={String(viewMonth.year)}
+            onChange={(nextYear) =>
+              setViewMonth((current) => ({
+                ...current,
+                year: Number(nextYear),
+              }))
+            }
+            aria-label="سال"
+          />
+          <Select
+            options={MONTH_OPTIONS}
+            value={String(viewMonth.month)}
+            onChange={(nextMonth) =>
+              setViewMonth((current) => ({
+                ...current,
+                month: Number(nextMonth),
+              }))
+            }
+            aria-label="ماه"
+          />
         </div>
 
         <div className="grid grid-cols-7 gap-[var(--primitive-space-1)] text-center">

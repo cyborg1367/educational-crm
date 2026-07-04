@@ -70,3 +70,13 @@ export function formatJalaliMonthTitle({ year, month }: JalaliMonth): string {
 export function jalaliMonthToStorageAnchor({ year, month }: JalaliMonth): StorageDate {
   return toStorageDate(`${year}/${month}/1`);
 }
+
+export function buildJalaliYearRange(minYear: number, maxYear: number): number[] {
+  const start = Math.min(minYear, maxYear);
+  const end = Math.max(minYear, maxYear);
+  const years: number[] = [];
+  for (let year = end; year >= start; year--) {
+    years.push(year);
+  }
+  return years;
+}

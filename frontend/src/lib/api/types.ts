@@ -103,13 +103,35 @@ export type PersonStatus =
   | "dormant"
   | "alumni";
 
+export type PersonGender = "male" | "female" | "other";
+
+export type PersonInterest =
+  | "programming"
+  | "ai"
+  | "accounting"
+  | "english"
+  | "graphic"
+  | "robotics";
+
+export type PersonSource =
+  | "friend_referral"
+  | "social_media"
+  | "website"
+  | "advertisement"
+  | "other";
+
 export type PersonRead = {
   id: number;
   full_name: string;
   phone: string | null;
   email: string | null;
+  birth_date: StorageDate | null;
+  gender: PersonGender | null;
+  address: string | null;
+  interests: PersonInterest[] | null;
+  interests_note: string | null;
   status: PersonStatus;
-  source: string | null;
+  source: PersonSource | null;
   notes: string | null;
   org_id: number;
   created_at: string;
@@ -120,7 +142,12 @@ export type PersonCreate = {
   full_name: string;
   phone?: string | null;
   email?: string | null;
-  source?: string | null;
+  birth_date?: StorageDate | null;
+  gender?: PersonGender | null;
+  address?: string | null;
+  interests?: PersonInterest[] | null;
+  interests_note?: string | null;
+  source?: PersonSource | null;
   notes?: string | null;
 };
 
@@ -128,8 +155,13 @@ export type PersonUpdate = {
   full_name?: string;
   phone?: string | null;
   email?: string | null;
+  birth_date?: StorageDate | null;
+  gender?: PersonGender | null;
+  address?: string | null;
+  interests?: PersonInterest[] | null;
+  interests_note?: string | null;
   status?: PersonStatus;
-  source?: string | null;
+  source?: PersonSource | null;
   notes?: string | null;
 };
 

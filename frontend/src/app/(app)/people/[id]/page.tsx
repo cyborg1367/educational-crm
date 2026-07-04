@@ -11,21 +11,28 @@ import {
 import type { PaginatedResponse } from "@/components/data-display/types";
 import {
   AISummaryPanel,
+  ConfirmDialog,
   StaleLeadIndicator,
   StatusAction,
   StatusBadge,
 } from "@/components/domain";
-import { AppDrawer, ErrorState, useToast } from "@/components/feedback";
-import { FormField } from "@/components/form/form-field";
-import { Select } from "@/components/form/select";
-import { TextInput } from "@/components/form/text-input";
+import {
+  emptyPersonFormState,
+  personFormStateFromRead,
+  personFormStateToUpdateBody,
+  type PersonFormState,
+} from "@/components/domain/person-form-fields";
+import { PersonFormDialog } from "@/components/domain/person-form-dialog";
+import { ErrorState, useToast } from "@/components/feedback";
 import { Breadcrumb } from "@/components/layout";
+import { Badge } from "@/components/primitives/badge";
 import { T1DetailSkeleton } from "@/components/skeletons";
 import { BlockSkeleton } from "@/components/feedback/skeleton";
 import { Button } from "@/components/ui/button";
 import { fieldErrorFromApi, toApiError } from "@/lib/api/errors";
 import type { ApiError, ApiFieldError } from "@/lib/api/error";
 import {
+  deletePerson,
   getPerson,
   listClasses,
   listDepartments,
@@ -36,6 +43,7 @@ import {
 } from "@/lib/api/people";
 import { listConsultations } from "@/lib/api/consultations";
 import { getCourse } from "@/lib/api/finance";
+import { listUsers } from "@/lib/api/users";
 import { canManageEnrollments } from "@/lib/auth/role";
 import type {
   ConsultationRead,
@@ -52,7 +60,13 @@ import {
   fetchLastActivityForPerson,
   isStaleLead,
 } from "@/lib/person/stale-lead";
-import { PERSON_STATUS_OPTIONS, taskTypeLabel, terminologyLabel } from "@/lib/terminology";
+import {
+  genderLabel,
+  interestLabel,
+  sourceLabel,
+  taskTypeLabel,
+  terminologyLabel,
+} from "@/lib/terminology";
 
 const emptyPage = <T,>(): PaginatedResponse<T> => ({
   items: [],
@@ -100,14 +114,14 @@ export default function PersonDetailPage() {
   const [coursesById, setCoursesById] = React.useState<Map<number, CourseRead>>(
     new Map(),
   );
+  const [usersMap, setUsersMap] = React.useState<Record<number, string>>({});
   const [tabLoading, setTabLoading] = React.useState(false);
 
   const [editOpen, setEditOpen] = React.useState(false);
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
-  const [formFullName, setFormFullName] = React.useState("");
-  const [formPhone, setFormPhone] = React.useState("");
-  const [formEmail, setFormEmail] = React.useState("");
-  const [formStatus, setFormStatus] = React.useState<PersonRead["status"]>("prospect");
+  const [deleting, setDeleting] = React.useState(false);
+  const [formState, setFormState] = React.useState<PersonFormState | null>(null);
   const [formError, setFormError] = React.useState<ApiError | null>(null);
   const [fieldError, setFieldError] = React.useState<ApiFieldError | null>(null);
 
@@ -185,12 +199,16 @@ export default function PersonDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const [personData, lastActivity] = await Promise.all([
+      const [personData, lastActivity, usersRes] = await Promise.all([
         getPerson(personId),
         fetchLastActivityForPerson(personId),
+        listUsers({ limit: 500 }),
       ]);
       setPerson(personData);
       setLastActivityAt(lastActivity);
+      setUsersMap(
+        Object.fromEntries(usersRes.items.map((user) => [user.id, user.name])),
+      );
     } catch (err) {
       setError(toApiError(err, "خطا در بارگذاری شخص"));
     } finally {
@@ -256,27 +274,22 @@ export default function PersonDetailPage() {
 
   const openEditDrawer = () => {
     if (!person) return;
-    setFormFullName(person.full_name);
-    setFormPhone(person.phone ?? "");
-    setFormEmail(person.email ?? "");
-    setFormStatus(person.status);
+    setFormState(personFormStateFromRead(person));
     setFormError(null);
     setFieldError(null);
     setEditOpen(true);
   };
 
   const handleUpdate = async () => {
-    if (!person || !formFullName.trim()) return;
+    if (!person || !formState || !formState.fullName.trim()) return;
     setSubmitting(true);
     setFormError(null);
     setFieldError(null);
     try {
-      const updated = await updatePerson(person.id, {
-        full_name: formFullName.trim(),
-        phone: formPhone.trim() || null,
-        email: formEmail.trim() || null,
-        status: formStatus,
-      });
+      const updated = await updatePerson(
+        person.id,
+        personFormStateToUpdateBody(formState),
+      );
       setPerson(updated);
       toast({ variant: "success", title: "تغییرات ذخیره شد" });
       setEditOpen(false);
@@ -289,6 +302,24 @@ export default function PersonDetailPage() {
       }
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!person) return;
+    setDeleting(true);
+    try {
+      await deletePerson(person.id);
+      toast({ variant: "success", title: "شخص حذف شد" });
+      setDeleteOpen(false);
+      router.push("/people");
+    } catch (err) {
+      toast({
+        variant: "error",
+        title: toApiError(err, "خطا در حذف شخص").detail,
+      });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -338,6 +369,14 @@ export default function PersonDetailPage() {
             <Button type="button" variant="secondary" size="sm" onClick={openEditDrawer}>
               ویرایش
             </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={() => setDeleteOpen(true)}
+            >
+              حذف
+            </Button>
           </div>
         }
         tabs={[
@@ -349,6 +388,47 @@ export default function PersonDetailPage() {
                 <dl className="rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] px-[var(--primitive-space-4)]">
                   <KeyValueRow label="تلفن" value={person.phone} />
                   <KeyValueRow label="ایمیل" value={person.email} />
+                  <KeyValueRow
+                    label="تاریخ تولد"
+                    value={
+                      person.birth_date
+                        ? formatDateDisplay(person.birth_date)
+                        : "ثبت نشده"
+                    }
+                  />
+                  <KeyValueRow
+                    label="جنسیت"
+                    value={
+                      person.gender ? genderLabel(person.gender) : "ثبت نشده"
+                    }
+                  />
+                  <KeyValueRow
+                    label="علاقه‌مندی‌ها"
+                    value={
+                      person.interests && person.interests.length > 0 ? (
+                        <span className="flex flex-wrap gap-[var(--primitive-space-2)]">
+                          {person.interests.map((interest) => (
+                            <Badge key={interest} variant="brand">
+                              {interestLabel(interest)}
+                            </Badge>
+                          ))}
+                        </span>
+                      ) : (
+                        "ثبت نشده"
+                      )
+                    }
+                  />
+                  <KeyValueRow
+                    label="توضیحات علاقه‌مندی"
+                    value={person.interests_note ?? "—"}
+                  />
+                  <KeyValueRow
+                    label="منبع آشنایی"
+                    value={
+                      person.source ? sourceLabel(person.source) : "ثبت نشده"
+                    }
+                  />
+                  <KeyValueRow label="یادداشت" value={person.notes ?? "—"} />
                 </dl>
 
                 <div className="flex flex-col gap-[var(--primitive-space-3)]">
@@ -500,6 +580,7 @@ export default function PersonDetailPage() {
                 personId={person.id}
                 orgId={person.org_id}
                 useMock={false}
+                usersMap={usersMap}
               />
             ),
           },
@@ -573,65 +654,37 @@ export default function PersonDetailPage() {
         }
       />
 
-      <AppDrawer
+      <PersonFormDialog
         open={editOpen}
         onOpenChange={setEditOpen}
-        mode="form"
         title="ویرایش شخص"
+        state={formState ?? emptyPersonFormState()}
+        onChange={(patch) =>
+          setFormState((prev) => (prev ? { ...prev, ...patch } : prev))
+        }
         onSubmit={handleUpdate}
         submitLoading={submitting}
-        submitDisabled={!formFullName.trim()}
-      >
-        {formError ? (
-          <ErrorState error={formError} className="py-[var(--primitive-space-4)]" />
-        ) : null}
-        <div className="flex flex-col gap-[var(--primitive-space-4)]">
-          <FormField
-            label="نام کامل"
-            required
-            error={fieldError?.field === "full_name" ? fieldError : null}
-          >
-            <TextInput
-              value={formFullName}
-              onChange={(e) => setFormFullName(e.target.value)}
-            />
-          </FormField>
-          <FormField
-            label="تلفن"
-            error={fieldError?.field === "phone" ? fieldError : null}
-          >
-            <TextInput
-              value={formPhone}
-              onChange={(e) => setFormPhone(e.target.value)}
-            />
-          </FormField>
-          <FormField
-            label="ایمیل"
-            error={fieldError?.field === "email" ? fieldError : null}
-          >
-            <TextInput
-              type="email"
-              value={formEmail}
-              onChange={(e) => setFormEmail(e.target.value)}
-            />
-          </FormField>
-          <FormField
-            label="وضعیت"
-            error={fieldError?.field === "status" ? fieldError : null}
-          >
-            <Select
-              options={PERSON_STATUS_OPTIONS.map((opt) => ({
-                value: opt.value,
-                label: opt.label,
-              }))}
-              value={formStatus}
-              onChange={(value) =>
-                setFormStatus(value as PersonRead["status"])
-              }
-            />
-          </FormField>
-        </div>
-      </AppDrawer>
+        submitDisabled={
+          !formState?.fullName.trim() || !formState?.phone.trim()
+        }
+        fieldError={fieldError}
+        formError={formError}
+        showStatus
+      />
+
+      <ConfirmDialog
+        tier={2}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="حذف شخص"
+        body={`آیا از حذف «${person.full_name}» مطمئن هستید؟ این عمل برای توسعه است و تمام timeline و داده‌های وابسته را هم پاک می‌کند.`}
+        confirmLabel="حذف"
+        cancelLabel="انصراف"
+        confirmVariant="destructive"
+        confirmLoading={deleting}
+        onConfirm={() => void handleDelete()}
+        onCancel={() => setDeleteOpen(false)}
+      />
     </>
   );
 }

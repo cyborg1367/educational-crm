@@ -1,6 +1,7 @@
-from datetime import datetime
+from datetime import date, datetime
+from typing import Any
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, func
+from sqlalchemy import Date, DateTime, Enum, ForeignKey, JSON, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -15,12 +16,17 @@ class Person(Base):
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    gender: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    interests: Mapped[list[Any] | None] = mapped_column(JSON, nullable=True)
+    interests_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[PersonStatus] = mapped_column(
         Enum(PersonStatus, name="person_status", native_enum=False),
         nullable=False,
         default=PersonStatus.prospect,
     )
-    source: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source: Mapped[str | None] = mapped_column(String(50), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     org_id: Mapped[int] = mapped_column(
         ForeignKey("organizations.id"), nullable=False, index=True

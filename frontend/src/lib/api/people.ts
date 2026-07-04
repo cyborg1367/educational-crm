@@ -53,6 +53,10 @@ export function updatePerson(
   return fetchJson<PersonRead>(`/people/${id}`, { method: "PATCH", body });
 }
 
+export function deletePerson(id: number): Promise<void> {
+  return fetchJson<void>(`/people/${id}`, { method: "DELETE" });
+}
+
 export function listJourneys(
   params: { limit?: number; offset?: number } = {},
 ): Promise<PaginatedResponse<import("@/lib/api/types").JourneyRead>> {

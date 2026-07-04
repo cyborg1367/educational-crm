@@ -18,7 +18,7 @@ const TextInput = React.forwardRef<HTMLInputElement, TextInputProps>(
       disabled={disabled}
       className={cn(
         controlVariants({ size: inputSize, error }),
-        "text-start",
+        "text-start read-only:pointer-events-none",
         className,
       )}
       {...props}

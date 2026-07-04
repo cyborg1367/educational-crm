@@ -13,7 +13,6 @@ export const controlVariants = cva(
     "active:bg-[var(--primitive-color-neutral-100)]",
     focusVisibleStyles,
     "disabled:pointer-events-none disabled:bg-[var(--semantic-color-surface-subtle)] disabled:text-[var(--semantic-color-text-disabled)]",
-    "read-only:pointer-events-none",
   ].join(" "),
   {
     variants: {
