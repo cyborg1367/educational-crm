@@ -40,11 +40,23 @@ export function getEnrollment(id: number): Promise<EnrollmentRead> {
 }
 
 export function listEnrollments(
-  params: { limit?: number; offset?: number } = {},
+  params: {
+    status?: EnrollmentRead["status"];
+    class_id?: number;
+    limit?: number;
+    offset?: number;
+  } = {},
 ): Promise<PaginatedResponse<EnrollmentRead>> {
   const limit = params.limit ?? DEFAULT_LIMIT;
   const offset = params.offset ?? 0;
-  return fetchJson(`/enrollments${buildQuery({ limit, offset })}`);
+  return fetchJson(
+    `/enrollments${buildQuery({
+      limit,
+      offset,
+      status: params.status,
+      class_id: params.class_id,
+    })}`,
+  );
 }
 
 export function createEnrollment(body: EnrollmentCreate): Promise<EnrollmentRead> {
@@ -70,11 +82,17 @@ export function getClass(id: number): Promise<CourseClassRead> {
 }
 
 export function listClasses(
-  params: { limit?: number; offset?: number } = {},
+  params: {
+    status?: CourseClassRead["status"];
+    limit?: number;
+    offset?: number;
+  } = {},
 ): Promise<PaginatedResponse<CourseClassRead>> {
   const limit = params.limit ?? DEFAULT_LIMIT;
   const offset = params.offset ?? 0;
-  return fetchJson(`/classes${buildQuery({ limit, offset })}`);
+  return fetchJson(
+    `/classes${buildQuery({ limit, offset, status: params.status })}`,
+  );
 }
 
 export function getCourse(id: number): Promise<CourseRead> {

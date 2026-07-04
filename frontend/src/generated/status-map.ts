@@ -9,7 +9,7 @@ export const statusMap = {
   "enrollment.active": "color.status.success",
   "enrollment.completed": "color.status.success-muted",
   "enrollment.dropped": "color.status.danger-strong",
-  "invoice.pending": "color.status.neutral",
+  "invoice.open": "color.status.neutral",
   "invoice.partially_paid": "color.status.warning",
   "invoice.paid": "color.status.success",
   "installment.pending": "color.status.neutral",

@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
@@ -9,6 +9,7 @@ from app.core.rate_limit import SENSITIVE_LIMIT
 from app.core.openapi import PROTECTED_RESPONSES
 from app.core.pagination import PaginatedResponse, PaginationParams
 from app.enrollment import service as enrollment_service
+from app.enrollment.enums import EnrollmentStatus
 from app.enrollment.model import Enrollment
 from app.enrollment.schemas import (
     EnrollmentCreate,
@@ -27,6 +28,12 @@ def list_enrollments(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     pagination: Annotated[PaginationParams, Depends()],
+    status: Annotated[
+        EnrollmentStatus | None, Query(description="Filter by enrollment status.")
+    ] = None,
+    class_id: Annotated[
+        int | None, Query(description="Filter by class ID.")
+    ] = None,
 ) -> PaginatedResponse[EnrollmentRead]:
     """List enrollments.
 
@@ -35,6 +42,8 @@ def list_enrollments(
     items, total_count = enrollment_service.list_enrollments(
         db,
         current_user.org_id,
+        status=status,
+        class_id=class_id,
         limit=pagination.limit,
         offset=pagination.offset,
     )

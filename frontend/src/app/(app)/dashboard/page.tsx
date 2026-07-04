@@ -22,6 +22,7 @@ import { listConsultations } from "@/lib/api/consultations";
 import { listClasses, listInstallments, listInvoices } from "@/lib/api/finance";
 import { listEnrollments, listPeople } from "@/lib/api/people";
 import { listTasks } from "@/lib/api/tasks";
+import { getMe } from "@/lib/api/users";
 import type {
   CollectionRate,
   ConsultationRead,
@@ -35,15 +36,14 @@ import type {
 } from "@/lib/api/types";
 import type { ApiError } from "@/lib/api/error";
 import { toApiError } from "@/lib/api/errors";
-import { getDevUserRole } from "@/lib/auth/role";
+import { getCurrentRole } from "@/lib/auth/role";
+import type { UserRole } from "@/lib/nav/types";
 import { formatCount, formatDateDisplay, formatToman, todayDisplay, todayStorage } from "@/lib/locale";
 import { STALE_LEAD_DAYS } from "@/lib/person/stale-lead";
 import { TASK_TYPE_LABELS, terminologyLabel } from "@/lib/terminology";
 
-const role = getDevUserRole();
 const YEAR = dayjs().year();
 const TODAY = todayStorage();
-const DEV_USER_ID = Number(process.env.NEXT_PUBLIC_DEV_USER_ID ?? Number.NaN);
 
 const emptyPage = <T,>(): PaginatedResponse<T> => ({
   items: [],
@@ -82,6 +82,8 @@ function WidgetTable<T>({
 }
 
 export default function DashboardPage() {
+  const [role, setRole] = React.useState<UserRole>("admin");
+  const [currentUserId, setCurrentUserId] = React.useState<number | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<ApiError | null>(null);
   const [people, setPeople] = React.useState<PersonRead[]>([]);
@@ -93,6 +95,20 @@ export default function DashboardPage() {
   const [revenue, setRevenue] = React.useState<RevenueSummary | null>(null);
   const [enrollmentReport, setEnrollmentReport] = React.useState<EnrollmentTrends | null>(null);
   const [collection, setCollection] = React.useState<CollectionRate | null>(null);
+
+  React.useEffect(() => {
+    setRole(getCurrentRole());
+  }, []);
+
+  React.useEffect(() => {
+    if (role !== "department_manager") {
+      setCurrentUserId(null);
+      return;
+    }
+    void getMe()
+      .then((me) => setCurrentUserId(me.id))
+      .catch(() => setCurrentUserId(null));
+  }, [role]);
 
   const loadData = React.useCallback(async () => {
     setLoading(true);
@@ -161,9 +177,10 @@ export default function DashboardPage() {
     (cls) => cls.start_date === TODAY || cls.status === "active",
   );
   const openTasks = tasks.filter((task) => task.status === "open");
-  const openTasksAssignedToMe = Number.isFinite(DEV_USER_ID)
-    ? openTasks.filter((task) => task.assignee_id === DEV_USER_ID)
-    : openTasks;
+  const openTasksAssignedToMe =
+    currentUserId != null
+      ? openTasks.filter((task) => task.assignee_id === currentUserId)
+      : [];
 
   if (error) return <ErrorState error={error} />;
 

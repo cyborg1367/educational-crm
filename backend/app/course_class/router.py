@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
@@ -22,6 +22,9 @@ def list_classes(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     pagination: Annotated[PaginationParams, Depends()],
+    status: Annotated[
+        ClassStatus | None, Query(description="Filter by class status.")
+    ] = None,
 ) -> PaginatedResponse[CourseClassRead]:
     """List classes.
 
@@ -30,6 +33,7 @@ def list_classes(
     items, total_count = class_service.list_classes(
         db,
         current_user.org_id,
+        status=status,
         limit=pagination.limit,
         offset=pagination.offset,
     )

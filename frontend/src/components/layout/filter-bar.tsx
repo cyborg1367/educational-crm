@@ -5,6 +5,7 @@ import { Bookmark } from "lucide-react";
 
 import { DatePicker } from "@/components/form/date-picker";
 import { Select, type SelectOption } from "@/components/form/select";
+import { TextInput } from "@/components/form/text-input";
 import { Checkbox } from "@/components/form/selection-control";
 import { focusVisibleStyles } from "@/components/form/control-styles";
 import {
@@ -39,10 +40,18 @@ export type FacetDateRangeConfig = {
   toLabel?: string;
 };
 
+export type FacetSearchConfig = {
+  id: string;
+  type: "search";
+  label: string;
+  placeholder?: string;
+};
+
 export type FacetConfig =
   | FacetSelectConfig
   | FacetMultiSelectConfig
-  | FacetDateRangeConfig;
+  | FacetDateRangeConfig
+  | FacetSearchConfig;
 
 export type SavedView = {
   id: string;
@@ -161,6 +170,24 @@ function FacetField({
   values: FilterValues;
   onValuesChange: (values: FilterValues) => void;
 }) {
+  if (facet.type === "search") {
+    const value = values[facet.id];
+    return (
+      <div className="min-w-[12rem] flex-1 sm:max-w-[20rem]">
+        <label className="mb-[var(--primitive-space-1)] block text-[length:var(--primitive-font-size-xs)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-secondary)]">
+          {facet.label}
+        </label>
+        <TextInput
+          value={typeof value === "string" ? value : ""}
+          onChange={(event) =>
+            onValuesChange(updateValue(values, facet.id, event.target.value))
+          }
+          placeholder={facet.placeholder}
+        />
+      </div>
+    );
+  }
+
   if (facet.type === "select") {
     const value = values[facet.id];
     return (

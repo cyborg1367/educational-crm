@@ -73,11 +73,12 @@ export type TaskStatus = "open" | "done" | "cancelled";
 
 export type TaskType =
   | "follow_up_registration"
-  | "follow_up_payment"
+  | "pre_enroll_unpaid"
+  | "post_course_consultation"
+  | "dormant_followup"
+  | "installment_overdue"
   | "referral"
-  | "post_course_review"
-  | "dormant_follow_up"
-  | "other";
+  | "custom";
 
 export type TaskRead = {
   id: number;

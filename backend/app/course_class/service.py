@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import NotFoundError, ValidationError
 from app.core.pagination import paginate_query
 from app.course import service as course_service
+from app.course_class.enums import ClassStatus
 from app.course_class.model import CourseClass
 from app.course_class.schemas import CourseClassCreate, CourseClassUpdate
 from app.tenancy.scoping import scoped
@@ -12,11 +13,18 @@ from app.user.enums import UserRole
 
 
 def list_classes(
-    db: Session, org_id: int, *, limit: int = 50, offset: int = 0
+    db: Session,
+    org_id: int,
+    *,
+    status: ClassStatus | None = None,
+    limit: int = 50,
+    offset: int = 0,
 ) -> tuple[list[CourseClass], int]:
     stmt = scoped(select(CourseClass), CourseClass, org_id).order_by(
         CourseClass.start_date.desc(), CourseClass.name
     )
+    if status is not None:
+        stmt = stmt.where(CourseClass.status == status)
     return paginate_query(db, stmt, limit=limit, offset=offset)
 
 

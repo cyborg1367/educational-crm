@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { DataTable, EntitySummaryCard } from "@/components/data-display";
 import type { PaginatedResponse } from "@/components/data-display/types";
@@ -30,8 +30,10 @@ import type {
   DepartmentRead,
   JourneyRead,
   PersonRead,
+  PersonStatus,
 } from "@/lib/api/types";
 import { formatDateTimeDisplay } from "@/lib/locale";
+import { normalizeDigitsInput } from "@/lib/locale/number";
 import {
   buildLastActivityMap,
   isStaleLead,
@@ -50,9 +52,16 @@ const emptyPage = <T,>(): PaginatedResponse<T> => ({
 
 export default function PeopleListPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  const [filterValues, setFilterValues] = React.useState<FilterValues>({});
+  const [filterValues, setFilterValues] = React.useState<FilterValues>(() => {
+    const status = searchParams.get("status");
+    if (status) {
+      return { status };
+    }
+    return {};
+  });
   const [offset, setOffset] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<ApiError | null>(null);
@@ -78,6 +87,10 @@ export default function PeopleListPage() {
     typeof filterValues.department === "string"
       ? filterValues.department
       : undefined;
+  const searchQuery =
+    typeof filterValues.search === "string"
+      ? filterValues.search.trim()
+      : "";
 
   const loadData = React.useCallback(async () => {
     setLoading(true);
@@ -85,7 +98,11 @@ export default function PeopleListPage() {
     try {
       const [people, deptRes, journeyRes, activities, communications] =
         await Promise.all([
-          listPeople({ limit: PAGE_LIMIT, offset }),
+          listPeople({
+            limit: PAGE_LIMIT,
+            offset,
+            status: statusFilter as PersonStatus | undefined,
+          }),
           listDepartments({ limit: 100 }),
           listJourneys({ limit: 500 }),
           listActivities({ limit: 500 }),
@@ -103,7 +120,7 @@ export default function PeopleListPage() {
     } finally {
       setLoading(false);
     }
-  }, [offset]);
+  }, [offset, statusFilter]);
 
   React.useEffect(() => {
     void loadData();
@@ -120,10 +137,11 @@ export default function PeopleListPage() {
   }, [journeys]);
 
   const filteredItems = React.useMemo(() => {
+    const normalizedSearch = searchQuery
+      ? normalizeDigitsInput(searchQuery).toLowerCase()
+      : "";
+
     return peoplePage.items.filter((person) => {
-      if (statusFilter && person.status !== statusFilter) {
-        return false;
-      }
       if (departmentFilter) {
         const deptId = Number(departmentFilter);
         const personDepts = departmentByPerson.get(person.id);
@@ -131,17 +149,39 @@ export default function PeopleListPage() {
           return false;
         }
       }
+      if (normalizedSearch) {
+        const nameMatch = person.full_name
+          .toLowerCase()
+          .includes(normalizedSearch);
+        const phoneMatch = person.phone
+          ? normalizeDigitsInput(person.phone).includes(normalizedSearch)
+          : false;
+        if (!nameMatch && !phoneMatch) {
+          return false;
+        }
+      }
       return true;
     });
-  }, [peoplePage.items, statusFilter, departmentFilter, departmentByPerson]);
+  }, [
+    peoplePage.items,
+    departmentFilter,
+    departmentByPerson,
+    searchQuery,
+  ]);
 
-  const tableData: PaginatedResponse<PersonRead> = {
-    ...peoplePage,
-    items: filteredItems,
-  };
+  const tableData: PaginatedResponse<PersonRead> =
+    departmentFilter || searchQuery
+      ? { ...peoplePage, items: filteredItems }
+      : peoplePage;
 
   const facets = React.useMemo(
     () => [
+      {
+        id: "search",
+        type: "search" as const,
+        label: "جستجو",
+        placeholder: "جستجو بر اساس نام یا تلفن",
+      },
       {
         id: "status",
         type: "select" as const,

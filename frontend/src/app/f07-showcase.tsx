@@ -102,7 +102,7 @@ const mockTasks: TaskRead[] = [
   {
     id: 2,
     person_id: MOCK_PERSON_ID,
-    type: "follow_up_payment",
+    type: "pre_enroll_unpaid",
     title: "پیگیری پرداخت قسط",
     description: null,
     due_date: daysFromToday(7),
