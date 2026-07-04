@@ -101,6 +101,9 @@ export default function LoginPage() {
         <p className="mt-[var(--primitive-space-2)] text-center text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
           Educational CRM
         </p>
+        <p className="mt-[var(--primitive-space-2)] text-center text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]">
+          dev: admin@crm.local / Admin1234!
+        </p>
 
         <form
           onSubmit={handleSubmit}

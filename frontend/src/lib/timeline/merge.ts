@@ -1,17 +1,13 @@
 import type { ActivityRead, CommunicationRead } from "@/lib/api/types";
-import {
-  extractActivitySummary,
-  formatActivityActionLabel,
-  formatCommunicationLabel,
-} from "@/lib/timeline/labels";
+import { formatCommunicationLabel } from "@/lib/timeline/labels";
 
 export type TimelineActivityEntry = {
   kind: "activity";
   id: number;
   created_at: string;
   action: string;
-  actionLabel: string;
-  summary: string;
+  payload: Record<string, unknown> | null;
+  actor_id: number | null;
 };
 
 export type TimelineCommunicationEntry = {
@@ -34,8 +30,8 @@ function toActivityEntry(activity: ActivityRead): TimelineActivityEntry {
     id: activity.id,
     created_at: activity.created_at,
     action: activity.action,
-    actionLabel: formatActivityActionLabel(activity.action),
-    summary: extractActivitySummary(activity.action, activity.payload),
+    payload: activity.payload,
+    actor_id: activity.actor_id,
   };
 }
 

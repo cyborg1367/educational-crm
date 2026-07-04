@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { Clock, MessageSquare, Zap } from "lucide-react";
 
 import { EmptyState } from "@/components/feedback/empty-state";
@@ -16,10 +17,19 @@ import type {
   ActivityRead,
   CommunicationRead,
   PaginatedResponse,
+  TaskType,
 } from "@/lib/api/types";
 import type { ApiError } from "@/lib/api/error";
 import { formatDateTimeDisplay } from "@/lib/locale/date";
+import { formatToman } from "@/lib/locale";
 import { mergeTimelineEntries, type TimelineEntry } from "@/lib/timeline/merge";
+import {
+  actionLabel,
+  CONSULTATION_OUTCOME_LABELS,
+  sourceLabel,
+  STATUS_DISPLAY_LABELS,
+  TASK_TYPE_LABELS,
+} from "@/lib/terminology";
 import { cn } from "@/lib/utils";
 
 const TIMELINE_FETCH_LIMIT = 100;
@@ -28,6 +38,7 @@ export type TimelineProps = {
   personId: number;
   orgId: number;
   useMock?: boolean;
+  usersMap?: Record<number, string>;
   className?: string;
 };
 
@@ -49,6 +60,193 @@ async function fetchTimelineData(
   ]);
 
   return mergeTimelineEntries(activities.items, communications.items);
+}
+
+function payloadString(
+  payload: Record<string, unknown> | null,
+  key: string,
+): string | undefined {
+  const value = payload?.[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function payloadNumber(
+  payload: Record<string, unknown> | null,
+  key: string,
+): number | undefined {
+  const value = payload?.[key];
+  return typeof value === "number" ? value : undefined;
+}
+
+function actorName(
+  actorId: number | null,
+  usersMap?: Record<number, string>,
+): string | undefined {
+  if (actorId == null || !usersMap) {
+    return undefined;
+  }
+  return usersMap[actorId];
+}
+
+function activityBorderColor(action: string): string {
+  if (action === "person_created") {
+    return "var(--semantic-color-action-primary)";
+  }
+  if (action === "consultation_done") {
+    return "var(--semantic-color-action-primary)";
+  }
+  if (
+    action === "enrollment_created" ||
+    action === "enrollment_activated" ||
+    action === "course_completed"
+  ) {
+    return "var(--semantic-color-status-success)";
+  }
+  if (action === "payment_recorded") {
+    return "var(--semantic-color-status-warning)";
+  }
+  if (action === "task_created" || action === "manual_note") {
+    return "var(--semantic-color-status-neutral)";
+  }
+  if (action === "enrollment_dropped" || action === "payment_refunded") {
+    return "var(--semantic-color-status-danger)";
+  }
+  return "var(--semantic-color-surface-border)";
+}
+
+function ActivityDetails({
+  action,
+  payload,
+  actorId,
+  usersMap,
+}: {
+  action: string;
+  payload: Record<string, unknown> | null;
+  actorId: number | null;
+  usersMap?: Record<number, string>;
+}) {
+  const detailClassName =
+    "mt-[var(--primitive-space-1)] text-[length:var(--primitive-font-size-sm)] leading-[var(--primitive-font-lineHeight-sm)] text-[var(--semantic-color-text-secondary)]";
+
+  switch (action) {
+    case "person_created": {
+      const status = payloadString(payload, "status");
+      const source = payloadString(payload, "source");
+      const actor = actorName(actorId, usersMap);
+      return (
+        <>
+          {status ? (
+            <p className={detailClassName}>
+              وضعیت: {STATUS_DISPLAY_LABELS[`person.${status}`] ?? status}
+            </p>
+          ) : null}
+          {source ? (
+            <p className={detailClassName}>منبع: {sourceLabel(source)}</p>
+          ) : null}
+          {actor ? <p className={detailClassName}>توسط: {actor}</p> : null}
+        </>
+      );
+    }
+    case "consultation_done": {
+      const outcome = payloadString(payload, "outcome");
+      const actor = actorName(actorId, usersMap);
+      return (
+        <>
+          {outcome ? (
+            <p className={detailClassName}>
+              نتیجه:{" "}
+              {CONSULTATION_OUTCOME_LABELS[
+                outcome as keyof typeof CONSULTATION_OUTCOME_LABELS
+              ] ?? outcome}
+            </p>
+          ) : null}
+          {actor ? <p className={detailClassName}>توسط: {actor}</p> : null}
+        </>
+      );
+    }
+    case "enrollment_created": {
+      const status = payloadString(payload, "status");
+      const enrollmentId = payloadNumber(payload, "enrollment_id");
+      return (
+        <>
+          {status ? (
+            <p className={detailClassName}>
+              وضعیت: {STATUS_DISPLAY_LABELS[`enrollment.${status}`] ?? status}
+            </p>
+          ) : null}
+          {enrollmentId != null ? (
+            <Link
+              href={`/enrollments/${enrollmentId}`}
+              className={cn(
+                detailClassName,
+                "inline-block font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-action-primary)]",
+                "hover:text-[var(--semantic-color-action-primaryHover)]",
+              )}
+            >
+              مشاهده ثبت‌نام →
+            </Link>
+          ) : null}
+        </>
+      );
+    }
+    case "enrollment_dropped": {
+      const reason = payloadString(payload, "reason");
+      return reason ? (
+        <p
+          className={cn(
+            detailClassName,
+            "text-[var(--semantic-color-status-danger)]",
+          )}
+        >
+          دلیل: {reason}
+        </p>
+      ) : null;
+    }
+    case "payment_recorded": {
+      const amount = payloadNumber(payload, "amount");
+      const installmentId = payloadNumber(payload, "installment_id");
+      return (
+        <>
+          {amount != null ? (
+            <p className={detailClassName}>
+              مبلغ: {formatToman(amount)} تومان
+            </p>
+          ) : null}
+          {installmentId != null ? (
+            <p className={detailClassName}>قسط: #{installmentId}</p>
+          ) : null}
+        </>
+      );
+    }
+    case "payment_refunded": {
+      const amount = payloadNumber(payload, "amount");
+      return amount != null ? (
+        <p className={detailClassName}>
+          مبلغ بازگشتی: {formatToman(amount)} تومان
+        </p>
+      ) : null;
+    }
+    case "task_created": {
+      const taskType = payloadString(payload, "task_type");
+      const title = payloadString(payload, "title");
+      return (
+        <>
+          {taskType ? (
+            <p className={detailClassName}>
+              نوع: {TASK_TYPE_LABELS[taskType as TaskType] ?? taskType}
+            </p>
+          ) : null}
+          {title ? <p className={detailClassName}>{title}</p> : null}
+        </>
+      );
+    }
+    case "course_completed":
+      return (
+        <p className={detailClassName}>دوره با موفقیت تکمیل شد</p>
+      );
+    default:
+      return null;
+  }
 }
 
 function TimelineRowSkeleton() {
@@ -78,10 +276,21 @@ function TimelineSkeleton() {
   );
 }
 
-function TimelineRow({ entry }: { entry: TimelineEntry }) {
+function TimelineRow({
+  entry,
+  usersMap,
+}: {
+  entry: TimelineEntry;
+  usersMap?: Record<number, string>;
+}) {
   const isActivity = entry.kind === "activity";
   const Icon = isActivity ? Zap : MessageSquare;
-  const label = isActivity ? entry.actionLabel : entry.channelLabel;
+  const label = isActivity
+    ? actionLabel(entry.action)
+    : entry.channelLabel;
+  const borderColor = isActivity
+    ? activityBorderColor(entry.action)
+    : undefined;
 
   return (
     <article className="flex gap-[var(--primitive-space-3)] border-b border-[var(--semantic-color-surface-border)] py-[var(--primitive-space-4)] last:border-b-0">
@@ -95,7 +304,14 @@ function TimelineRow({ entry }: { entry: TimelineEntry }) {
       >
         <Icon className="size-[var(--primitive-space-5)]" />
       </div>
-      <div className="min-w-0 flex-1">
+      <div
+        className={cn(
+          "min-w-0 flex-1",
+          borderColor &&
+            "border-s-[2px] ps-[var(--primitive-space-3)]",
+        )}
+        style={borderColor ? { borderInlineStartColor: borderColor } : undefined}
+      >
         <time
           dateTime={entry.created_at}
           className="text-[length:var(--primitive-font-size-xs)] leading-[var(--primitive-font-lineHeight-xs)] text-[var(--semantic-color-text-secondary)]"
@@ -105,9 +321,18 @@ function TimelineRow({ entry }: { entry: TimelineEntry }) {
         <p className="mt-[var(--primitive-space-1)] text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)] leading-[var(--primitive-font-lineHeight-sm)] text-[var(--semantic-color-text-primary)]">
           {label}
         </p>
-        <p className="mt-[var(--primitive-space-1)] text-[length:var(--primitive-font-size-sm)] leading-[var(--primitive-font-lineHeight-sm)] text-[var(--semantic-color-text-secondary)]">
-          {entry.summary}
-        </p>
+        {isActivity ? (
+          <ActivityDetails
+            action={entry.action}
+            payload={entry.payload}
+            actorId={entry.actor_id}
+            usersMap={usersMap}
+          />
+        ) : (
+          <p className="mt-[var(--primitive-space-1)] text-[length:var(--primitive-font-size-sm)] leading-[var(--primitive-font-lineHeight-sm)] text-[var(--semantic-color-text-secondary)]">
+            {entry.summary}
+          </p>
+        )}
       </div>
     </article>
   );
@@ -115,7 +340,13 @@ function TimelineRow({ entry }: { entry: TimelineEntry }) {
 
 type TimelineBodyProps = TimelineProps;
 
-function TimelineBody({ personId, orgId, useMock, className }: TimelineBodyProps) {
+function TimelineBody({
+  personId,
+  orgId,
+  useMock,
+  usersMap,
+  className,
+}: TimelineBodyProps) {
   const [entries, setEntries] = React.useState<TimelineEntry[] | null>(null);
   const [error, setError] = React.useState<ApiError | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -191,6 +422,7 @@ function TimelineBody({ personId, orgId, useMock, className }: TimelineBodyProps
         <TimelineRow
           key={`${entry.kind}-${entry.id}`}
           entry={entry}
+          usersMap={usersMap}
         />
       ))}
     </div>

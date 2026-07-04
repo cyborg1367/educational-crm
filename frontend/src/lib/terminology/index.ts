@@ -1,6 +1,9 @@
 import type {
   ClassStatus,
   ConsultationOutcome,
+  PersonGender,
+  PersonInterest,
+  PersonSource,
   PersonStatus,
   TaskType,
   UserRole,
@@ -149,3 +152,63 @@ export const USER_ROLE_OPTIONS: { value: UserRole; label: string }[] = [
 export function userRoleLabel(role: UserRole): string {
   return terminologyLabel(role);
 }
+
+export const INTERESTS_OPTIONS: { value: PersonInterest; label: string }[] = [
+  { value: "programming", label: "برنامه‌نویسی" },
+  { value: "ai", label: "هوش مصنوعی" },
+  { value: "accounting", label: "حسابداری و هوش مالی" },
+  { value: "english", label: "زبان انگلیسی" },
+  { value: "graphic", label: "گرافیک" },
+  { value: "robotics", label: "رباتیک" },
+];
+
+export const GENDER_OPTIONS: { value: PersonGender; label: string }[] = [
+  { value: "male", label: "مرد" },
+  { value: "female", label: "زن" },
+  { value: "other", label: "سایر" },
+];
+
+export const SOURCE_OPTIONS: { value: PersonSource; label: string }[] = [
+  { value: "friend_referral", label: "معرفی دوست" },
+  { value: "social_media", label: "فضای مجازی" },
+  { value: "website", label: "سایت" },
+  { value: "advertisement", label: "تبلیغات" },
+  { value: "other", label: "سایر" },
+];
+
+export function interestLabel(value: string): string {
+  return INTERESTS_OPTIONS.find((opt) => opt.value === value)?.label ?? value;
+}
+
+export function genderLabel(value: string): string {
+  return GENDER_OPTIONS.find((opt) => opt.value === value)?.label ?? value;
+}
+
+export function sourceLabel(value: string): string {
+  return SOURCE_OPTIONS.find((opt) => opt.value === value)?.label ?? value;
+}
+
+/** Activity timeline action labels — keyed by backend `Activity.action`. */
+export const ACTION_LABELS: Record<string, string> = {
+  person_created: "ورود لید به سیستم",
+  consultation_done: "مشاوره انجام شد",
+  enrollment_created: "ثبت‌نام انجام شد",
+  enrollment_dropped: "انصراف از ثبت‌نام",
+  payment_recorded: "پرداخت ثبت شد",
+  payment_refunded: "بازپرداخت انجام شد",
+  task_created: "وظیفه ایجاد شد",
+  course_completed: "دوره تکمیل شد",
+  manual_note: "یادداشت",
+};
+
+export function actionLabel(action: string): string {
+  return ACTION_LABELS[action] ?? action;
+}
+
+export const CONSULTATION_OUTCOME_LABELS: Record<ConsultationOutcome, string> = {
+  pre_enroll: terminologyLabel("pre_enroll"),
+  follow_up: terminologyLabel("follow_up"),
+  refer_other_dept: terminologyLabel("refer_other_dept"),
+  not_suitable: terminologyLabel("not_suitable"),
+  closed: terminologyLabel("closed"),
+};

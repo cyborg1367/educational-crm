@@ -86,6 +86,7 @@
   --primitive-motion-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --primitive-zIndex-dropdown: 10;
   --primitive-zIndex-drawer: 20;
+  --primitive-zIndex-popover: 35;
   --primitive-zIndex-modal: 30;
   --primitive-zIndex-toast: 40;
   --semantic-color-text-primary: #18181B;

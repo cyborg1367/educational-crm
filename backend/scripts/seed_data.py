@@ -27,7 +27,7 @@ from app.roadmap import model as _roadmap_model  # noqa: F401
 from app.task import model as _task_model  # noqa: F401
 from app.user import model as _user_model  # noqa: F401
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 from app.activity.model import Activity
 from app.activity.service import log_activity
@@ -608,47 +608,300 @@ def seed_tasks(db, people: list[Person]) -> None:
     print("  created 10 tasks")
 
 
-def seed_activities(db, people: list[Person], consultations: list[Consultation], enrollments: list[Enrollment]) -> None:
+def _first_installment_for_enrollment(db, enrollment_id: int):
+    from app.finance.model import Installment, Invoice
+
+    invoice = db.scalars(
+        select(Invoice).where(
+            Invoice.org_id == ORG_ID,
+            Invoice.enrollment_id == enrollment_id,
+        )
+    ).first()
+    if invoice is None:
+        return None
+    return db.scalars(
+        select(Installment)
+        .where(Installment.org_id == ORG_ID, Installment.invoice_id == invoice.id)
+        .order_by(Installment.sequence)
+    ).first()
+
+
+def seed_activities(
+    db,
+    people: list[Person],
+    consultations: list[Consultation],
+    enrollments: list[Enrollment],
+) -> None:
     existing_count = db.scalar(
         select(func.count()).select_from(Activity).where(Activity.org_id == ORG_ID)
     )
-    if existing_count and existing_count >= 15:
-        print("  skip activities")
-        return
+    if existing_count:
+        db.execute(delete(Activity).where(Activity.org_id == ORG_ID))
+        db.commit()
+        print(f"  cleared {existing_count} old activities (timeline demo rebuild)")
 
     admission = _get_user_by_role_key(db, "admission")
     finance_user = _get_user_by_role_key(db, "finance")
+    created = 0
+
+    demo_enrollment = enrollments[0]
+    demo_person_id = demo_enrollment.person_id
+    demo_consultation = next(
+        (c for c in consultations if c.person_id == demo_person_id),
+        consultations[0],
+    )
+    demo_installment = _first_installment_for_enrollment(db, demo_enrollment.id)
+    demo_task = db.scalars(
+        select(Task).where(Task.org_id == ORG_ID).order_by(Task.id).limit(1)
+    ).first()
+
+    log_activity(
+        db,
+        ORG_ID,
+        demo_person_id,
+        "consultation_done",
+        payload={
+            "consultation_id": demo_consultation.id,
+            "outcome": (
+                demo_consultation.outcome.value if demo_consultation.outcome else None
+            ),
+        },
+        actor_id=admission.id,
+    )
+    created += 1
+
+    log_activity(
+        db,
+        ORG_ID,
+        demo_person_id,
+        "enrollment_created",
+        payload={
+            "enrollment_id": demo_enrollment.id,
+            "class_id": demo_enrollment.class_id,
+            "status": demo_enrollment.status.value,
+        },
+        actor_id=admission.id,
+    )
+    created += 1
+
+    if demo_installment is not None:
+        log_activity(
+            db,
+            ORG_ID,
+            demo_person_id,
+            "payment_recorded",
+            payload={
+                "enrollment_id": demo_enrollment.id,
+                "installment_id": demo_installment.id,
+                "amount": demo_installment.paid_amount or demo_installment.amount // 2,
+                "invoice_id": demo_installment.invoice_id,
+            },
+            actor_id=finance_user.id,
+        )
+        created += 1
+
+    if demo_task is not None:
+        log_activity(
+            db,
+            ORG_ID,
+            demo_person_id,
+            "task_created",
+            payload={
+                "task_id": demo_task.id,
+                "task_type": demo_task.type.value,
+                "title": demo_task.title,
+                "due_date": demo_task.due_date.isoformat(),
+            },
+            actor_id=admission.id,
+        )
+        created += 1
+
+    log_activity(
+        db,
+        ORG_ID,
+        demo_person_id,
+        "manual_note",
+        payload={"note": "علاقه‌مند به کلاس عصر — پیگیری هفته آینده"},
+        actor_id=admission.id,
+    )
+    created += 1
+
+    completed_enrollment = next(
+        (e for e in enrollments if e.status == EnrollmentStatus.completed),
+        enrollments[5],
+    )
+    log_activity(
+        db,
+        ORG_ID,
+        completed_enrollment.person_id,
+        "course_completed",
+        payload={
+            "enrollment_id": completed_enrollment.id,
+            "class_id": completed_enrollment.class_id,
+        },
+        actor_id=admission.id,
+    )
+    created += 1
+
+    dropped_enrollment = next(
+        (e for e in enrollments if e.status == EnrollmentStatus.dropped),
+        enrollments[-1],
+    )
+    log_activity(
+        db,
+        ORG_ID,
+        dropped_enrollment.person_id,
+        "enrollment_dropped",
+        payload={
+            "enrollment_id": dropped_enrollment.id,
+            "reason": "عدم پرداخت به موقع",
+            "notes": "پس از دو بار یادآوری",
+        },
+        actor_id=admission.id,
+    )
+    created += 1
+
+    refund_enrollment = enrollments[3]
+    refund_installment = _first_installment_for_enrollment(db, refund_enrollment.id)
+    if refund_installment is not None:
+        log_activity(
+            db,
+            ORG_ID,
+            refund_enrollment.person_id,
+            "payment_refunded",
+            payload={
+                "enrollment_id": refund_enrollment.id,
+                "installment_id": refund_installment.id,
+                "amount": refund_installment.paid_amount or 500_000,
+                "reason": "انصراف از دوره",
+            },
+            actor_id=finance_user.id,
+        )
+        created += 1
 
     for consultation in consultations[:5]:
+        if consultation.person_id == demo_person_id:
+            continue
         log_activity(
             db,
             ORG_ID,
             consultation.person_id,
             "consultation_done",
-            payload={"consultation_id": consultation.id, "outcome": consultation.outcome.value if consultation.outcome else None},
+            payload={
+                "consultation_id": consultation.id,
+                "outcome": (
+                    consultation.outcome.value if consultation.outcome else None
+                ),
+            },
             actor_id=admission.id,
         )
+        created += 1
 
-    for enrollment in enrollments[:5]:
+    for enrollment in enrollments[1:5]:
         log_activity(
             db,
             ORG_ID,
             enrollment.person_id,
             "enrollment_created",
-            payload={"enrollment_id": enrollment.id, "class_id": enrollment.class_id},
+            payload={
+                "enrollment_id": enrollment.id,
+                "class_id": enrollment.class_id,
+                "status": enrollment.status.value,
+            },
             actor_id=admission.id,
         )
+        created += 1
 
-    for index, enrollment in enumerate(enrollments[:5]):
+        installment = _first_installment_for_enrollment(db, enrollment.id)
+        if installment is None:
+            continue
         log_activity(
             db,
             ORG_ID,
             enrollment.person_id,
             "payment_recorded",
-            payload={"enrollment_id": enrollment.id, "amount": enrollment.final_amount // 2},
+            payload={
+                "enrollment_id": enrollment.id,
+                "installment_id": installment.id,
+                "amount": installment.paid_amount or installment.amount // 2,
+                "invoice_id": installment.invoice_id,
+            },
             actor_id=finance_user.id,
         )
-    print("  created 15 activities")
+        created += 1
+
+    print(f"  created {created} activities")
+
+
+def seed_communications(db, people: list[Person]) -> None:
+    from app.communication.enums import CommunicationChannel, CommunicationDirection
+    from app.communication.model import Communication
+
+    expected_count = 6
+    existing_count = db.scalar(
+        select(func.count())
+        .select_from(Communication)
+        .where(Communication.org_id == ORG_ID)
+    )
+    if existing_count:
+        db.execute(delete(Communication).where(Communication.org_id == ORG_ID))
+        db.commit()
+        if existing_count != expected_count:
+            print(f"  cleared {existing_count} old communications (timeline demo rebuild)")
+
+    demo_people = people[6:9]
+    specs: list[tuple[Person, CommunicationChannel, CommunicationDirection, str]] = [
+        (
+            demo_people[0],
+            CommunicationChannel.phone,
+            CommunicationDirection.outbound,
+            "تماس برای تأیید زمان کلاس و پرداخت اولین قسط.",
+        ),
+        (
+            demo_people[0],
+            CommunicationChannel.sms,
+            CommunicationDirection.outbound,
+            "یادآوری جلسه مشاوره فردا ساعت ۱۰.",
+        ),
+        (
+            demo_people[0],
+            CommunicationChannel.email,
+            CommunicationDirection.inbound,
+            "درخواست تغییر زمان کلاس به شیفت عصر.",
+        ),
+        (
+            demo_people[1],
+            CommunicationChannel.phone,
+            CommunicationDirection.inbound,
+            "پرسش درباره تخفیف خواهر و برادر.",
+        ),
+        (
+            demo_people[2],
+            CommunicationChannel.in_person,
+            CommunicationDirection.outbound,
+            "مراجعه حضوری برای تکمیل فرم ثبت‌نام.",
+        ),
+        (
+            people[5],
+            CommunicationChannel.chat,
+            CommunicationDirection.inbound,
+            "سؤال درباره پیش‌نیاز دوره Python.",
+        ),
+    ]
+
+    for person, channel, direction, content in specs:
+        db.add(
+            Communication(
+                person_id=person.id,
+                channel=channel,
+                direction=direction,
+                content=content,
+                metadata_=None,
+                org_id=ORG_ID,
+            )
+        )
+    db.commit()
+    print(f"  created {len(specs)} communications")
 
 
 def seed_attendances(db, enrollments: list[Enrollment]) -> None:
@@ -705,8 +958,30 @@ def main() -> None:
             return
 
         if _already_seeded(db):
-            print("Seed data already present — backfilling journeys…")
+            print("Seed data already present — backfilling…")
             seed_journeys(db)
+            enrollments = list(
+                db.scalars(
+                    select(Enrollment)
+                    .where(Enrollment.org_id == ORG_ID)
+                    .order_by(Enrollment.id)
+                    .limit(10)
+                ).all()
+            )
+            consultations = list(
+                db.scalars(
+                    select(Consultation)
+                    .where(Consultation.org_id == ORG_ID)
+                    .order_by(Consultation.id)
+                ).all()
+            )
+            people = list(
+                db.scalars(
+                    select(Person).where(Person.org_id == ORG_ID).order_by(Person.id)
+                ).all()
+            )
+            seed_activities(db, people, consultations, enrollments)
+            seed_communications(db, people)
             return
 
         print("Seeding users…")
@@ -744,6 +1019,9 @@ def main() -> None:
 
         print("Seeding activities…")
         seed_activities(db, people, consultations, enrollments)
+
+        print("Seeding communications…")
+        seed_communications(db, people)
 
         print("Seeding attendances…")
         seed_attendances(db, enrollments)

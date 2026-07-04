@@ -11,6 +11,7 @@ export {
 } from "./date";
 export {
   buildMonthGrid,
+  buildJalaliYearRange,
   currentJalaliMonth,
   formatJalaliMonthTitle,
   JALALI_WEEKDAY_LABELS,

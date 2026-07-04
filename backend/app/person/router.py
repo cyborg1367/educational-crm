@@ -70,7 +70,9 @@ def create_person(
     Returns 409 if the phone number is already registered in the org.
     Returns 422 if request validation fails.
     """
-    return person_service.create_person(db, current_user.org_id, body)
+    return person_service.create_person(
+        db, current_user.org_id, body, actor_id=current_user.id
+    )
 
 
 @router.patch("/{person_id}", response_model=PersonRead)
@@ -88,3 +90,17 @@ def update_person(
     Returns 422 if request validation fails.
     """
     return person_service.update_person(db, current_user.org_id, person_id, body)
+
+
+@router.delete("/{person_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_person(
+    person_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> None:
+    """Hard-delete a person and related records (development use).
+
+    Permanently removes the person and dependent timeline, task, and enrollment
+    data scoped to the organization. Returns 404 if not found.
+    """
+    person_service.delete_person(db, current_user.org_id, person_id)
