@@ -11,12 +11,20 @@ export type StepperProps = {
   steps: StepperStep[];
   /** Zero-based index of the active step. */
   currentStep: number;
+  /** Navigate to a previous (or current) step when the user clicks the stepper. */
+  onStepClick?: (stepIndex: number) => void;
   /** Force compact dot layout (e.g. preview in a narrow container). */
   compact?: boolean;
   className?: string;
 };
 
-function Stepper({ steps, currentStep, compact = false, className }: StepperProps) {
+function Stepper({
+  steps,
+  currentStep,
+  onStepClick,
+  compact = false,
+  className,
+}: StepperProps) {
   if (steps.length === 0) {
     return null;
   }
@@ -35,21 +43,41 @@ function Stepper({ steps, currentStep, compact = false, className }: StepperProp
         {steps.map((step, index) => {
           const isComplete = index < clampedCurrent;
           const isCurrent = index === clampedCurrent;
+          const isNavigable = onStepClick != null && index <= clampedCurrent;
 
           return (
             <li key={step.label} className="flex items-center">
-              <span
-                aria-current={isCurrent ? "step" : undefined}
-                aria-label={`${step.label}${isComplete ? " (تکمیل‌شده)" : isCurrent ? " (فعلی)" : ""}`}
-                className={cn(
-                  "block rounded-[var(--primitive-radius-full)] transition-colors",
-                  isCurrent
-                    ? "size-[10px] bg-[var(--semantic-color-action-primary)]"
-                    : isComplete
-                      ? "size-[8px] bg-[var(--semantic-color-status-success)]"
-                      : "size-[8px] bg-[var(--primitive-color-neutral-300)]",
-                )}
-              />
+              {isNavigable ? (
+                <button
+                  type="button"
+                  aria-current={isCurrent ? "step" : undefined}
+                  aria-label={`${step.label}${isComplete ? " (تکمیل‌شده)" : isCurrent ? " (فعلی)" : ""}`}
+                  onClick={() => onStepClick(index)}
+                  className={cn(
+                    "block rounded-[var(--primitive-radius-full)] transition-colors",
+                    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
+                    "focus-visible:outline-[var(--semantic-color-action-primary)]",
+                    isCurrent
+                      ? "size-[10px] bg-[var(--semantic-color-action-primary)]"
+                      : isComplete
+                        ? "size-[8px] bg-[var(--semantic-color-status-success)] hover:opacity-80"
+                        : "size-[8px] bg-[var(--primitive-color-neutral-300)]",
+                  )}
+                />
+              ) : (
+                <span
+                  aria-current={isCurrent ? "step" : undefined}
+                  aria-label={`${step.label}${isComplete ? " (تکمیل‌شده)" : isCurrent ? " (فعلی)" : ""}`}
+                  className={cn(
+                    "block rounded-[var(--primitive-radius-full)] transition-colors",
+                    isCurrent
+                      ? "size-[10px] bg-[var(--semantic-color-action-primary)]"
+                      : isComplete
+                        ? "size-[8px] bg-[var(--semantic-color-status-success)]"
+                        : "size-[8px] bg-[var(--primitive-color-neutral-300)]",
+                  )}
+                />
+              )}
             </li>
           );
         })}
@@ -66,6 +94,42 @@ function Stepper({ steps, currentStep, compact = false, className }: StepperProp
           const isComplete = index < clampedCurrent;
           const isCurrent = index === clampedCurrent;
           const isUpcoming = index > clampedCurrent;
+          const isNavigable = onStepClick != null && index <= clampedCurrent;
+
+          const stepContent = (
+            <>
+              <span
+                aria-hidden
+                className={cn(
+                  "flex size-[var(--primitive-space-6)] shrink-0 items-center justify-center",
+                  "rounded-[var(--primitive-radius-full)]",
+                  "text-[length:var(--primitive-font-size-xs)] font-[var(--primitive-font-weight-medium)]",
+                  isComplete &&
+                    "bg-[var(--semantic-color-status-success)] text-[var(--semantic-color-text-inverse)]",
+                  isCurrent &&
+                    "bg-[var(--semantic-color-action-primary)] text-[var(--semantic-color-text-inverse)]",
+                  isUpcoming &&
+                    "border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] text-[var(--semantic-color-text-secondary)]",
+                )}
+              >
+                {isComplete ? (
+                  <Check className="size-[var(--primitive-space-4)]" aria-hidden />
+                ) : (
+                  index + 1
+                )}
+              </span>
+              <span
+                className={cn(
+                  "truncate text-[length:var(--primitive-font-size-sm)]",
+                  isCurrent
+                    ? "font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]"
+                    : "font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-secondary)]",
+                )}
+              >
+                {step.label}
+              </span>
+            </>
+          );
 
           return (
             <li
@@ -75,43 +139,31 @@ function Stepper({ steps, currentStep, compact = false, className }: StepperProp
                 index < steps.length - 1 && "gap-[var(--primitive-space-2)]",
               )}
             >
-              <div
-                className={cn(
-                  "flex min-w-0 items-center gap-[var(--primitive-space-2)]",
-                  isUpcoming && "opacity-60",
-                )}
-              >
-                <span
+              {isNavigable ? (
+                <button
+                  type="button"
                   aria-current={isCurrent ? "step" : undefined}
+                  onClick={() => onStepClick(index)}
                   className={cn(
-                    "flex size-[var(--primitive-space-6)] shrink-0 items-center justify-center",
-                    "rounded-[var(--primitive-radius-full)]",
-                    "text-[length:var(--primitive-font-size-xs)] font-[var(--primitive-font-weight-medium)]",
-                    isComplete &&
-                      "bg-[var(--semantic-color-status-success)] text-[var(--semantic-color-text-inverse)]",
-                    isCurrent &&
-                      "bg-[var(--semantic-color-action-primary)] text-[var(--semantic-color-text-inverse)]",
-                    isUpcoming &&
-                      "border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] text-[var(--semantic-color-text-secondary)]",
+                    "flex min-w-0 items-center gap-[var(--primitive-space-2)] rounded-[var(--primitive-radius-sm)]",
+                    "transition-colors hover:bg-[var(--semantic-color-surface-muted)]",
+                    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
+                    "focus-visible:outline-[var(--semantic-color-action-primary)]",
+                    isUpcoming && "opacity-60",
                   )}
                 >
-                  {isComplete ? (
-                    <Check className="size-[var(--primitive-space-4)]" aria-hidden />
-                  ) : (
-                    index + 1
-                  )}
-                </span>
-                <span
+                  {stepContent}
+                </button>
+              ) : (
+                <div
                   className={cn(
-                    "truncate text-[length:var(--primitive-font-size-sm)]",
-                    isCurrent
-                      ? "font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]"
-                      : "font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-secondary)]",
+                    "flex min-w-0 items-center gap-[var(--primitive-space-2)]",
+                    isUpcoming && "opacity-60",
                   )}
                 >
-                  {step.label}
-                </span>
-              </div>
+                  {stepContent}
+                </div>
+              )}
               {index < steps.length - 1 ? (
                 <span
                   aria-hidden

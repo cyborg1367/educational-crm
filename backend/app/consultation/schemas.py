@@ -37,7 +37,10 @@ class ConsultationRead(BaseModel):
 class ConsultationCreate(BaseModel):
     person_id: int = Field(description="Person being consulted.")
     department_id: int = Field(description="Department conducting the consultation.")
-    consultant_id: int = Field(description="Staff user conducting the consultation.")
+    consultant_id: int | None = Field(
+        default=None,
+        description="Staff user conducting the consultation. Defaults to department manager.",
+    )
     journey_id: int | None = Field(default=None, description="Optional linked journey.")
     current_level: str | None = Field(
         default=None,

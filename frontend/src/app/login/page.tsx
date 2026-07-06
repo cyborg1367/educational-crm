@@ -36,7 +36,7 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
 export default function LoginPage() {
   const router = useRouter();
   const nextPathRef = React.useRef<string>("/dashboard");
-  const [email, setEmail] = React.useState("admin@crm.local");
+  const [email, setEmail] = React.useState("admin@example.com");
   const [password, setPassword] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<ApiError | null>(null);
@@ -102,7 +102,7 @@ export default function LoginPage() {
           Educational CRM
         </p>
         <p className="mt-[var(--primitive-space-2)] text-center text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]">
-          dev: admin@crm.local / Admin1234!
+          dev: admin@example.com / changeme123
         </p>
 
         <form

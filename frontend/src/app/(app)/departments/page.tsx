@@ -4,11 +4,14 @@ import * as React from "react";
 
 import { DataTable, EntitySummaryCard } from "@/components/data-display";
 import type { PaginatedResponse } from "@/components/data-display/types";
-import { AppDrawer, ErrorState, useToast } from "@/components/feedback";
-import { Checkbox } from "@/components/form/selection-control";
-import { FormField } from "@/components/form/form-field";
-import { Select } from "@/components/form/select";
-import { TextInput } from "@/components/form/text-input";
+import {
+  departmentFormStateToCreateBody,
+  DepartmentFormFields,
+  emptyDepartmentFormState,
+  type DepartmentFormState,
+} from "@/components/domain/department-form-fields";
+import { FormDialog } from "@/components/domain/form-dialog";
+import { ErrorState, useToast } from "@/components/feedback";
 import { ListPageSkeleton } from "@/components/skeletons";
 import { Avatar } from "@/components/primitives/avatar";
 import { Badge } from "@/components/primitives/badge";
@@ -16,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { createDepartment, listDepartments } from "@/lib/api/departments";
 import type { ApiError, ApiFieldError } from "@/lib/api/error";
 import { fieldErrorFromApi, toApiError } from "@/lib/api/errors";
+import { availableInstituteDepartmentNames } from "@/lib/department/institute-departments";
 import type { DepartmentRead, UserRead } from "@/lib/api/types";
 import { listUsers } from "@/lib/api/users";
 import { cn } from "@/lib/utils";
@@ -56,11 +60,11 @@ export default function DepartmentsListPage() {
     React.useState<PaginatedResponse<DepartmentRead>>(emptyPage);
   const [users, setUsers] = React.useState<UserRead[]>([]);
 
-  const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const [dialogOpen, setDialogOpen] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
-  const [formName, setFormName] = React.useState("");
-  const [formManagerId, setFormManagerId] = React.useState("");
-  const [formIsActive, setFormIsActive] = React.useState(true);
+  const [formState, setFormState] = React.useState<DepartmentFormState>(
+    emptyDepartmentFormState(),
+  );
   const [formError, setFormError] = React.useState<ApiError | null>(null);
   const [fieldError, setFieldError] = React.useState<ApiFieldError | null>(null);
 
@@ -70,7 +74,13 @@ export default function DepartmentsListPage() {
     try {
       const [deptRes, usersRes] = await Promise.all([
         listDepartments({ limit: PAGE_LIMIT, offset }),
-        listUsers({ limit: 500 }).catch(() => ({ items: [], total_count: 0, limit: 500, offset: 0, has_more: false })),
+        listUsers({ limit: 500 }).catch(() => ({
+          items: [],
+          total_count: 0,
+          limit: 500,
+          offset: 0,
+          has_more: false,
+        })),
       ]);
       setDepartmentsPage(deptRes);
       setUsers(usersRes.items);
@@ -116,29 +126,31 @@ export default function DepartmentsListPage() {
     items: rows,
   };
 
+  const availableDepartmentNames = React.useMemo(
+    () => availableInstituteDepartmentNames(rows.map((row) => row.name)),
+    [rows],
+  );
+
   const resetForm = () => {
-    setFormName("");
-    setFormManagerId("");
-    setFormIsActive(true);
+    setFormState({
+      ...emptyDepartmentFormState(),
+      name: availableDepartmentNames[0] ?? "",
+    });
     setFormError(null);
     setFieldError(null);
   };
 
   const handleCreate = async () => {
-    if (!formName.trim()) {
+    if (!formState.name.trim()) {
       return;
     }
     setSubmitting(true);
     setFormError(null);
     setFieldError(null);
     try {
-      await createDepartment({
-        name: formName.trim(),
-        manager_id: formManagerId ? Number(formManagerId) : null,
-        is_active: formIsActive,
-      });
+      await createDepartment(departmentFormStateToCreateBody(formState));
       toast({ variant: "success", title: "دپارتمان جدید ثبت شد" });
-      setDrawerOpen(false);
+      setDialogOpen(false);
       resetForm();
       void loadData();
     } catch (err) {
@@ -166,9 +178,10 @@ export default function DepartmentsListPage() {
             type="button"
             variant="primary"
             size="md"
+            disabled={availableDepartmentNames.length === 0}
             onClick={() => {
               resetForm();
-              setDrawerOpen(true);
+              setDialogOpen(true);
             }}
           >
             افزودن دپارتمان
@@ -227,51 +240,28 @@ export default function DepartmentsListPage() {
         }
       />
 
-      <AppDrawer
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        mode="form"
+      <FormDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
         title="افزودن دپارتمان"
-        onSubmit={handleCreate}
         submitLabel="ثبت"
+        onSubmit={() => void handleCreate()}
         submitLoading={submitting}
-        submitDisabled={!formName.trim()}
+        submitDisabled={
+          !formState.name.trim() || availableDepartmentNames.length === 0
+        }
+        formError={formError}
       >
-        {formError ? (
-          <ErrorState error={formError} className="py-[var(--primitive-space-4)]" />
-        ) : null}
-        <div className="flex flex-col gap-[var(--primitive-space-4)]">
-          <FormField
-            label="نام"
-            required
-            error={fieldError?.field === "name" ? fieldError : null}
-          >
-            <TextInput
-              value={formName}
-              onChange={(e) => setFormName(e.target.value)}
-            />
-          </FormField>
-          <FormField
-            label="مدیر"
-            error={fieldError?.field === "manager_id" ? fieldError : null}
-          >
-            <Select
-              options={managerOptions.map((user) => ({
-                value: String(user.id),
-                label: user.name,
-              }))}
-              value={formManagerId}
-              onChange={setFormManagerId}
-              placeholder="بدون مدیر"
-            />
-          </FormField>
-          <Checkbox
-            label="فعال"
-            checked={formIsActive}
-            onChange={(e) => setFormIsActive(e.target.checked)}
-          />
-        </div>
-      </AppDrawer>
+        <DepartmentFormFields
+          state={formState}
+          onChange={(patch) =>
+            setFormState((prev) => ({ ...prev, ...patch }))
+          }
+          managerOptions={managerOptions}
+          availableNames={availableDepartmentNames}
+          fieldError={fieldError}
+        />
+      </FormDialog>
     </>
   );
 }

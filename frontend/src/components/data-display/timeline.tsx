@@ -26,6 +26,8 @@ import { mergeTimelineEntries, type TimelineEntry } from "@/lib/timeline/merge";
 import {
   actionLabel,
   CONSULTATION_OUTCOME_LABELS,
+  levelLabel,
+  motivationLabel,
   sourceLabel,
   STATUS_DISPLAY_LABELS,
   TASK_TYPE_LABELS,
@@ -92,7 +94,7 @@ function activityBorderColor(action: string): string {
   if (action === "person_created") {
     return "var(--semantic-color-action-primary)";
   }
-  if (action === "consultation_done") {
+  if (action === "consultation_done" || action === "consultation_referred") {
     return "var(--semantic-color-action-primary)";
   }
   if (
@@ -147,8 +149,44 @@ function ActivityDetails({
         </>
       );
     }
+    case "consultation_referred": {
+      const departmentName = payloadString(payload, "department_name");
+      const notes = payloadString(payload, "notes");
+      const consultantId = payloadNumber(payload, "consultant_id");
+      const consultant = actorName(consultantId ?? null, usersMap);
+      const referrer = actorName(actorId, usersMap);
+      return (
+        <>
+          {departmentName ? (
+            <p className={detailClassName}>دپارتمان: {departmentName}</p>
+          ) : null}
+          {consultant ? (
+            <p className={detailClassName}>مشاور: {consultant}</p>
+          ) : null}
+          {referrer ? (
+            <p className={detailClassName}>ارجاع‌دهنده: {referrer}</p>
+          ) : null}
+          {notes ? <p className={detailClassName}>{notes}</p> : null}
+        </>
+      );
+    }
+    case "consultation_assessment_saved": {
+      const actor = actorName(actorId, usersMap);
+      const consultationId = payloadNumber(payload, "consultation_id");
+      return (
+        <>
+          {consultationId != null ? (
+            <p className={detailClassName}>مشاوره #{consultationId}</p>
+          ) : null}
+          {actor ? <p className={detailClassName}>توسط: {actor}</p> : null}
+        </>
+      );
+    }
     case "consultation_done": {
       const outcome = payloadString(payload, "outcome");
+      const level = payloadString(payload, "current_level");
+      const motivation = payloadString(payload, "goal");
+      const courseName = payloadString(payload, "recommended_course_name");
       const actor = actorName(actorId, usersMap);
       return (
         <>
@@ -159,6 +197,17 @@ function ActivityDetails({
                 outcome as keyof typeof CONSULTATION_OUTCOME_LABELS
               ] ?? outcome}
             </p>
+          ) : null}
+          {level ? (
+            <p className={detailClassName}>سطح: {levelLabel(level)}</p>
+          ) : null}
+          {motivation ? (
+            <p className={detailClassName}>
+              انگیزه: {motivationLabel(motivation)}
+            </p>
+          ) : null}
+          {courseName ? (
+            <p className={detailClassName}>دوره پیشنهادی: {courseName}</p>
           ) : null}
           {actor ? <p className={detailClassName}>توسط: {actor}</p> : null}
         </>

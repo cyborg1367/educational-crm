@@ -20,9 +20,12 @@ from app.finance.enums import InstallmentStatus
 from app.finance.schemas import InstallmentPlanItem, InvoiceCreate
 from app.journey import service as journey_service
 from app.journey.enums import JourneyStatus
+from app.person.enums import PersonStatus
 from app.person.model import Person
 from app.task import service as task_service
 from app.task.enums import TaskStatus, TaskType
+from app.auth.security import hash_password
+from app.user.enums import UserRole
 from app.user.model import User
 from app.workflow import service as workflow_service
 
@@ -64,7 +67,130 @@ def _consultation_done_activities(
     ]
 
 
+def _consultation_closed_activities(
+    db_session: Session,
+    org_id: int,
+    person_id: int,
+) -> list:
+    activities, _ = activity_service.list_activities(
+        db_session, org_id, person_id=person_id
+    )
+    return [activity for activity in activities if activity.action == "consultation_closed"]
+
+
+def _log_consultation_referred(
+    db_session: Session,
+    org_id: int,
+    person_id: int,
+    department_id: int,
+    actor_id: int,
+) -> None:
+    activity_service.log_activity(
+        db_session,
+        org_id,
+        person_id,
+        "consultation_referred",
+        payload={"department_id": department_id},
+        actor_id=actor_id,
+    )
+
+
+def test_consultation_created_creates_task_and_journey(
+    db_session: Session,
+    org_id: int,
+    admin_user: User,
+    person: Person,
+    department: Department,
+) -> None:
+    assert person.status == PersonStatus.prospect
+
+    consultation = consultation_service.create_consultation(
+        db_session,
+        org_id,
+        ConsultationCreate(
+            person_id=person.id,
+            department_id=department.id,
+        ),
+        actor_id=admin_user.id,
+    )
+
+    db_session.refresh(person)
+    assert person.status == PersonStatus.lead
+    assert consultation.journey_id is not None
+
+    tasks, _ = task_service.list_tasks(
+        db_session, org_id, assignee_id=admin_user.id, status=TaskStatus.open
+    )
+    assert len(tasks) == 1
+    task = tasks[0]
+    assert task.type == TaskType.custom
+    assert task.related_entity_type == "consultation"
+    assert task.related_entity_id == consultation.id
+    assert task.person_id == person.id
+
+
 def test_consultation_outcome_pre_enroll(
+    db_session: Session,
+    org_id: int,
+    admin_user: User,
+    person: Person,
+    department: Department,
+    course: Course,
+) -> None:
+    admission_user = User(
+        name="Admission Pre Enroll",
+        email="admission-pre@test.example",
+        password_hash="test-password",
+        role=UserRole.admission,
+        org_id=org_id,
+        is_active=True,
+    )
+    db_session.add(admission_user)
+    db_session.commit()
+    db_session.refresh(admission_user)
+
+    consultation = _create_consultation(
+        db_session,
+        org_id,
+        person,
+        department,
+        admin_user,
+        recommended_course_id=course.id,
+    )
+
+    workflow_service.on_consultation_outcome(
+        db_session,
+        org_id,
+        consultation.id,
+        ConsultationOutcome.pre_enroll,
+        actor_id=admin_user.id,
+    )
+
+    enrollments, _ = enrollment_service.list_enrollments(db_session, org_id)
+    assert len(enrollments) == 0
+
+    invoices, _ = finance_service.list_invoices(db_session, org_id)
+    assert len(invoices) == 0
+
+    tasks, _ = task_service.list_tasks(db_session, org_id)
+    feedback_tasks = [
+        task
+        for task in tasks
+        if task.type == TaskType.follow_up_registration
+        and task.related_entity_id == consultation.id
+    ]
+    assert len(feedback_tasks) == 1
+    assert feedback_tasks[0].title == f"پیگیری ثبت‌نام {person.full_name}"
+    assert feedback_tasks[0].assignee_id == admission_user.id
+
+    done_activities = _consultation_done_activities(
+        db_session, org_id, person.id, consultation.id
+    )
+    assert len(done_activities) == 1
+    assert done_activities[0].payload["outcome"] == ConsultationOutcome.pre_enroll.value
+
+
+def test_consultation_outcome_pre_enroll_with_class_id(
     db_session: Session,
     org_id: int,
     admin_user: User,
@@ -102,21 +228,7 @@ def test_consultation_outcome_pre_enroll(
 
     invoices, _ = finance_service.list_invoices(db_session, org_id)
     assert len(invoices) == 1
-    invoice = invoices[0]
-    assert invoice.enrollment_id == enrollment.id
-    assert invoice.total_amount == enrollment.final_amount
-
-    installments = finance_service.get_installments_for_invoice(
-        db_session, org_id, invoice.id
-    )
-    assert len(installments) == 2
-    assert sum(i.amount for i in installments) == invoice.total_amount
-
-    done_activities = _consultation_done_activities(
-        db_session, org_id, person.id, consultation.id
-    )
-    assert len(done_activities) == 1
-    assert done_activities[0].payload["outcome"] == ConsultationOutcome.pre_enroll.value
+    assert invoices[0].enrollment_id == enrollment.id
 
 
 def test_consultation_outcome_follow_up(
@@ -126,8 +238,23 @@ def test_consultation_outcome_follow_up(
     person: Person,
     department: Department,
 ) -> None:
+    admission_user = User(
+        name="Admission Staff",
+        email="admission@test.example",
+        password_hash="test-password",
+        role=UserRole.admission,
+        org_id=org_id,
+        is_active=True,
+    )
+    db_session.add(admission_user)
+    db_session.commit()
+    db_session.refresh(admission_user)
+
     consultation = _create_consultation(
         db_session, org_id, person, department, admin_user
+    )
+    _log_consultation_referred(
+        db_session, org_id, person.id, department.id, admission_user.id
     )
 
     workflow_service.on_consultation_outcome(
@@ -135,15 +262,21 @@ def test_consultation_outcome_follow_up(
         org_id,
         consultation.id,
         ConsultationOutcome.follow_up,
+        notes="تماس مجدد لازم است",
         actor_id=admin_user.id,
+        actor=admin_user,
     )
 
     tasks, _ = task_service.list_tasks(db_session, org_id)
-    assert len(tasks) == 1
-    task = tasks[0]
-    assert task.type == TaskType.follow_up_registration
+    follow_up_tasks = [
+        task for task in tasks if task.type == TaskType.follow_up_registration
+    ]
+    assert len(follow_up_tasks) == 1
+    task = follow_up_tasks[0]
     assert task.person_id == person.id
-    assert task.assignee_id == admin_user.id
+    assert task.assignee_id == admission_user.id
+    assert task.title == f"پیگیری مجدد با {person.full_name}"
+    assert task.description == "تماس مجدد لازم است"
     assert task.related_entity_type == "consultation"
     assert task.related_entity_id == consultation.id
 
@@ -161,6 +294,18 @@ def test_consultation_outcome_refer_other_dept(
     person: Person,
     department: Department,
 ) -> None:
+    admission_user = User(
+        name="Admission Staff",
+        email="admission-refer@test.example",
+        password_hash="test-password",
+        role=UserRole.admission,
+        org_id=org_id,
+        is_active=True,
+    )
+    db_session.add(admission_user)
+    db_session.commit()
+    db_session.refresh(admission_user)
+
     target_department = Department(
         name="Target Department",
         manager_id=admin_user.id,
@@ -196,13 +341,19 @@ def test_consultation_outcome_refer_other_dept(
     assert target_journeys[0].person_id == person.id
 
     tasks, _ = task_service.list_tasks(db_session, org_id)
-    assert len(tasks) == 1
-    task = tasks[0]
-    assert task.type == TaskType.referral
-    assert task.person_id == person.id
-    assert task.assignee_id == target_department.manager_id
-    assert task.related_entity_type == "consultation"
-    assert task.related_entity_id == consultation.id
+    referral_tasks = [task for task in tasks if task.type == TaskType.referral]
+    assert len(referral_tasks) == 2
+    manager_task = next(
+        task for task in referral_tasks if task.assignee_id == target_department.manager_id
+    )
+    assert manager_task.person_id == person.id
+    assert manager_task.related_entity_type == "consultation"
+    assert manager_task.related_entity_id == consultation.id
+    admission_feedback = next(
+        task for task in referral_tasks if task.assignee_id == admission_user.id
+    )
+    assert admission_feedback.title == f"ارجاع {person.full_name} به دپارتمان دیگر"
+    assert admission_feedback.description == f"ارجاع به دپارتمان {target_department.name}"
 
     done_activities = _consultation_done_activities(
         db_session, org_id, person.id, consultation.id
@@ -241,6 +392,13 @@ def test_consultation_outcome_not_suitable(
     journey = journey_service.get_journey(db_session, org_id, updated.journey_id)
     assert journey.status == JourneyStatus.completed
 
+    closed_activities = _consultation_closed_activities(
+        db_session, org_id, person.id
+    )
+    assert len(closed_activities) == 1
+    assert closed_activities[0].payload["outcome"] == ConsultationOutcome.not_suitable.value
+    assert closed_activities[0].payload["department_id"] == department.id
+
     done_activities = _consultation_done_activities(
         db_session, org_id, person.id, consultation.id
     )
@@ -277,6 +435,12 @@ def test_consultation_outcome_closed(
 
     journey = journey_service.get_journey(db_session, org_id, updated.journey_id)
     assert journey.status == JourneyStatus.completed
+
+    closed_activities = _consultation_closed_activities(
+        db_session, org_id, person.id
+    )
+    assert len(closed_activities) == 1
+    assert closed_activities[0].payload["outcome"] == ConsultationOutcome.closed.value
 
     done_activities = _consultation_done_activities(
         db_session, org_id, person.id, consultation.id

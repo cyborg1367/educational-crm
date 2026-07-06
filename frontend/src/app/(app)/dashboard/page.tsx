@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 
 import {
@@ -37,7 +38,12 @@ import type {
 import type { ApiError } from "@/lib/api/error";
 import { toApiError } from "@/lib/api/errors";
 import { getCurrentRole } from "@/lib/auth/role";
+import {
+  assessmentStatusLabel,
+  isConsultationAssessmentComplete,
+} from "@/lib/consultation/assessment";
 import type { UserRole } from "@/lib/nav/types";
+import { isConsultationIntakeTask } from "@/lib/task/consultation-task";
 import { formatCount, formatDateDisplay, formatToman, todayDisplay, todayStorage } from "@/lib/locale";
 import { STALE_LEAD_DAYS } from "@/lib/person/stale-lead";
 import { TASK_TYPE_LABELS, terminologyLabel } from "@/lib/terminology";
@@ -53,18 +59,27 @@ const emptyPage = <T,>(): PaginatedResponse<T> => ({
   has_more: false,
 });
 
+function consultationWizardHref(consultation: ConsultationRead): string {
+  const step = isConsultationAssessmentComplete(consultation)
+    ? "outcome"
+    : "assessment";
+  return `/people/${consultation.person_id}/consultations/${consultation.id}?step=${step}`;
+}
+
 function WidgetTable<T>({
   title,
   columns,
   items,
   emptyMessage,
   viewAllHref,
+  onRowClick,
 }: {
   title: string;
   columns: Parameters<typeof DataTable<T>>[0]["columns"];
   items: T[];
   emptyMessage: string;
   viewAllHref: string;
+  onRowClick?: (row: T) => void;
 }) {
   return (
     <div className="rounded-[var(--primitive-radius-md)] bg-[var(--semantic-color-surface-card)] p-[var(--semantic-space-cardPadding)] shadow-[var(--primitive-elevation-1)]">
@@ -76,12 +91,14 @@ function WidgetTable<T>({
         data={{ ...emptyPage<T>(), items, total_count: items.length }}
         widgetMode={{ rowCap: 5, viewAllHref }}
         emptyMessage={emptyMessage}
+        onRowClick={onRowClick}
       />
     </div>
   );
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [role, setRole] = React.useState<UserRole>("admin");
   const [currentUserId, setCurrentUserId] = React.useState<number | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -172,6 +189,14 @@ export default function DashboardPage() {
     (person) => person.status === "lead" && dayjs(person.created_at).isAfter(dayjs().subtract(7, "day")),
   );
   const pendingConsultations = consultations.filter((consultation) => consultation.outcome === null);
+  const myPendingConsultations =
+    currentUserId != null
+      ? pendingConsultations.filter((consultation) => consultation.consultant_id === currentUserId)
+      : [];
+  const peopleById = React.useMemo(
+    () => new Map(people.map((person) => [person.id, person])),
+    [people],
+  );
   const overdueInstallments = installments.filter((installment) => installment.status === "overdue");
   const todaysClasses = classes.filter(
     (cls) => cls.start_date === TODAY || cls.status === "active",
@@ -179,7 +204,9 @@ export default function DashboardPage() {
   const openTasks = tasks.filter((task) => task.status === "open");
   const openTasksAssignedToMe =
     currentUserId != null
-      ? openTasks.filter((task) => task.assignee_id === currentUserId)
+      ? openTasks
+          .filter((task) => task.assignee_id === currentUserId)
+          .filter((task) => !isConsultationIntakeTask(task))
       : [];
 
   if (error) return <ErrorState error={error} />;
@@ -342,6 +369,37 @@ export default function DashboardPage() {
                 },
               ]
             : [
+                {
+                  colSpan: 12,
+                  content: (
+                    <WidgetTable<ConsultationRead>
+                      title="مشاوره‌های در انتظار من"
+                      columns={[
+                        {
+                          key: "person",
+                          header: "شخص",
+                          cell: (row) => peopleById.get(row.person_id)?.full_name ?? `#${row.person_id}`,
+                        },
+                        { key: "goal", header: "هدف", cell: (row) => row.goal ?? "—" },
+                        {
+                          key: "assessment",
+                          header: "ارزیابی",
+                          cell: (row) => assessmentStatusLabel(row),
+                        },
+                        {
+                          key: "created_at",
+                          header: "تاریخ",
+                          align: "end",
+                          cell: (row) => formatDateDisplay(row.created_at.slice(0, 10)),
+                        },
+                      ]}
+                      items={myPendingConsultations}
+                      emptyMessage="مشاوره‌ای در انتظار نیست"
+                      viewAllHref="/tasks"
+                      onRowClick={(row) => router.push(consultationWizardHref(row))}
+                    />
+                  ),
+                },
                 {
                   colSpan: 12,
                   content: (

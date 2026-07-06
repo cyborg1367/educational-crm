@@ -14,6 +14,7 @@ export type WizardSkeletonProps = {
   children: React.ReactNode;
   onBack?: () => void;
   onNext?: () => void;
+  onStepClick?: (stepIndex: number) => void;
   backLabel?: string;
   nextLabel?: string;
   nextDisabled?: boolean;
@@ -28,6 +29,7 @@ function WizardSkeleton({
   children,
   onBack,
   onNext,
+  onStepClick,
   backLabel = "بازگشت",
   nextLabel = "بعدی",
   nextDisabled = false,
@@ -48,7 +50,11 @@ function WizardSkeleton({
           <h1 className="text-[length:var(--primitive-font-size-2xl)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
             {title}
           </h1>
-          <Stepper steps={steps} currentStep={currentStep} />
+          <Stepper
+            steps={steps}
+            currentStep={currentStep}
+            onStepClick={onStepClick}
+          />
         </div>
       </PageZone>
 

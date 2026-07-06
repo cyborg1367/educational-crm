@@ -21,6 +21,7 @@ import {
   getPerson,
   listClasses,
 } from "@/lib/api/finance";
+import { updateTask } from "@/lib/api/tasks";
 import type {
   CourseClassRead,
   CourseRead,
@@ -86,6 +87,12 @@ function NewEnrollmentWizard() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const personId = Number(searchParams.get("person_id"));
+  const taskIdRaw = searchParams.get("task_id");
+  const taskId =
+    taskIdRaw != null && taskIdRaw !== "" ? Number(taskIdRaw) : null;
+  const courseIdRaw = searchParams.get("course_id");
+  const courseId =
+    courseIdRaw != null && courseIdRaw !== "" ? Number(courseIdRaw) : null;
   const readOnly = !canManageEnrollments();
 
   const [step, setStep] = React.useState(0);
@@ -96,6 +103,9 @@ function NewEnrollmentWizard() {
   const [coursesById, setCoursesById] = React.useState<Map<number, CourseRead>>(
     new Map(),
   );
+  const [recommendedCourseName, setRecommendedCourseName] = React.useState<
+    string | null
+  >(null);
 
   const [selectedClassId, setSelectedClassId] = React.useState<string>("");
   const [selectedCourse, setSelectedCourse] = React.useState<CourseRead | null>(
@@ -138,11 +148,28 @@ function NewEnrollmentWizard() {
         getPerson(personId),
         listClasses({ limit: 500 }),
       ]);
-      const openClasses = classesRes.items.filter(
+      let openClasses = classesRes.items.filter(
         (cls) => cls.status === "planned" || cls.status === "active",
       );
+
+      if (courseId != null && Number.isFinite(courseId)) {
+        openClasses = openClasses.filter((cls) => cls.course_id === courseId);
+        try {
+          const recommendedCourse = await getCourse(courseId);
+          setRecommendedCourseName(recommendedCourse.title);
+        } catch {
+          setRecommendedCourseName(null);
+        }
+      } else {
+        setRecommendedCourseName(null);
+      }
+
       setPerson(personData);
       setClasses(openClasses);
+
+      if (openClasses.length === 1) {
+        setSelectedClassId(String(openClasses[0].id));
+      }
 
       const courseIds = [...new Set(openClasses.map((cls) => cls.course_id))];
       const courses = await Promise.all(courseIds.map((id) => getCourse(id)));
@@ -152,7 +179,7 @@ function NewEnrollmentWizard() {
     } finally {
       setLoading(false);
     }
-  }, [personId]);
+  }, [personId, courseId]);
 
   React.useEffect(() => {
     void loadInitial();
@@ -211,7 +238,16 @@ function NewEnrollmentWizard() {
         })),
       });
 
-      toast({ variant: "success", title: "ثبت‌نام و فاکتور ایجاد شد" });
+      if (taskId != null && Number.isFinite(taskId)) {
+        await updateTask(taskId, { status: "done" });
+        toast({
+          variant: "success",
+          title: "ثبت‌نام با موفقیت انجام شد و وظیفه تکمیل شد",
+        });
+      } else {
+        toast({ variant: "success", title: "ثبت‌نام و فاکتور ایجاد شد" });
+      }
+
       setConfirmOpen(false);
       router.push(`/enrollments/${enrollment.id}`);
     } catch (err) {
@@ -289,15 +325,31 @@ function NewEnrollmentWizard() {
         isLastStep={step === 2}
       >
         {step === 0 ? (
-          <FormField label="کلاس" required>
-            <Select
-              searchable
-              options={classOptions}
-              value={selectedClassId}
-              onChange={setSelectedClassId}
-              placeholder="جستجو و انتخاب کلاس"
+          <div className="flex flex-col gap-[var(--primitive-space-4)]">
+            <FrozenField
+              variant="text"
+              label="دانش‌پذیر"
+              value={person.full_name}
+              lockReason="دانش‌پذیر از وظیفه پیگیری ثبت‌نام انتخاب شده و قابل تغییر نیست"
             />
-          </FormField>
+            {recommendedCourseName ? (
+              <p className="rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-subtle)] px-[var(--primitive-space-4)] py-[var(--primitive-space-3)] text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
+                دوره پیشنهادی از مشاوره:{" "}
+                <span className="font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-primary)]">
+                  {recommendedCourseName}
+                </span>
+              </p>
+            ) : null}
+            <FormField label="کلاس" required>
+              <Select
+                searchable
+                options={classOptions}
+                value={selectedClassId}
+                onChange={setSelectedClassId}
+                placeholder="جستجو و انتخاب کلاس"
+              />
+            </FormField>
+          </div>
         ) : null}
 
         {step === 1 ? (

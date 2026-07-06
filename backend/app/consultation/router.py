@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
@@ -26,14 +26,28 @@ def list_consultations(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     pagination: Annotated[PaginationParams, Depends()],
+    consultant_id: Annotated[
+        int | None, Query(description="Filter by consultant user ID.")
+    ] = None,
+    department_id: Annotated[
+        int | None, Query(description="Filter by department ID.")
+    ] = None,
+    pending: Annotated[
+        bool | None,
+        Query(description="When true, only consultations without an outcome."),
+    ] = None,
 ) -> PaginatedResponse[ConsultationRead]:
     """List consultations.
 
-    Returns a paginated list of consultation records in the organization.
+    Returns a paginated list of consultation records in the organization,
+    optionally filtered by consultant, department, or pending outcome.
     """
     items, total_count = consultation_service.list_consultations(
         db,
         current_user.org_id,
+        consultant_id=consultant_id,
+        department_id=department_id,
+        pending=pending,
         limit=pagination.limit,
         offset=pagination.offset,
     )
@@ -73,7 +87,9 @@ def create_consultation(
     Returns 404 if referenced person, department, consultant, or course is not found.
     Returns 422 if request validation fails.
     """
-    return consultation_service.create_consultation(db, current_user.org_id, body)
+    return consultation_service.create_consultation(
+        db, current_user.org_id, body, actor_id=current_user.id
+    )
 
 
 @router.patch("/{consultation_id}", response_model=ConsultationRead)
@@ -90,7 +106,7 @@ def update_consultation(
     Returns 422 if request validation fails.
     """
     return consultation_service.update_consultation(
-        db, current_user.org_id, consultation_id, body
+        db, current_user.org_id, consultation_id, body, actor=current_user
     )
 
 
@@ -114,5 +130,7 @@ def set_consultation_outcome(
         consultation_id,
         body.outcome,
         class_id=body.class_id,
+        notes=body.notes,
         actor_id=current_user.id,
+        actor=current_user,
     )

@@ -58,7 +58,6 @@ const adminNavTree: NavTree = [
       item("courses", "دوره‌ها", "/courses", BookOpen),
       item("roadmaps", "نقشه‌های راه", "/roadmaps", Map),
       item("departments", "دپارتمان‌ها", "/departments", Building2),
-      item("users", "کاربران", "/users", UserCircle),
     ],
   },
   {
@@ -87,6 +86,13 @@ const adminNavTree: NavTree = [
     id: "admin-settings",
     label: "تنظیمات",
     items: [
+      item(
+        "users",
+        "کاربران و نقش‌ها",
+        "/users",
+        UserCircle,
+        ["مدیر", "پذیرش", "نقش"],
+      ),
       item("settings-org", "سازمان", "/settings/org", Settings),
       profileItem,
     ],
@@ -216,8 +222,9 @@ const departmentManagerNavTree: NavTree = [
         "وظایف",
         "دپارتمان",
       ]),
-      item("tasks", "وظایف", "/tasks", ClipboardList, [
+      item("tasks", "صندوق کار", "/tasks", ClipboardList, [
         "ارجاع",
+        "مشاوره",
         "صندوق ورودی",
       ]),
     ],
