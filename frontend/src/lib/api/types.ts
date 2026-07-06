@@ -441,7 +441,32 @@ export type ConsultationOutcome =
   | "follow_up"
   | "refer_other_dept"
   | "not_suitable"
-  | "closed";
+  | "closed"
+  | "continue";
+
+export type ConsultationCreate = {
+  person_id: number;
+  department_id: number;
+  consultant_id?: number | null;
+  journey_id?: number | null;
+  current_level?: string | null;
+  need?: string | null;
+  goal?: string | null;
+  decision?: string | null;
+  recommended_course_id?: number | null;
+  outcome?: ConsultationOutcome | null;
+  refer_to_department_id?: number | null;
+  next_action?: string | null;
+  next_action_date?: StorageDate | null;
+  notes?: string | null;
+};
+
+export type ActivityCreate = {
+  person_id: number;
+  action: string;
+  payload?: Record<string, unknown> | null;
+  actor_id?: number | null;
+};
 
 export type ConsultationRead = {
   id: number;
@@ -465,13 +490,21 @@ export type ConsultationRead = {
 };
 
 export type ConsultationUpdate = {
+  current_level?: string | null;
+  need?: string | null;
+  goal?: string | null;
+  decision?: string | null;
+  recommended_course_id?: number | null;
   refer_to_department_id?: number | null;
+  next_action?: string | null;
+  next_action_date?: StorageDate | null;
   notes?: string | null;
 };
 
 export type ConsultationOutcomeUpdate = {
   outcome: ConsultationOutcome;
   class_id?: number | null;
+  notes?: string | null;
 };
 
 export type UserRead = {

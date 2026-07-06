@@ -157,7 +157,7 @@ A person's path inside one department. One per `(person_id, department_id)`.
 1. **Intake → consultation.** Person created (`prospect`). The first consultation in a department auto-creates that person's `Journey`. Running the consultation moves the person to `lead`. The `department_manager` sets the `outcome`.
 2. **Outcome routing** (every branch lands somewhere concrete):
    - `pre_enroll` → create `Enrollment` (`pre_enroll`) + `Invoice` + `Installment`s.
-   - `follow_up` → create `Task` (`follow_up_registration`, `due_date = next_action_date`).
+   - `follow_up` → create `Task` (`follow_up_registration`, `due_date = next_action_date`, assignee = admission staff).
    - `refer_other_dept` → set `refer_to_department_id`, **create the target-department `Journey`**, and create a `Task` (`referral`) for it so the referral can't be dropped.
    - `not_suitable` / `closed` → no enrollment; the journey is closed (`Journey.status = dropped/completed`).
    - `continue` → for returning students (a new consultation on an existing journey).

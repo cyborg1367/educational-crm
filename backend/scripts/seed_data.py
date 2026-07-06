@@ -59,23 +59,25 @@ USER_SPECS = [
     ("admin@crm.local", "Admin1234!", UserRole.admin, "مدیر سیستم", None),
     ("admission@crm.local", "Admission1234!", UserRole.admission, "کارشناس پذیرش", None),
     ("finance@crm.local", "Finance1234!", UserRole.finance, "کارشناس مالی", None),
-    ("teacher@crm.local", "Teacher1234!", UserRole.teacher, "استاد احمدی", "برنامه‌نویسی"),
-    ("manager@crm.local", "Manager1234!", UserRole.department_manager, "مدیر دپارتمان", "برنامه‌نویسی"),
+    ("teacher@crm.local", "Teacher1234!", UserRole.teacher, "استاد احمدی", "دپارتمان فناوری و اطلاعات"),
+    ("manager@crm.local", "Manager1234!", UserRole.department_manager, "مدیر دپارتمان", "دپارتمان فناوری و اطلاعات"),
 ]
 
 DEPARTMENT_SPECS = [
-    ("برنامه‌نویسی", "admin"),
-    ("زبان انگلیسی", "admin"),
-    ("طراحی گرافیک", "admin"),
+    ("دپارتمان فناوری و اطلاعات", "admin"),
+    ("دپارتمان هوش مصنوعی", "admin"),
+    ("دپارتمان زبان کودکان", "admin"),
+    ("دپارتمان زبان بزرگسال", "admin"),
+    ("دپارتمان علوم مالی", "admin"),
 ]
 
 COURSE_SPECS = [
-    ("Python مقدماتی", "برنامه‌نویسی", 4_500_000),
-    ("JavaScript پیشرفته", "برنامه‌نویسی", 5_500_000),
-    ("IELTS آمادگی", "زبان انگلیسی", 8_000_000),
-    ("TOEFL آمادگی", "زبان انگلیسی", 7_500_000),
-    ("UI/UX مقدماتی", "طراحی گرافیک", 6_000_000),
-    ("Figma پیشرفته", "طراحی گرافیک", 5_000_000),
+    ("Python مقدماتی", "دپارتمان فناوری و اطلاعات", 4_500_000),
+    ("JavaScript پیشرفته", "دپارتمان فناوری و اطلاعات", 5_500_000),
+    ("IELTS آمادگی", "دپارتمان زبان بزرگسال", 8_000_000),
+    ("TOEFL آمادگی", "دپارتمان زبان بزرگسال", 7_500_000),
+    ("UI/UX مقدماتی", "دپارتمان فناوری و اطلاعات", 6_000_000),
+    ("Figma پیشرفته", "دپارتمان فناوری و اطلاعات", 5_000_000),
 ]
 
 CLASS_SPECS = [
@@ -199,13 +201,16 @@ def seed_departments(db) -> dict[str, Department]:
         print(f"  created department {name}")
     db.commit()
 
-    prog_dept = departments.get("برنامه‌نویسی") or db.scalars(
-        select(Department).where(Department.org_id == ORG_ID, Department.name == "برنامه‌نویسی")
+    tech_dept = departments.get("دپارتمان فناوری و اطلاعات") or db.scalars(
+        select(Department).where(
+            Department.org_id == ORG_ID,
+            Department.name == "دپارتمان فناوری و اطلاعات",
+        )
     ).one()
     for email in ("teacher@crm.local", "manager@crm.local"):
         user = _get_user_by_email(db, email)
-        if user and user.department_id != prog_dept.id:
-            user.department_id = prog_dept.id
+        if user and user.department_id != tech_dept.id:
+            user.department_id = tech_dept.id
     db.commit()
     return departments
 
@@ -346,9 +351,9 @@ def seed_consultations(db, people: list[Person], departments: dict[str, Departme
 
     admission = _get_user_by_role_key(db, "admission")
     dept_names = list(departments.keys()) or [
-        "برنامه‌نویسی",
-        "زبان انگلیسی",
-        "طراحی گرافیک",
+        "دپارتمان فناوری و اطلاعات",
+        "دپارتمان هوش مصنوعی",
+        "دپارتمان زبان بزرگسال",
     ]
     consultations: list[Consultation] = []
     for index, outcome in enumerate(CONSULTATION_OUTCOMES):
@@ -359,15 +364,15 @@ def seed_consultations(db, people: list[Person], departments: dict[str, Departme
         ).one()
         refer_dept_id: int | None = None
         if outcome == ConsultationOutcome.refer_other_dept:
-            design_dept = departments.get("طراحی گرافیک")
-            if design_dept is None:
-                design_dept = db.scalars(
+            ai_dept = departments.get("دپارتمان هوش مصنوعی")
+            if ai_dept is None:
+                ai_dept = db.scalars(
                     select(Department).where(
                         Department.org_id == ORG_ID,
-                        Department.name == "طراحی گرافیک",
+                        Department.name == "دپارتمان هوش مصنوعی",
                     )
                 ).first()
-            refer_dept_id = design_dept.id if design_dept else None
+            refer_dept_id = ai_dept.id if ai_dept else None
 
         consultation = Consultation(
             person_id=person.id,

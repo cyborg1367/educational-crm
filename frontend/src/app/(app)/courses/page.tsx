@@ -4,13 +4,16 @@ import * as React from "react";
 
 import { DataTable, EntitySummaryCard } from "@/components/data-display";
 import type { PaginatedResponse } from "@/components/data-display/types";
-import { AppDrawer, ErrorState, useToast } from "@/components/feedback";
+import {
+  CourseFormFields,
+  courseFormStateToCreateBody,
+  emptyCourseFormState,
+  isCourseFormValid,
+  type CourseFormState,
+} from "@/components/domain/course-form-fields";
+import { FormDialog } from "@/components/domain/form-dialog";
+import { ErrorState, useToast } from "@/components/feedback";
 import { Checkbox } from "@/components/form/selection-control";
-import { FormField } from "@/components/form/form-field";
-import { MoneyInput } from "@/components/form/money-input";
-import { Select } from "@/components/form/select";
-import { Textarea } from "@/components/form/textarea";
-import { TextInput } from "@/components/form/text-input";
 import { FilterBar, type FilterValues } from "@/components/layout";
 import { Badge } from "@/components/primitives/badge";
 import { ListPageSkeleton } from "@/components/skeletons";
@@ -61,14 +64,11 @@ export default function CoursesListPage() {
     React.useState<PaginatedResponse<CourseRead>>(emptyPage);
   const [departments, setDepartments] = React.useState<DepartmentRead[]>([]);
 
-  const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const [dialogOpen, setDialogOpen] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
-  const [formTitle, setFormTitle] = React.useState("");
-  const [formDepartmentId, setFormDepartmentId] = React.useState("");
-  const [formPrice, setFormPrice] = React.useState<number | null>(null);
-  const [formDuration, setFormDuration] = React.useState("");
-  const [formDescription, setFormDescription] = React.useState("");
-  const [formIsActive, setFormIsActive] = React.useState(true);
+  const [formState, setFormState] = React.useState<CourseFormState>(
+    emptyCourseFormState(),
+  );
   const [formError, setFormError] = React.useState<ApiError | null>(null);
   const [fieldError, setFieldError] = React.useState<ApiFieldError | null>(null);
 
@@ -141,37 +141,28 @@ export default function CoursesListPage() {
     [departments],
   );
 
+  const activeDepartments = React.useMemo(
+    () => departments.filter((department) => department.is_active),
+    [departments],
+  );
+
   const resetForm = () => {
-    setFormTitle("");
-    setFormDepartmentId(
-      departments[0] ? String(departments[0].id) : "",
-    );
-    setFormPrice(null);
-    setFormDuration("");
-    setFormDescription("");
-    setFormIsActive(true);
+    setFormState(emptyCourseFormState(activeDepartments));
     setFormError(null);
     setFieldError(null);
   };
 
   const handleCreate = async () => {
-    if (!formTitle.trim() || !formDepartmentId || formPrice == null || formPrice <= 0) {
+    if (!isCourseFormValid(formState)) {
       return;
     }
     setSubmitting(true);
     setFormError(null);
     setFieldError(null);
     try {
-      await createCourse({
-        title: formTitle.trim(),
-        department_id: Number(formDepartmentId),
-        current_price: formPrice,
-        duration_sessions: formDuration ? Number(formDuration) : null,
-        description: formDescription.trim() || null,
-        is_active: formIsActive,
-      });
+      await createCourse(courseFormStateToCreateBody(formState));
       toast({ variant: "success", title: "دوره جدید ثبت شد" });
-      setDrawerOpen(false);
+      setDialogOpen(false);
       resetForm();
       void loadData();
     } catch (err) {
@@ -199,9 +190,10 @@ export default function CoursesListPage() {
             type="button"
             variant="primary"
             size="md"
+            disabled={activeDepartments.length === 0}
             onClick={() => {
               resetForm();
-              setDrawerOpen(true);
+              setDialogOpen(true);
             }}
           >
             افزودن دوره
@@ -284,85 +276,25 @@ export default function CoursesListPage() {
         }
       />
 
-      <AppDrawer
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        mode="form"
+      <FormDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
         title="افزودن دوره"
-        onSubmit={handleCreate}
         submitLabel="ثبت"
+        onSubmit={() => void handleCreate()}
         submitLoading={submitting}
-        submitDisabled={
-          !formTitle.trim() ||
-          !formDepartmentId ||
-          formPrice == null ||
-          formPrice <= 0
-        }
+        submitDisabled={!isCourseFormValid(formState)}
+        formError={formError}
       >
-        {formError ? (
-          <ErrorState error={formError} className="py-[var(--primitive-space-4)]" />
-        ) : null}
-        <div className="flex flex-col gap-[var(--primitive-space-4)]">
-          <FormField
-            label="عنوان"
-            required
-            error={fieldError?.field === "title" ? fieldError : null}
-          >
-            <TextInput
-              value={formTitle}
-              onChange={(e) => setFormTitle(e.target.value)}
-            />
-          </FormField>
-          <FormField
-            label="دپارتمان"
-            required
-            error={fieldError?.field === "department_id" ? fieldError : null}
-          >
-            <Select
-              options={departments.map((dept) => ({
-                value: String(dept.id),
-                label: dept.name,
-              }))}
-              value={formDepartmentId}
-              onChange={setFormDepartmentId}
-              placeholder="انتخاب دپارتمان"
-            />
-          </FormField>
-          <FormField
-            label="قیمت"
-            required
-            error={fieldError?.field === "current_price" ? fieldError : null}
-          >
-            <MoneyInput value={formPrice} onValueChange={setFormPrice} />
-          </FormField>
-          <FormField
-            label="تعداد جلسات"
-            error={fieldError?.field === "duration_sessions" ? fieldError : null}
-          >
-            <TextInput
-              type="number"
-              min={1}
-              value={formDuration}
-              onChange={(e) => setFormDuration(e.target.value)}
-            />
-          </FormField>
-          <FormField
-            label="توضیحات"
-            error={fieldError?.field === "description" ? fieldError : null}
-          >
-            <Textarea
-              value={formDescription}
-              onChange={(e) => setFormDescription(e.target.value)}
-              rows={3}
-            />
-          </FormField>
-          <Checkbox
-            label="فعال"
-            checked={formIsActive}
-            onChange={(e) => setFormIsActive(e.target.checked)}
-          />
-        </div>
-      </AppDrawer>
+        <CourseFormFields
+          state={formState}
+          onChange={(patch) =>
+            setFormState((prev) => ({ ...prev, ...patch }))
+          }
+          departments={departments}
+          fieldError={fieldError}
+        />
+      </FormDialog>
     </>
   );
 }

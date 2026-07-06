@@ -28,12 +28,6 @@ const TERMINOLOGY: Record<string, string> = {
   planned: "برنامه‌ریزی‌شده",
   cancelled: "لغو‌شده",
 
-  // Consultation.outcome
-  follow_up: "پیگیری",
-  refer_other_dept: "ارجاع به بخش دیگر",
-  not_suitable: "مناسب نیست",
-  closed: "بسته شد",
-
   // Journey.status
   on_hold: "معلق",
 
@@ -91,6 +85,13 @@ export const STATUS_DISPLAY_LABELS: Record<string, string> = {
   "class.cancelled": "لغو‌شده",
   "journey.active": "فعال",
   "journey.completed": "تکمیل‌شده",
+  "consultation.pending": "در انتظار مشاوره",
+  "consultation.pre_enroll": "پیش‌ثبت‌نام",
+  "consultation.follow_up": "پیگیری",
+  "consultation.refer_other_dept": "ارجاع به بخش دیگر",
+  "consultation.not_suitable": "مناسب نیست",
+  "consultation.closed": "پرونده بسته",
+  "consultation.continue": "ادامه مسیر",
 };
 
 export function statusDisplayLabel(domain: string, value: string): string {
@@ -116,16 +117,74 @@ export const CLASS_STATUS_OPTIONS: { value: ClassStatus; label: string }[] = [
   { value: "cancelled", label: terminologyLabel("cancelled") },
 ];
 
+export const CONSULTATION_OUTCOME_LABELS: Record<ConsultationOutcome, string> = {
+  pre_enroll: "آماده ثبت‌نام",
+  follow_up: "نیاز به پیگیری",
+  refer_other_dept: "ارجاع به بخش دیگر",
+  not_suitable: "مناسب نیست",
+  closed: "بسته شد",
+  continue: "ادامه مسیر",
+};
+
 export const CONSULTATION_OUTCOME_OPTIONS: {
   value: ConsultationOutcome;
   label: string;
-}[] = [
-  { value: "pre_enroll", label: terminologyLabel("pre_enroll") },
-  { value: "follow_up", label: terminologyLabel("follow_up") },
-  { value: "refer_other_dept", label: terminologyLabel("refer_other_dept") },
-  { value: "not_suitable", label: terminologyLabel("not_suitable") },
-  { value: "closed", label: terminologyLabel("closed") },
+}[] = (
+  Object.entries(CONSULTATION_OUTCOME_LABELS) as [ConsultationOutcome, string][]
+).map(([value, label]) => ({ value, label }));
+
+/** Outcome choices shown in the consultation wizard (excludes continue). */
+export const CONSULTATION_WIZARD_OUTCOME_OPTIONS: {
+  value: ConsultationOutcome;
+  label: string;
+}[] = CONSULTATION_OUTCOME_OPTIONS.filter((opt) => opt.value !== "continue");
+
+export const CONSULTATION_LEVEL_OPTIONS: { value: string; label: string }[] = [
+  { value: "beginner", label: "مبتدی کامل" },
+  { value: "elementary", label: "آشنایی مقدماتی" },
+  { value: "intermediate", label: "متوسط" },
+  { value: "advanced", label: "پیشرفته" },
 ];
+
+export const CONSULTATION_MOTIVATION_OPTIONS: { value: string; label: string }[] = [
+  { value: "career_change", label: "تغییر شغل" },
+  { value: "career_growth", label: "ارتقا شغلی" },
+  { value: "personal_learning", label: "یادگیری شخصی" },
+  { value: "business", label: "راه‌اندازی کسب‌وکار" },
+  { value: "other", label: "سایر" },
+];
+
+export const LEVEL_LABELS: Record<string, string> = Object.fromEntries(
+  CONSULTATION_LEVEL_OPTIONS.map((opt) => [opt.value, opt.label]),
+);
+
+export const MOTIVATION_LABELS: Record<string, string> = Object.fromEntries(
+  CONSULTATION_MOTIVATION_OPTIONS.map((opt) => [opt.value, opt.label]),
+);
+
+export function levelLabel(value: string): string {
+  return LEVEL_LABELS[value] ?? value;
+}
+
+export function motivationLabel(value: string): string {
+  return MOTIVATION_LABELS[value] ?? value;
+}
+
+/** One-line helper text shown beneath outcome Select in the consultation wizard. */
+export const CONSULTATION_OUTCOME_DESCRIPTIONS: Record<
+  ConsultationOutcome,
+  string
+> = {
+  pre_enroll:
+    "آماده ثبت‌نام — کارشناس پذیرش برای انتخاب کلاس و تکمیل ثبت‌نام مطلع می‌شود.",
+  follow_up:
+    "هنوز قطعی نیست — وظیفه پیگیری ثبت‌نام به کارشناس پذیرش ارجاع می‌شود.",
+  refer_other_dept:
+    "دپارتمان دیگر مناسب‌تر است — پرونده و وظیفه به مدیر آن دپارتمان می‌رود.",
+  not_suitable: "ادامه نمی‌دهد — پرونده در این دپارتمان بسته می‌شود.",
+  closed: "انصراف یا پایان — پرونده بسته می‌شود.",
+  continue: "دانش‌پذیر برگشته — مشاوره بعدی بدون مسیر جدید.",
+};
 
 export const TASK_TYPE_LABELS: Record<TaskType, string> = {
   follow_up_registration: terminologyLabel("follow_up_registration"),
@@ -191,7 +250,10 @@ export function sourceLabel(value: string): string {
 /** Activity timeline action labels — keyed by backend `Activity.action`. */
 export const ACTION_LABELS: Record<string, string> = {
   person_created: "ورود لید به سیستم",
+  consultation_referred: "ارجاع به دپارتمان برای مشاوره",
+  consultation_assessment_saved: "ارزیابی مشاوره ثبت شد",
   consultation_done: "مشاوره انجام شد",
+  consultation_closed: "مشاوره بسته شد",
   enrollment_created: "ثبت‌نام انجام شد",
   enrollment_dropped: "انصراف از ثبت‌نام",
   payment_recorded: "پرداخت ثبت شد",
@@ -205,10 +267,3 @@ export function actionLabel(action: string): string {
   return ACTION_LABELS[action] ?? action;
 }
 
-export const CONSULTATION_OUTCOME_LABELS: Record<ConsultationOutcome, string> = {
-  pre_enroll: terminologyLabel("pre_enroll"),
-  follow_up: terminologyLabel("follow_up"),
-  refer_other_dept: terminologyLabel("refer_other_dept"),
-  not_suitable: terminologyLabel("not_suitable"),
-  closed: terminologyLabel("closed"),
-};

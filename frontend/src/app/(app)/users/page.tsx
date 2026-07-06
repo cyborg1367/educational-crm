@@ -4,11 +4,16 @@ import * as React from "react";
 
 import { DataTable, EntitySummaryCard } from "@/components/data-display";
 import type { PaginatedResponse } from "@/components/data-display/types";
+import { FormDialog } from "@/components/domain/form-dialog";
 import { PermissionBanner } from "@/components/domain/permission-banner";
-import { AppDrawer, ErrorState, useToast } from "@/components/feedback";
-import { FormField } from "@/components/form/form-field";
-import { Select } from "@/components/form/select";
-import { TextInput } from "@/components/form/text-input";
+import {
+  emptyUserFormState,
+  isUserFormValid,
+  UserFormFields,
+  userFormStateToCreateBody,
+  type UserFormState,
+} from "@/components/domain/user-form-fields";
+import { ErrorState, useToast } from "@/components/feedback";
 import { FilterBar, type FilterValues } from "@/components/layout";
 import { Badge } from "@/components/primitives/badge";
 import { ListPageSkeleton } from "@/components/skeletons";
@@ -54,8 +59,6 @@ function ActiveBadge({ isActive }: { isActive: boolean }) {
   );
 }
 
-const DEPARTMENT_REQUIRED_ROLES: UserRole[] = ["teacher", "department_manager"];
-
 export default function UsersListPage() {
   const { toast } = useToast();
   const isAdmin = getDevUserRole() === "admin";
@@ -68,13 +71,11 @@ export default function UsersListPage() {
     React.useState<PaginatedResponse<UserRead>>(emptyPage);
   const [departments, setDepartments] = React.useState<DepartmentRead[]>([]);
 
-  const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const [dialogOpen, setDialogOpen] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
-  const [formName, setFormName] = React.useState("");
-  const [formEmail, setFormEmail] = React.useState("");
-  const [formPassword, setFormPassword] = React.useState("");
-  const [formRole, setFormRole] = React.useState<UserRole>("teacher");
-  const [formDepartmentId, setFormDepartmentId] = React.useState("");
+  const [formState, setFormState] = React.useState<UserFormState>(
+    emptyUserFormState(),
+  );
   const [formError, setFormError] = React.useState<ApiError | null>(null);
   const [fieldError, setFieldError] = React.useState<ApiFieldError | null>(null);
 
@@ -137,40 +138,23 @@ export default function UsersListPage() {
     [],
   );
 
-  const departmentRequired = DEPARTMENT_REQUIRED_ROLES.includes(formRole);
-
   const resetForm = () => {
-    setFormName("");
-    setFormEmail("");
-    setFormPassword("");
-    setFormRole("teacher");
-    setFormDepartmentId("");
+    setFormState(emptyUserFormState());
     setFormError(null);
     setFieldError(null);
   };
 
   const handleCreate = async () => {
-    if (
-      !formName.trim() ||
-      !formEmail.trim() ||
-      !formPassword.trim() ||
-      (departmentRequired && !formDepartmentId)
-    ) {
+    if (!isUserFormValid(formState, departments)) {
       return;
     }
     setSubmitting(true);
     setFormError(null);
     setFieldError(null);
     try {
-      await createUser({
-        name: formName.trim(),
-        email: formEmail.trim(),
-        password: formPassword,
-        role: formRole,
-        department_id: formDepartmentId ? Number(formDepartmentId) : null,
-      });
+      await createUser(userFormStateToCreateBody(formState));
       toast({ variant: "success", title: "کاربر جدید ثبت شد" });
-      setDrawerOpen(false);
+      setDialogOpen(false);
       resetForm();
       void loadData();
     } catch (err) {
@@ -189,7 +173,7 @@ export default function UsersListPage() {
     return (
       <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-[var(--semantic-space-sectionGap)]">
         <h1 className="text-[length:var(--primitive-font-size-2xl)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
-          کاربران
+          کاربران و نقش‌ها
         </h1>
         <PermissionBanner message="فقط مدیر سیستم به این صفحه دسترسی دارد" />
       </div>
@@ -203,7 +187,7 @@ export default function UsersListPage() {
   return (
     <>
       <ListPageSkeleton
-        title="کاربران"
+        title="کاربران و نقش‌ها"
         headerAction={
           <Button
             type="button"
@@ -211,7 +195,7 @@ export default function UsersListPage() {
             size="md"
             onClick={() => {
               resetForm();
-              setDrawerOpen(true);
+              setDialogOpen(true);
             }}
           >
             افزودن کاربر
@@ -278,88 +262,25 @@ export default function UsersListPage() {
         }
       />
 
-      <AppDrawer
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        mode="form"
+      <FormDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
         title="افزودن کاربر"
-        onSubmit={handleCreate}
         submitLabel="ثبت"
+        onSubmit={() => void handleCreate()}
         submitLoading={submitting}
-        submitDisabled={
-          !formName.trim() ||
-          !formEmail.trim() ||
-          !formPassword.trim() ||
-          (departmentRequired && !formDepartmentId)
-        }
+        submitDisabled={!isUserFormValid(formState, departments)}
+        formError={formError}
       >
-        {formError ? (
-          <ErrorState error={formError} className="py-[var(--primitive-space-4)]" />
-        ) : null}
-        <div className="flex flex-col gap-[var(--primitive-space-4)]">
-          <FormField
-            label="نام"
-            required
-            error={fieldError?.field === "name" ? fieldError : null}
-          >
-            <TextInput
-              value={formName}
-              onChange={(e) => setFormName(e.target.value)}
-            />
-          </FormField>
-          <FormField
-            label="ایمیل"
-            required
-            error={fieldError?.field === "email" ? fieldError : null}
-          >
-            <TextInput
-              type="email"
-              value={formEmail}
-              onChange={(e) => setFormEmail(e.target.value)}
-            />
-          </FormField>
-          <FormField
-            label="رمز عبور"
-            required
-            error={fieldError?.field === "password" ? fieldError : null}
-          >
-            <TextInput
-              type="password"
-              value={formPassword}
-              onChange={(e) => setFormPassword(e.target.value)}
-            />
-          </FormField>
-          <FormField
-            label="نقش"
-            required
-            error={fieldError?.field === "role" ? fieldError : null}
-          >
-            <Select
-              options={USER_ROLE_OPTIONS.map((opt) => ({
-                value: opt.value,
-                label: opt.label,
-              }))}
-              value={formRole}
-              onChange={(value) => setFormRole(value as UserRole)}
-            />
-          </FormField>
-          <FormField
-            label="دپارتمان"
-            required={departmentRequired}
-            error={fieldError?.field === "department_id" ? fieldError : null}
-          >
-            <Select
-              options={departments.map((dept) => ({
-                value: String(dept.id),
-                label: dept.name,
-              }))}
-              value={formDepartmentId}
-              onChange={setFormDepartmentId}
-              placeholder="انتخاب دپارتمان"
-            />
-          </FormField>
-        </div>
-      </AppDrawer>
+        <UserFormFields
+          state={formState}
+          onChange={(patch) =>
+            setFormState((prev) => ({ ...prev, ...patch }))
+          }
+          departments={departments}
+          fieldError={fieldError}
+        />
+      </FormDialog>
     </>
   );
 }

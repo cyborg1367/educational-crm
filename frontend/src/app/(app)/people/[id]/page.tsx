@@ -13,7 +13,6 @@ import {
   AISummaryPanel,
   ConfirmDialog,
   StaleLeadIndicator,
-  StatusAction,
   StatusBadge,
 } from "@/components/domain";
 import {
@@ -24,6 +23,8 @@ import {
 } from "@/components/domain/person-form-fields";
 import { PersonFormDialog } from "@/components/domain/person-form-dialog";
 import { ErrorState, useToast } from "@/components/feedback";
+import { FormDialog } from "@/components/domain/form-dialog";
+import { ReferralFormFields } from "@/components/domain/referral-form-fields";
 import { Breadcrumb } from "@/components/layout";
 import { Badge } from "@/components/primitives/badge";
 import { T1DetailSkeleton } from "@/components/skeletons";
@@ -31,29 +32,42 @@ import { BlockSkeleton } from "@/components/feedback/skeleton";
 import { Button } from "@/components/ui/button";
 import { fieldErrorFromApi, toApiError } from "@/lib/api/errors";
 import type { ApiError, ApiFieldError } from "@/lib/api/error";
+import { createActivity } from "@/lib/api/activities";
+import { createConsultation, listConsultations } from "@/lib/api/consultations";
+import { getDepartment, listDepartments } from "@/lib/api/departments";
 import {
   deletePerson,
   getPerson,
   listClasses,
-  listDepartments,
   listEnrollments,
   listJourneys,
   listTasks,
   updatePerson,
 } from "@/lib/api/people";
-import { listConsultations } from "@/lib/api/consultations";
-import { getCourse } from "@/lib/api/finance";
-import { listUsers } from "@/lib/api/users";
-import { canManageEnrollments } from "@/lib/auth/role";
+import { getMe, listUsers } from "@/lib/api/users";
+import {
+  canConductConsultation,
+  canManageEnrollments,
+  canReferToDepartment,
+  getCurrentRole,
+} from "@/lib/auth/role";
+import {
+  assessmentStatusLabel,
+  isConsultationAssessmentComplete,
+} from "@/lib/consultation/assessment";
+import {
+  matchDepartmentsToInterests,
+  sortDepartmentsByInstituteCatalog,
+} from "@/lib/department/institute-departments";
 import type {
   ConsultationRead,
   CourseClassRead,
-  CourseRead,
   DepartmentRead,
   EnrollmentRead,
   JourneyRead,
   PersonRead,
   TaskRead,
+  UserRead,
 } from "@/lib/api/types";
 import { formatDateDisplay, formatDateTimeDisplay, formatToman } from "@/lib/locale";
 import {
@@ -95,6 +109,7 @@ export default function PersonDetailPage() {
   const { toast } = useToast();
   const personId = Number(params.id);
   const canEnroll = canManageEnrollments();
+  const canRefer = canReferToDepartment();
 
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<ApiError | null>(null);
@@ -111,10 +126,8 @@ export default function PersonDetailPage() {
   const [consultations, setConsultations] = React.useState<ConsultationRead[]>(
     [],
   );
-  const [coursesById, setCoursesById] = React.useState<Map<number, CourseRead>>(
-    new Map(),
-  );
   const [usersMap, setUsersMap] = React.useState<Record<number, string>>({});
+  const [me, setMe] = React.useState<UserRead | null>(null);
   const [tabLoading, setTabLoading] = React.useState(false);
 
   const [editOpen, setEditOpen] = React.useState(false);
@@ -124,6 +137,22 @@ export default function PersonDetailPage() {
   const [formState, setFormState] = React.useState<PersonFormState | null>(null);
   const [formError, setFormError] = React.useState<ApiError | null>(null);
   const [fieldError, setFieldError] = React.useState<ApiFieldError | null>(null);
+
+  const [referralOpen, setReferralOpen] = React.useState(false);
+  const [referralDepartments, setReferralDepartments] = React.useState<
+    DepartmentRead[]
+  >([]);
+  const [referralDepartmentsLoading, setReferralDepartmentsLoading] =
+    React.useState(false);
+  const [selectedDepartmentIds, setSelectedDepartmentIds] = React.useState<
+    Set<number>
+  >(new Set());
+  const [referralNotes, setReferralNotes] = React.useState("");
+  const [referralSubmitting, setReferralSubmitting] = React.useState(false);
+  const [referralProgress, setReferralProgress] = React.useState<{
+    current: number;
+    total: number;
+  } | null>(null);
 
   const departmentNameById = React.useMemo(() => {
     const map = new Map<number, string>();
@@ -199,16 +228,26 @@ export default function PersonDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const [personData, lastActivity, usersRes] = await Promise.all([
+      const currentRole = getCurrentRole();
+      const [personData, lastActivity, meData] = await Promise.all([
         getPerson(personId),
         fetchLastActivityForPerson(personId),
-        listUsers({ limit: 500 }),
+        getMe(),
       ]);
       setPerson(personData);
       setLastActivityAt(lastActivity);
-      setUsersMap(
-        Object.fromEntries(usersRes.items.map((user) => [user.id, user.name])),
-      );
+      setMe(meData);
+
+      let nameByUserId: Record<number, string> = {
+        [meData.id]: meData.name,
+      };
+      if (currentRole === "admin") {
+        const usersRes = await listUsers({ limit: 500 });
+        nameByUserId = Object.fromEntries(
+          usersRes.items.map((user) => [user.id, user.name]),
+        );
+      }
+      setUsersMap(nameByUserId);
     } catch (err) {
       setError(toApiError(err, "خطا در بارگذاری شخص"));
     } finally {
@@ -235,32 +274,114 @@ export default function PersonDetailPage() {
       setDepartments(deptRes.items);
       setClasses(classRes.items);
       setConsultations(consultRes.items);
-
-      const courseIds = [
-        ...new Set(
-          consultRes.items
-            .map((c) => c.recommended_course_id)
-            .filter((id): id is number => id != null),
-        ),
-      ];
-      if (courseIds.length > 0) {
-        const courses = await Promise.all(
-          courseIds.map((id) => getCourse(id).catch(() => null)),
-        );
-        const courseMap = new Map<number, CourseRead>();
-        for (const course of courses) {
-          if (course) {
-            courseMap.set(course.id, course);
-          }
-        }
-        setCoursesById(courseMap);
-      }
     } catch {
       // Tab-level errors handled per tab via empty states
     } finally {
       setTabLoading(false);
     }
   }, [person]);
+
+  const refreshConsultations = React.useCallback(async () => {
+    try {
+      const consultRes = await listConsultations({ limit: 500 });
+      setConsultations(consultRes.items);
+    } catch {
+      // Keep existing list on refresh failure
+    }
+  }, []);
+
+  const openReferralDrawer = React.useCallback(async () => {
+    if (!person) return;
+    setReferralOpen(true);
+    setReferralNotes("");
+    setReferralProgress(null);
+    setReferralDepartmentsLoading(true);
+    try {
+      const deptRes = await listDepartments({ limit: 100 });
+      const activeDepartments = sortDepartmentsByInstituteCatalog(
+        deptRes.items.filter((dept) => dept.is_active),
+      );
+      setReferralDepartments(activeDepartments);
+      setSelectedDepartmentIds(
+        matchDepartmentsToInterests(activeDepartments, person.interests),
+      );
+    } catch (err) {
+      toast({
+        variant: "error",
+        title: toApiError(err, "خطا در بارگذاری دپارتمان‌ها").detail,
+      });
+      setReferralOpen(false);
+    } finally {
+      setReferralDepartmentsLoading(false);
+    }
+  }, [person, toast]);
+
+  const toggleDepartmentSelection = (departmentId: number) => {
+    setSelectedDepartmentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(departmentId)) {
+        next.delete(departmentId);
+      } else {
+        next.add(departmentId);
+      }
+      return next;
+    });
+  };
+
+  const handleReferralSubmit = async () => {
+    if (!person || selectedDepartmentIds.size === 0) return;
+
+    const selectedIds = [...selectedDepartmentIds];
+    setReferralSubmitting(true);
+    setReferralProgress({ current: 0, total: selectedIds.length });
+
+    try {
+      for (let index = 0; index < selectedIds.length; index += 1) {
+        const departmentId = selectedIds[index]!;
+        setReferralProgress({ current: index + 1, total: selectedIds.length });
+
+        const department = await getDepartment(departmentId);
+        if (department.manager_id == null) {
+          throw new Error(`دپارتمان «${department.name}» مدیر ندارد`);
+        }
+
+        await createConsultation({
+          person_id: person.id,
+          department_id: department.id,
+          consultant_id: department.manager_id,
+          notes: referralNotes.trim() || null,
+          current_level: null,
+          goal: null,
+        });
+
+        await createActivity({
+          person_id: person.id,
+          action: "consultation_referred",
+          payload: {
+            department_id: department.id,
+            department_name: department.name,
+            consultant_id: department.manager_id,
+            notes: referralNotes.trim() || null,
+          },
+        });
+      }
+
+      toast({
+        variant: "success",
+        title: `ارجاع به ${selectedIds.length} دپارتمان با موفقیت انجام شد`,
+      });
+      await refreshConsultations();
+      setReferralOpen(false);
+    } catch (err) {
+      toast({
+        variant: "error",
+        title: toApiError(err, "خطا در ارجاع به دپارتمان").detail,
+      });
+    } finally {
+      setReferralSubmitting(false);
+      setReferralProgress(null);
+    }
+  };
 
   React.useEffect(() => {
     void loadPerson();
@@ -432,9 +553,21 @@ export default function PersonDetailPage() {
                 </dl>
 
                 <div className="flex flex-col gap-[var(--primitive-space-3)]">
-                  <h2 className="text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-primary)]">
-                    مشاوره‌ها
-                  </h2>
+                  <div className="flex flex-wrap items-center justify-between gap-[var(--primitive-space-3)]">
+                    <h2 className="text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-primary)]">
+                      مشاوره‌ها
+                    </h2>
+                    {canRefer ? (
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        onClick={() => void openReferralDrawer()}
+                      >
+                        ارجاع به دپارتمان
+                      </Button>
+                    ) : null}
+                  </div>
                   {tabLoading ? (
                     <BlockSkeleton height="120px" width="100%" />
                   ) : personConsultations.length === 0 ? (
@@ -446,34 +579,79 @@ export default function PersonDetailPage() {
                       {personConsultations.map((consultation) => (
                         <div
                           key={consultation.id}
-                          className="flex flex-wrap items-center justify-between gap-[var(--primitive-space-3)] rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] px-[var(--primitive-space-4)] py-[var(--primitive-space-3)]"
+                          className="rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] px-[var(--primitive-space-4)] py-[var(--primitive-space-3)]"
                         >
-                          <div className="min-w-0">
-                            <p className="text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)]">
-                              مشاوره #{consultation.id}
-                            </p>
-                            <p className="mt-[var(--primitive-space-1)] text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]">
-                              {consultation.goal ?? "—"}
-                              {consultation.recommended_course_id != null
-                                ? ` · ${
-                                    coursesById.get(
-                                      consultation.recommended_course_id,
-                                    )?.title ?? "دوره"
-                                  }`
-                                : ""}
-                            </p>
-                          </div>
-                          <StatusAction
-                            entity="consultation"
-                            outcome={consultation.outcome}
-                            onAction={() => {
-                              if (consultation.outcome === null) {
-                                router.push(
-                                  `/people/${person.id}/consultations/${consultation.id}`,
-                                );
+                          <dl className="flex flex-col gap-[var(--primitive-space-2)]">
+                            <KeyValueRow
+                              label="دپارتمان"
+                              value={
+                                departmentNameById.get(consultation.department_id) ??
+                                "—"
                               }
-                            }}
-                          />
+                            />
+                            <KeyValueRow
+                              label="مشاور"
+                              value={
+                                usersMap[consultation.consultant_id] ?? "—"
+                              }
+                            />
+                            <KeyValueRow
+                              label="سطح"
+                              value={consultation.current_level ?? "—"}
+                            />
+                            <KeyValueRow
+                              label="هدف"
+                              value={consultation.goal ?? "—"}
+                            />
+                            <KeyValueRow
+                              label="ارزیابی"
+                              value={assessmentStatusLabel(consultation)}
+                            />
+                            <KeyValueRow
+                              label="تاریخ"
+                              value={formatDateTimeDisplay(
+                                consultation.created_at,
+                                "YYYY/MM/DD",
+                              )}
+                            />
+                            <KeyValueRow
+                              label="وضعیت"
+                              value={
+                                <div className="flex flex-wrap items-center gap-[var(--primitive-space-2)]">
+                                  <StatusBadge
+                                    domain="consultation"
+                                    value={consultation.outcome ?? "pending"}
+                                  />
+                                  {me &&
+                                  canConductConsultation(consultation, me) &&
+                                  consultation.outcome === null ? (
+                                    <Button
+                                      type="button"
+                                      variant="primary"
+                                      size="sm"
+                                      onClick={() =>
+                                        router.push(
+                                          `/people/${person.id}/consultations/${consultation.id}?step=${
+                                            isConsultationAssessmentComplete(
+                                              consultation,
+                                            )
+                                              ? "outcome"
+                                              : "assessment"
+                                          }`,
+                                        )
+                                      }
+                                    >
+                                      {isConsultationAssessmentComplete(
+                                        consultation,
+                                      )
+                                        ? "تعیین نتیجه"
+                                        : "ادامه مشاوره"}
+                                    </Button>
+                                  ) : null}
+                                </div>
+                              }
+                            />
+                          </dl>
                         </div>
                       ))}
                     </div>
@@ -685,6 +863,30 @@ export default function PersonDetailPage() {
         onConfirm={() => void handleDelete()}
         onCancel={() => setDeleteOpen(false)}
       />
+
+      <FormDialog
+        open={referralOpen}
+        onOpenChange={setReferralOpen}
+        title="ارجاع به دپارتمان جهت مشاوره"
+        cancelLabel="لغو"
+        submitLabel="ارجاع"
+        onSubmit={() => void handleReferralSubmit()}
+        submitLoading={referralSubmitting}
+        submitDisabled={
+          selectedDepartmentIds.size === 0 || referralDepartments.length === 0
+        }
+      >
+        <ReferralFormFields
+          departments={referralDepartments}
+          loading={referralDepartmentsLoading}
+          selectedDepartmentIds={selectedDepartmentIds}
+          onToggleDepartment={toggleDepartmentSelection}
+          notes={referralNotes}
+          onNotesChange={setReferralNotes}
+          submitting={referralSubmitting}
+          progress={referralProgress}
+        />
+      </FormDialog>
     </>
   );
 }

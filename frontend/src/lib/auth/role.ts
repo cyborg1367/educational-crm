@@ -49,6 +49,22 @@ export function canManageEnrollments(role: UserRole = getDevUserRole()): boolean
   return role === "admin" || role === "admission";
 }
 
+/** Admission and admin may refer a person to departments for consultation. */
+export function canReferToDepartment(role: UserRole = getDevUserRole()): boolean {
+  return role === "admin" || role === "admission";
+}
+
+/** Admin or assigned consultant may run a pending consultation. */
+export function canConductConsultation(
+  consultation: { consultant_id: number; outcome: string | null },
+  me: { id: number; role: UserRole },
+): boolean {
+  if (consultation.outcome != null) {
+    return false;
+  }
+  return me.role === "admin" || consultation.consultant_id === me.id;
+}
+
 /** Finance and admin may record payments and refunds. */
 export function canManageFinance(role: UserRole = getDevUserRole()): boolean {
   return role === "admin" || role === "finance";

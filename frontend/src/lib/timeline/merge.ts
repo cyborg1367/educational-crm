@@ -24,6 +24,17 @@ export type TimelineEntry =
   | TimelineActivityEntry
   | TimelineCommunicationEntry;
 
+/** System/automated activities hidden from person timeline UI. */
+const HIDDEN_TIMELINE_ACTIONS = new Set([
+  "task_created",
+  "consultation_assessment_saved",
+  "course_completed",
+]);
+
+export function isTimelineActivityVisible(action: string): boolean {
+  return !HIDDEN_TIMELINE_ACTIONS.has(action);
+}
+
 function toActivityEntry(activity: ActivityRead): TimelineActivityEntry {
   return {
     kind: "activity",
@@ -61,7 +72,9 @@ export function mergeTimelineEntries(
   communications: CommunicationRead[],
 ): TimelineEntry[] {
   const merged: TimelineEntry[] = [
-    ...activities.map(toActivityEntry),
+    ...activities
+      .filter((activity) => isTimelineActivityVisible(activity.action))
+      .map(toActivityEntry),
     ...communications.map(toCommunicationEntry),
   ];
 

@@ -28,6 +28,10 @@ export function listDepartments(
   return fetchJson(`/departments${buildQuery({ limit, offset })}`);
 }
 
+export function getDepartment(id: number): Promise<DepartmentRead> {
+  return fetchJson<DepartmentRead>(`/departments/${id}`);
+}
+
 export function createDepartment(
   body: DepartmentCreate,
 ): Promise<DepartmentRead> {

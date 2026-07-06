@@ -11,3 +11,7 @@ class ConsultationOutcomeUpdate(BaseModel):
         default=None,
         description="Target class for pre_enroll outcome. Required if no open class exists for recommended course.",
     )
+    notes: str | None = Field(
+        default=None,
+        description="Manager notes for the referring admission officer.",
+    )

@@ -1,57 +1,60 @@
 "use client";
 
 import * as React from "react";
-import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 
-import { ConfirmDialog } from "@/components/domain";
+import {
+  ConsultationAssessmentFields,
+  assessmentFormStateToUpdateBody,
+  consultationToAssessmentFormState,
+  type ConsultationAssessmentFormState,
+} from "@/components/domain/consultation-assessment-fields";
+import { ConsultationOutcomeFields } from "@/components/domain/consultation-outcome-fields";
+import { StatusBadge } from "@/components/domain/status-badge";
 import { ErrorState, useToast } from "@/components/feedback";
-import { FormField } from "@/components/form/form-field";
-import { Select } from "@/components/form/select";
-import { Textarea } from "@/components/form/textarea";
 import { Breadcrumb } from "@/components/layout";
 import { WizardSkeleton } from "@/components/skeletons";
 import { fieldErrorFromApi, toApiError } from "@/lib/api/errors";
 import type { ApiError, ApiFieldError } from "@/lib/api/error";
+import { listCourses } from "@/lib/api/courses";
 import {
   getConsultation,
   setConsultationOutcome,
   updateConsultation,
 } from "@/lib/api/consultations";
-import { getCourse, listClasses } from "@/lib/api/finance";
+import { getCourse } from "@/lib/api/finance";
 import { getPerson, listDepartments } from "@/lib/api/people";
+import { getMe } from "@/lib/api/users";
 import type {
   ConsultationOutcome,
   ConsultationRead,
-  CourseClassRead,
   CourseRead,
   DepartmentRead,
   PersonRead,
+  UserRead,
 } from "@/lib/api/types";
-import { cn } from "@/lib/utils";
+import { canConductConsultation } from "@/lib/auth/role";
+import { formatDateDisplay, formatDateTimeDisplay } from "@/lib/locale/date";
 import {
-  CONSULTATION_OUTCOME_OPTIONS,
+  CONSULTATION_OUTCOME_LABELS,
+  levelLabel,
+  motivationLabel,
+  statusDisplayLabel,
 } from "@/lib/terminology";
 
 const WIZARD_STEPS = [
-  { id: "context", label: "انتخاب نتیجه" },
-  { id: "details", label: "جزئیات" },
+  { id: "context", label: "زمینه" },
+  { id: "assessment", label: "ارزیابی" },
+  { id: "outcome", label: "نتیجه" },
 ] as const;
 
 const DEFAULT_OUTCOME: ConsultationOutcome = "pre_enroll";
 
-function findEarliestOpenClass(
-  classes: CourseClassRead[],
-  courseId: number,
-): CourseClassRead | null {
-  return (
-    classes
-      .filter(
-        (cls) =>
-          cls.course_id === courseId &&
-          (cls.status === "planned" || cls.status === "active"),
-      )
-      .sort((a, b) => a.start_date.localeCompare(b.start_date))[0] ?? null
-  );
+function parseInitialStep(raw: string | null): number {
+  if (raw === "outcome" || raw === "2") return 2;
+  if (raw === "assessment" || raw === "1") return 1;
+  return 0;
 }
 
 function KeyValueRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -69,30 +72,42 @@ function KeyValueRow({ label, value }: { label: string; value: React.ReactNode }
 
 export default function ConsultationOutcomeWizardPage() {
   const params = useParams<{ id: string; consultationId: string }>();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { toast } = useToast();
   const personId = Number(params.id);
   const consultationId = Number(params.consultationId);
 
-  const [step, setStep] = React.useState(0);
+  const [step, setStep] = React.useState(() =>
+    parseInitialStep(searchParams.get("step")),
+  );
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<ApiError | null>(null);
   const [person, setPerson] = React.useState<PersonRead | null>(null);
   const [consultation, setConsultation] = React.useState<ConsultationRead | null>(
     null,
   );
+  const [me, setMe] = React.useState<UserRead | null>(null);
+  const [courses, setCourses] = React.useState<CourseRead[]>([]);
   const [recommendedCourse, setRecommendedCourse] =
     React.useState<CourseRead | null>(null);
-  const [openClasses, setOpenClasses] = React.useState<CourseClassRead[]>([]);
   const [departments, setDepartments] = React.useState<DepartmentRead[]>([]);
 
-  const [outcome, setOutcome] = React.useState<ConsultationOutcome>(DEFAULT_OUTCOME);
-  const [selectedClassId, setSelectedClassId] = React.useState("");
-  const [referDepartmentId, setReferDepartmentId] = React.useState("");
-  const [notes, setNotes] = React.useState("");
-  const [fieldError, setFieldError] = React.useState<ApiFieldError | null>(null);
+  const [assessmentForm, setAssessmentForm] =
+    React.useState<ConsultationAssessmentFormState>(
+      consultationToAssessmentFormState({
+        current_level: null,
+        goal: null,
+        recommended_course_id: null,
+        notes: null,
+      }),
+    );
 
-  const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [outcome, setOutcome] = React.useState<ConsultationOutcome>(DEFAULT_OUTCOME);
+  const [referDepartmentId, setReferDepartmentId] = React.useState("");
+  const [admissionNotes, setAdmissionNotes] = React.useState("");
+  const [fieldError, setFieldError] = React.useState<ApiFieldError | null>(null);
+  const [savingAssessment, setSavingAssessment] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
 
   const loadData = React.useCallback(async () => {
@@ -109,12 +124,13 @@ export default function ConsultationOutcomeWizardPage() {
     setLoading(true);
     setError(null);
     try {
-      const [personData, consultationData, classRes, deptRes] =
+      const [personData, consultationData, deptRes, meData, courseRes] =
         await Promise.all([
           getPerson(personId),
           getConsultation(consultationId),
-          listClasses({ limit: 500 }),
           listDepartments({ limit: 100 }),
+          getMe(),
+          listCourses({ is_active: true, limit: 500 }),
         ]);
 
       if (consultationData.person_id !== personId) {
@@ -127,28 +143,22 @@ export default function ConsultationOutcomeWizardPage() {
         return;
       }
 
-      const open = classRes.items.filter(
-        (cls) => cls.status === "planned" || cls.status === "active",
-      );
-
       let course: CourseRead | null = null;
       if (consultationData.recommended_course_id != null) {
         course = await getCourse(consultationData.recommended_course_id);
-        const defaultClass = findEarliestOpenClass(
-          open,
-          consultationData.recommended_course_id,
-        );
-        if (defaultClass) {
-          setSelectedClassId(String(defaultClass.id));
-        }
       }
+
+      const deptCourses = courseRes.items.filter(
+        (item) => item.department_id === consultationData.department_id,
+      );
 
       setPerson(personData);
       setConsultation(consultationData);
+      setMe(meData);
       setRecommendedCourse(course);
-      setOpenClasses(open);
       setDepartments(deptRes.items);
-      setOutcome(DEFAULT_OUTCOME);
+      setCourses(deptCourses);
+      setAssessmentForm(consultationToAssessmentFormState(consultationData));
     } catch (err) {
       setError(toApiError(err, "خطا در بارگذاری مشاوره"));
     } finally {
@@ -160,31 +170,46 @@ export default function ConsultationOutcomeWizardPage() {
     void loadData();
   }, [loadData]);
 
-  const classOptions = React.useMemo(() => {
-    const pool =
-      consultation?.recommended_course_id != null
-        ? openClasses.filter(
-            (cls) => cls.course_id === consultation.recommended_course_id,
-          )
-        : openClasses;
-    return pool.map((cls) => ({
-      value: String(cls.id),
-      label: cls.name,
-    }));
-  }, [openClasses, consultation?.recommended_course_id]);
+  const canEdit =
+    consultation != null &&
+    me != null &&
+    canConductConsultation(consultation, me);
 
-  const canProceedStep1 = outcome.length > 0;
+  const canSubmitOutcome =
+    outcome !== "refer_other_dept" || referDepartmentId.length > 0;
 
-  const canSubmitStep2 = React.useMemo(() => {
-    switch (outcome) {
-      case "pre_enroll":
-        return selectedClassId.length > 0;
-      case "refer_other_dept":
-        return referDepartmentId.length > 0;
-      default:
-        return true;
+  const saveAssessment = async (): Promise<boolean> => {
+    if (!consultation) return false;
+    setSavingAssessment(true);
+    setFieldError(null);
+    try {
+      const updated = await updateConsultation(
+        consultation.id,
+        assessmentFormStateToUpdateBody(assessmentForm),
+      );
+      setConsultation(updated);
+      setAssessmentForm(consultationToAssessmentFormState(updated));
+      if (updated.recommended_course_id != null) {
+        const course = await getCourse(updated.recommended_course_id);
+        setRecommendedCourse(course);
+      }
+      toast({ variant: "success", title: "ارزیابی ذخیره شد" });
+      return true;
+    } catch (err) {
+      const validation = fieldErrorFromApi(err);
+      if (validation) {
+        setFieldError(validation);
+      } else {
+        toast({
+          variant: "error",
+          title: toApiError(err, "خطا در ذخیره ارزیابی").detail,
+        });
+      }
+      return false;
+    } finally {
+      setSavingAssessment(false);
     }
-  }, [outcome, selectedClassId, referDepartmentId]);
+  };
 
   const submitOutcome = async () => {
     if (!consultation) return;
@@ -197,19 +222,9 @@ export default function ConsultationOutcomeWizardPage() {
         });
       }
 
-      if (
-        (outcome === "not_suitable" || outcome === "closed") &&
-        notes.trim()
-      ) {
-        await updateConsultation(consultation.id, {
-          notes: notes.trim(),
-        });
-      }
-
       await setConsultationOutcome(consultation.id, {
         outcome,
-        class_id:
-          outcome === "pre_enroll" ? Number(selectedClassId) : undefined,
+        notes: admissionNotes.trim() || undefined,
       });
 
       toast({ variant: "success", title: "نتیجه مشاوره ثبت شد" });
@@ -226,36 +241,47 @@ export default function ConsultationOutcomeWizardPage() {
       }
     } finally {
       setSubmitting(false);
-      setConfirmOpen(false);
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step === 0) {
       setStep(1);
       return;
     }
 
-    if (outcome === "pre_enroll") {
-      setConfirmOpen(true);
+    if (step === 1) {
+      const saved = await saveAssessment();
+      if (!saved) return;
+      setStep(2);
       return;
     }
 
-    void submitOutcome();
+    if (step === 2) {
+      void submitOutcome();
+    }
   };
 
   const handleBack = () => {
     if (step > 0) {
       setStep(step - 1);
+      setFieldError(null);
     } else {
       router.push(`/people/${personId}`);
+    }
+  };
+
+  const handleStepClick = (targetStep: number) => {
+    if (targetStep <= step) {
+      setStep(targetStep);
+      setFieldError(null);
     }
   };
 
   if (loading) {
     return (
       <WizardSkeleton
-        title="تعیین نتیجه مشاوره"
+        title="مشاوره"
         steps={WIZARD_STEPS.map((item) => ({ id: item.id, label: item.label }))}
         currentStep={0}
       >
@@ -270,15 +296,78 @@ export default function ConsultationOutcomeWizardPage() {
 
   if (consultation.outcome != null) {
     return (
+      <>
+        <Breadcrumb
+          crumbs={[
+            { label: "خانه", href: "/dashboard" },
+            { label: "افراد", href: "/people" },
+            { label: person.full_name, href: `/people/${personId}` },
+            { label: "مشاوره" },
+          ]}
+          className="mb-[var(--semantic-space-sectionGap)]"
+        />
+        <div className="rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] p-[var(--primitive-space-5)]">
+          <div className="mb-[var(--primitive-space-4)] flex items-center gap-[var(--primitive-space-2)]">
+            <h1 className="text-[length:var(--primitive-font-size-lg)] font-[var(--primitive-font-weight-semibold)]">
+              مشاوره #{consultation.id}
+            </h1>
+            <StatusBadge domain="consultation" value={consultation.outcome} />
+          </div>
+          <dl className="px-[var(--primitive-space-2)]">
+            <KeyValueRow
+              label="سطح"
+              value={
+                consultation.current_level
+                  ? levelLabel(consultation.current_level)
+                  : null
+              }
+            />
+            <KeyValueRow
+              label="انگیزه"
+              value={consultation.goal ? motivationLabel(consultation.goal) : null}
+            />
+            <KeyValueRow
+              label="دوره پیشنهادی"
+              value={recommendedCourse?.title ?? "—"}
+            />
+            <KeyValueRow
+              label="نتیجه"
+              value={CONSULTATION_OUTCOME_LABELS[consultation.outcome]}
+            />
+            <KeyValueRow
+              label="تاریخ"
+              value={formatDateTimeDisplay(consultation.updated_at)}
+            />
+          </dl>
+          <Link
+            href={`/people/${personId}`}
+            className="mt-[var(--primitive-space-4)] inline-block text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-link)]"
+          >
+            بازگشت به پرونده شخص
+          </Link>
+        </div>
+      </>
+    );
+  }
+
+  if (!canEdit) {
+    return (
       <ErrorState
         error={{
-          detail: "نتیجه این مشاوره قبلاً ثبت شده است",
-          error_code: "CONFLICT",
+          detail: "شما مجاز به انجام این مشاوره نیستید",
+          error_code: "PERMISSION_DENIED",
           timestamp: new Date().toISOString(),
         }}
       />
     );
   }
+
+  const nextDisabled =
+    step === 1
+      ? savingAssessment
+      : step === 2
+        ? !canSubmitOutcome || submitting
+        : false;
 
   return (
     <>
@@ -287,144 +376,83 @@ export default function ConsultationOutcomeWizardPage() {
           { label: "خانه", href: "/dashboard" },
           { label: "افراد", href: "/people" },
           { label: person.full_name, href: `/people/${personId}` },
-          { label: "تعیین نتیجه مشاوره" },
+          { label: "مشاوره" },
         ]}
         className="mb-[var(--semantic-space-sectionGap)]"
       />
 
       <WizardSkeleton
-        title="تعیین نتیجه مشاوره"
+        title="مشاوره"
         steps={WIZARD_STEPS.map((item) => ({ id: item.id, label: item.label }))}
         currentStep={step}
         onBack={handleBack}
-        onNext={handleNext}
-        nextDisabled={
-          step === 0 ? !canProceedStep1 : !canSubmitStep2 || submitting
+        onStepClick={handleStepClick}
+        onNext={() => void handleNext()}
+        nextDisabled={nextDisabled}
+        nextLabel={
+          step === 1
+            ? savingAssessment
+              ? "در حال ذخیره…"
+              : "ذخیره و ادامه"
+            : step === 2
+              ? submitting
+                ? "در حال ثبت…"
+                : "ثبت نهایی"
+              : "ادامه"
         }
         isLastStep={step === WIZARD_STEPS.length - 1}
       >
         {step === 0 ? (
-          <div className="flex flex-col gap-[var(--semantic-space-sectionGap)]">
+          <div className="flex flex-col gap-[var(--primitive-space-sectionGap)]">
             <dl className="rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] px-[var(--primitive-space-4)]">
+              <KeyValueRow label="نام" value={person.full_name} />
+              <KeyValueRow label="تلفن" value={person.phone} />
               <KeyValueRow
-                label="سطح فعلی"
-                value={consultation.current_level}
+                label="وضعیت"
+                value={statusDisplayLabel("person", person.status)}
               />
-              <KeyValueRow label="هدف" value={consultation.goal} />
               <KeyValueRow
-                label="دوره پیشنهادی"
-                value={recommendedCourse?.title ?? "—"}
+                label="یادداشت ارجاع"
+                value={consultation.notes?.trim() || "—"}
+              />
+              <KeyValueRow
+                label="تاریخ ارجاع"
+                value={formatDateDisplay(consultation.created_at.slice(0, 10))}
               />
             </dl>
-
-            <FormField
-              label="نتیجه مشاوره"
-              required
-              error={fieldError?.field === "outcome" ? fieldError : null}
+            <Link
+              href={`/people/${personId}`}
+              className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-link)]"
             >
-              <div
-                className={cn(
-                  "rounded-[var(--primitive-radius-md)]",
-                  outcome === DEFAULT_OUTCOME &&
-                    "bg-[color-mix(in_srgb,var(--semantic-color-status-info)_8%,var(--semantic-color-surface-card))] p-[var(--primitive-space-2)]",
-                )}
-              >
-                <Select
-                  inputSize="lg"
-                  options={CONSULTATION_OUTCOME_OPTIONS.map((opt) => ({
-                    value: opt.value,
-                    label: opt.label,
-                  }))}
-                  value={outcome}
-                  onChange={(value) =>
-                    setOutcome(value as ConsultationOutcome)
-                  }
-                />
-                {outcome === DEFAULT_OUTCOME ? (
-                  <p className="mt-[var(--primitive-space-2)] text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]">
-                    پیشنهاد در دسترس نیست
-                  </p>
-                ) : null}
-              </div>
-            </FormField>
+              مشاهده پرونده کامل
+            </Link>
           </div>
-        ) : (
-          <div className="flex flex-col gap-[var(--semantic-space-sectionGap)]">
-            {outcome === "pre_enroll" ? (
-              <FormField
-                label="کلاس"
-                required
-                error={fieldError?.field === "class_id" ? fieldError : null}
-              >
-                <Select
-                  searchable
-                  inputSize="lg"
-                  options={classOptions}
-                  value={selectedClassId}
-                  onChange={setSelectedClassId}
-                  placeholder="جستجو و انتخاب کلاس"
-                />
-              </FormField>
-            ) : null}
+        ) : null}
 
-            {outcome === "follow_up" ? (
-              <p className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
-                با ثبت این نتیجه، یک وظیفه پیگیری برای مشاور ایجاد می‌شود. آیا
-                مطمئن هستید؟
-              </p>
-            ) : null}
+        {step === 1 ? (
+          <ConsultationAssessmentFields
+            formState={assessmentForm}
+            onChange={(patch) =>
+              setAssessmentForm((prev) => ({ ...prev, ...patch }))
+            }
+            courses={courses}
+            fieldError={fieldError}
+          />
+        ) : null}
 
-            {outcome === "refer_other_dept" ? (
-              <FormField
-                label="دپارتمان مقصد"
-                required
-                error={
-                  fieldError?.field === "refer_to_department_id"
-                    ? fieldError
-                    : null
-                }
-              >
-                <Select
-                  inputSize="lg"
-                  options={departments.map((dept) => ({
-                    value: String(dept.id),
-                    label: dept.name,
-                  }))}
-                  value={referDepartmentId}
-                  onChange={setReferDepartmentId}
-                  placeholder="انتخاب دپارتمان"
-                />
-              </FormField>
-            ) : null}
-
-            {outcome === "not_suitable" || outcome === "closed" ? (
-              <FormField
-                label="یادداشت"
-                error={fieldError?.field === "notes" ? fieldError : null}
-              >
-                <Textarea
-                  value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
-                  rows={4}
-                />
-              </FormField>
-            ) : null}
-          </div>
-        )}
+        {step === 2 ? (
+          <ConsultationOutcomeFields
+            outcome={outcome}
+            onOutcomeChange={setOutcome}
+            departments={departments}
+            referDepartmentId={referDepartmentId}
+            onReferDepartmentIdChange={setReferDepartmentId}
+            admissionNotes={admissionNotes}
+            onAdmissionNotesChange={setAdmissionNotes}
+            fieldError={fieldError}
+          />
+        ) : null}
       </WizardSkeleton>
-
-      <ConfirmDialog
-        tier={2}
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        title="تأیید پیش‌ثبت‌نام"
-        body="این عملیات یک ثبت‌نام و فاکتور ایجاد می‌کند. مطمئن هستید؟"
-        confirmLabel="ثبت نهایی"
-        confirmVariant="primary"
-        confirmLoading={submitting}
-        onConfirm={() => void submitOutcome()}
-        onCancel={() => setConfirmOpen(false)}
-      />
     </>
   );
 }
