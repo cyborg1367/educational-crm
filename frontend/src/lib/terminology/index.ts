@@ -235,6 +235,19 @@ export const SOURCE_OPTIONS: { value: PersonSource; label: string }[] = [
   { value: "other", label: "سایر" },
 ];
 
+export const WEEKDAY_OPTIONS = [
+  { value: "saturday", label: "شنبه" },
+  { value: "sunday", label: "یکشنبه" },
+  { value: "monday", label: "دوشنبه" },
+  { value: "tuesday", label: "سه‌شنبه" },
+  { value: "wednesday", label: "چهارشنبه" },
+  { value: "thursday", label: "پنجشنبه" },
+] as const;
+
+export function weekdayLabel(value: string): string {
+  return WEEKDAY_OPTIONS.find((opt) => opt.value === value)?.label ?? value;
+}
+
 export function interestLabel(value: string): string {
   return INTERESTS_OPTIONS.find((opt) => opt.value === value)?.label ?? value;
 }
@@ -255,15 +268,31 @@ export const ACTION_LABELS: Record<string, string> = {
   consultation_done: "مشاوره انجام شد",
   consultation_closed: "مشاوره بسته شد",
   enrollment_created: "ثبت‌نام انجام شد",
+  enrollment_prepayment: "ثبت‌نام قطعی شد — پیش‌پرداخت دریافت شد",
+  enrollment_activated: "ثبت‌نام فعال شد",
   enrollment_dropped: "انصراف از ثبت‌نام",
   payment_recorded: "پرداخت ثبت شد",
   payment_refunded: "بازپرداخت انجام شد",
   task_created: "وظیفه ایجاد شد",
   course_completed: "دوره تکمیل شد",
   manual_note: "یادداشت",
+  // Legacy / dotted action keys (mock data and older rows)
+  "enrollment.created": "ثبت‌نام انجام شد",
+  "enrollment.dropped": "ثبت‌نام لغو شد",
+  "enrollment.completed": "ثبت‌نام تکمیل شد",
+  "person.status_changed": "وضعیت شخص تغییر کرد",
+  "person.created": "شخص جدید ثبت شد",
+  "note.added": "یادداشت اضافه شد",
+  "consultation.completed": "مشاوره تکمیل شد",
+  "consultation.scheduled": "مشاوره زمان‌بندی شد",
+  "payment.recorded": "پرداخت ثبت شد",
+  "refund.recorded": "استرداد ثبت شد",
+  "task.created": "وظیفه ایجاد شد",
+  "task.completed": "وظیفه تکمیل شد",
+  "invoice.created": "فاکتور صادر شد",
 };
 
 export function actionLabel(action: string): string {
-  return ACTION_LABELS[action] ?? action;
+  return ACTION_LABELS[action] ?? "رویداد ثبت‌شده";
 }
 

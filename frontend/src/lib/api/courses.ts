@@ -2,6 +2,7 @@ import { fetchJson } from "@/lib/api/client";
 import type {
   CourseCreate,
   CourseRead,
+  CourseUpdate,
   PaginatedResponse,
 } from "@/lib/api/types";
 
@@ -40,4 +41,11 @@ export function getCourse(id: number): Promise<CourseRead> {
 
 export function createCourse(body: CourseCreate): Promise<CourseRead> {
   return fetchJson<CourseRead>("/courses", { method: "POST", body });
+}
+
+export function updateCourse(
+  id: number,
+  body: CourseUpdate,
+): Promise<CourseRead> {
+  return fetchJson<CourseRead>(`/courses/${id}`, { method: "PATCH", body });
 }

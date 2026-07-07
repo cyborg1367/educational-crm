@@ -84,7 +84,11 @@ def create_enrollment(
     """
     enrollment = enrollment_service.create_enrollment(db, current_user.org_id, body)
     workflow_service.on_enrollment_created(
-        db, current_user.org_id, enrollment.id, actor_id=current_user.id
+        db,
+        current_user.org_id,
+        enrollment.id,
+        actor_id=current_user.id,
+        skip_timeline_log=body.defer_timeline_log,
     )
     return enrollment
 

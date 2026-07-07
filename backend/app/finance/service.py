@@ -8,6 +8,7 @@ from app.activity import service as activity_service
 from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.core.logging_config import get_logger
 from app.core.pagination import paginate_query
+from app.course_class import service as class_service
 from app.enrollment import service as enrollment_service
 from app.finance.enums import InstallmentStatus, InvoiceStatus
 from app.finance.model import Installment, Invoice, Payment, Refund
@@ -119,7 +120,51 @@ def get_installment(db: Session, org_id: int, installment_id: int) -> Installmen
     return installment
 
 
-def issue_invoice(db: Session, org_id: int, data: InvoiceCreate) -> Invoice:
+def _unpaid_installment_count(installments: list[Installment]) -> int:
+    return sum(
+        1
+        for inst in installments
+        if inst.status
+        not in (InstallmentStatus.paid, InstallmentStatus.cancelled)
+    )
+
+
+def _log_enrollment_prepayment_activity(
+    db: Session,
+    org_id: int,
+    *,
+    enrollment_id: int,
+    upfront_amount: int,
+    installments: list[Installment],
+    actor_id: int,
+) -> None:
+    enrollment = enrollment_service.get_enrollment(db, org_id, enrollment_id)
+    course_class = class_service.get_class(db, org_id, enrollment.class_id)
+    remaining = _unpaid_installment_count(installments)
+
+    activity_service.log_activity(
+        db,
+        org_id,
+        enrollment.person_id,
+        "enrollment_prepayment",
+        payload={
+            "enrollment_id": enrollment_id,
+            "class_name": course_class.name,
+            "upfront_amount": upfront_amount,
+            "remaining_installments": remaining,
+            "total_installments": len(installments),
+        },
+        actor_id=actor_id,
+    )
+
+
+def issue_invoice(
+    db: Session,
+    org_id: int,
+    data: InvoiceCreate,
+    *,
+    actor_id: int | None = None,
+) -> Invoice:
     enrollment = enrollment_service.get_enrollment(db, org_id, data.enrollment_id)
 
     sequences = [item.sequence for item in data.installments]
@@ -163,6 +208,42 @@ def issue_invoice(db: Session, org_id: int, data: InvoiceCreate) -> Invoice:
         db.rollback()
         raise ConflictError("Enrollment already has an invoice") from None
     db.refresh(invoice)
+
+    if data.record_upfront_payment:
+        if actor_id is None:
+            raise ValidationError(
+                "actor_id is required when record_upfront_payment is true",
+                field="record_upfront_payment",
+            )
+        installments = get_installments_for_invoice(db, org_id, invoice.id)
+        upfront = next((i for i in installments if i.sequence == 1), None)
+        if upfront is None:
+            raise ValidationError(
+                "record_upfront_payment requires a sequence-1 installment",
+                field="installments",
+            )
+        record_payment(
+            db,
+            org_id,
+            upfront.id,
+            upfront.amount,
+            actor_id,
+            payment_date=upfront.due_date,
+            notes="پیش‌پرداخت هنگام ثبت‌نام",
+            skip_activity=True,
+        )
+        installments = get_installments_for_invoice(db, org_id, invoice.id)
+        _log_enrollment_prepayment_activity(
+            db,
+            org_id,
+            enrollment_id=invoice.enrollment_id,
+            upfront_amount=upfront.amount,
+            installments=installments,
+            actor_id=actor_id,
+        )
+        db.commit()
+        db.refresh(invoice)
+
     return invoice
 
 
@@ -242,6 +323,7 @@ def record_payment(
     *,
     payment_date: date | None = None,
     notes: str | None = None,
+    skip_activity: bool = False,
 ) -> Payment:
     if amount <= 0:
         raise ValidationError(
@@ -274,20 +356,25 @@ def record_payment(
     db.flush()
 
     enrollment = enrollment_service.get_enrollment(db, org_id, invoice.enrollment_id)
-    activity_service.log_activity(
-        db,
-        org_id,
-        enrollment.person_id,
-        "payment_recorded",
-        payload={
-            "payment_id": payment.id,
-            "installment_id": installment.id,
-            "amount": amount,
-            "invoice_id": invoice.id,
-            "enrollment_id": enrollment.id,
-        },
-        actor_id=recorded_by_user_id,
-    )
+    remaining_unpaid = _unpaid_installment_count(installments)
+    if not skip_activity:
+        activity_service.log_activity(
+            db,
+            org_id,
+            enrollment.person_id,
+            "payment_recorded",
+            payload={
+                "payment_id": payment.id,
+                "installment_id": installment.id,
+                "installment_sequence": installment.sequence,
+                "total_installments": len(installments),
+                "remaining_unpaid_installments": remaining_unpaid,
+                "amount": amount,
+                "invoice_id": invoice.id,
+                "enrollment_id": enrollment.id,
+            },
+            actor_id=recorded_by_user_id,
+        )
     logger.info(
         "payment_recorded",
         extra={
@@ -318,6 +405,7 @@ def record_payment(
             org_id,
             enrollment.id,
             actor_id=recorded_by_user_id,
+            skip_activity=skip_activity,
         )
     else:
         db.commit()

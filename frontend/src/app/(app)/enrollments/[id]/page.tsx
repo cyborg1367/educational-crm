@@ -31,19 +31,27 @@ import {
   createPayment,
   dropEnrollment,
   getClass,
+  getCourse,
   getEnrollment,
+  getInvoice,
   getPerson,
   listAttendances,
   listInstallments,
   listInvoices,
 } from "@/lib/api/finance";
+import { getUser } from "@/lib/api/users";
 import type {
   AttendanceRead,
   CourseClassRead,
+  CourseRead,
   EnrollmentRead,
   InstallmentRead,
+  InvoiceDetailRead,
   PersonRead,
+  UserRead,
 } from "@/lib/api/types";
+import { InvoicePrintActions } from "@/components/invoice/invoice-print-actions";
+import type { InvoiceData } from "@/lib/pdf/types";
 import { canManageEnrollments, canManageFinance } from "@/lib/auth/role";
 import { computeDropPreflight } from "@/lib/finance/preflight";
 import { formatDateDisplay, formatToman } from "@/lib/locale";
@@ -87,6 +95,9 @@ export default function EnrollmentDetailPage() {
   const [courseClass, setCourseClass] = React.useState<CourseClassRead | null>(
     null,
   );
+  const [course, setCourse] = React.useState<CourseRead | null>(null);
+  const [teacher, setTeacher] = React.useState<UserRead | null>(null);
+  const [invoice, setInvoice] = React.useState<InvoiceDetailRead | null>(null);
   const [invoiceId, setInvoiceId] = React.useState<number | null>(null);
   const [installments, setInstallments] = React.useState<InstallmentRead[]>([]);
   const [attendances, setAttendances] = React.useState<AttendanceRead[]>([]);
@@ -124,9 +135,15 @@ export default function EnrollmentDetailPage() {
         getPerson(enrollmentData.person_id),
         getClass(enrollmentData.class_id),
       ]);
+      const [courseData, teacherData] = await Promise.all([
+        getCourse(classData.course_id),
+        getUser(classData.teacher_id),
+      ]);
       setEnrollment(enrollmentData);
       setPerson(personData);
       setCourseClass(classData);
+      setCourse(courseData);
+      setTeacher(teacherData);
     } catch (err) {
       setError(toApiError(err, "خطا در بارگذاری ثبت‌نام"));
     } finally {
@@ -143,17 +160,20 @@ export default function EnrollmentDetailPage() {
         listAttendances({ enrollment_id: enrollment.id, limit: 500 }),
       ]);
 
-      const invoice = invoicesRes.items.find(
+      const invoiceSummary = invoicesRes.items.find(
         (item) => item.enrollment_id === enrollment.id,
       );
-      setInvoiceId(invoice?.id ?? null);
+      setInvoiceId(invoiceSummary?.id ?? null);
 
-      if (invoice) {
-        const installmentsRes = await listInstallments(invoice.id, {
-          limit: 100,
-        });
+      if (invoiceSummary) {
+        const [invoiceData, installmentsRes] = await Promise.all([
+          getInvoice(invoiceSummary.id),
+          listInstallments(invoiceSummary.id, { limit: 100 }),
+        ]);
+        setInvoice(invoiceData);
         setInstallments(installmentsRes.items);
       } else {
+        setInvoice(null);
         setInstallments([]);
       }
 
@@ -162,6 +182,7 @@ export default function EnrollmentDetailPage() {
       );
       setAttendances(filteredAttendances);
     } catch {
+      setInvoice(null);
       setInstallments([]);
       setAttendances([]);
     } finally {
@@ -277,6 +298,19 @@ export default function EnrollmentDetailPage() {
 
   const headerTitle = `${courseClass.name} — ${person.full_name}`;
 
+  const pdfData: InvoiceData | null =
+    invoice && course
+      ? {
+          invoice,
+          installments,
+          enrollment,
+          person,
+          courseClass,
+          course,
+          teacher,
+        }
+      : null;
+
   return (
     <>
       <Breadcrumb
@@ -359,7 +393,19 @@ export default function EnrollmentDetailPage() {
             id: "invoice",
             label: "فاکتور و اقساط",
             content: invoiceId ? (
-              <FinancialTable
+              <div className="flex flex-col gap-[var(--primitive-space-4)]">
+                <div className="flex flex-wrap items-center justify-between gap-[var(--primitive-space-3)]">
+                  <h2 className="text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-primary)]">
+                    اقساط
+                  </h2>
+                  <InvoicePrintActions
+                    data={pdfData}
+                    onError={(message) =>
+                      toast({ variant: "error", title: message })
+                    }
+                  />
+                </div>
+                <FinancialTable
                 columns={[
                   {
                     key: "sequence",
@@ -408,6 +454,7 @@ export default function EnrollmentDetailPage() {
                 loading={tabLoading}
                 emptyMessage="قسطی یافت نشد"
               />
+              </div>
             ) : (
               <p className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
                 فاکتوری برای این ثبت‌نام صادر نشده است.

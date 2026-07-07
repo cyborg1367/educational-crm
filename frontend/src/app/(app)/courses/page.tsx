@@ -6,7 +6,9 @@ import { DataTable, EntitySummaryCard } from "@/components/data-display";
 import type { PaginatedResponse } from "@/components/data-display/types";
 import {
   CourseFormFields,
+  courseFormStateFromRead,
   courseFormStateToCreateBody,
+  courseFormStateToUpdateBody,
   emptyCourseFormState,
   isCourseFormValid,
   type CourseFormState,
@@ -18,7 +20,7 @@ import { FilterBar, type FilterValues } from "@/components/layout";
 import { Badge } from "@/components/primitives/badge";
 import { ListPageSkeleton } from "@/components/skeletons";
 import { Button } from "@/components/ui/button";
-import { createCourse, listCourses } from "@/lib/api/courses";
+import { createCourse, listCourses, updateCourse } from "@/lib/api/courses";
 import { listDepartments } from "@/lib/api/departments";
 import type { ApiError, ApiFieldError } from "@/lib/api/error";
 import { fieldErrorFromApi, toApiError } from "@/lib/api/errors";
@@ -35,6 +37,8 @@ const emptyPage = <T,>(): PaginatedResponse<T> => ({
   offset: 0,
   has_more: false,
 });
+
+type DialogMode = "create" | "edit";
 
 function ActiveBadge({ isActive }: { isActive: boolean }) {
   return (
@@ -65,6 +69,10 @@ export default function CoursesListPage() {
   const [departments, setDepartments] = React.useState<DepartmentRead[]>([]);
 
   const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [dialogMode, setDialogMode] = React.useState<DialogMode>("create");
+  const [editingCourseId, setEditingCourseId] = React.useState<number | null>(
+    null,
+  );
   const [submitting, setSubmitting] = React.useState(false);
   const [formState, setFormState] = React.useState<CourseFormState>(
     emptyCourseFormState(),
@@ -148,11 +156,27 @@ export default function CoursesListPage() {
 
   const resetForm = () => {
     setFormState(emptyCourseFormState(activeDepartments));
+    setEditingCourseId(null);
     setFormError(null);
     setFieldError(null);
   };
 
-  const handleCreate = async () => {
+  const openCreateDialog = () => {
+    resetForm();
+    setDialogMode("create");
+    setDialogOpen(true);
+  };
+
+  const openEditDialog = (course: CourseRead) => {
+    setFormState(courseFormStateFromRead(course));
+    setEditingCourseId(course.id);
+    setDialogMode("edit");
+    setFormError(null);
+    setFieldError(null);
+    setDialogOpen(true);
+  };
+
+  const handleSubmit = async () => {
     if (!isCourseFormValid(formState)) {
       return;
     }
@@ -160,8 +184,16 @@ export default function CoursesListPage() {
     setFormError(null);
     setFieldError(null);
     try {
-      await createCourse(courseFormStateToCreateBody(formState));
-      toast({ variant: "success", title: "دوره جدید ثبت شد" });
+      if (dialogMode === "create") {
+        await createCourse(courseFormStateToCreateBody(formState));
+        toast({ variant: "success", title: "دوره جدید ثبت شد" });
+      } else if (editingCourseId != null) {
+        await updateCourse(
+          editingCourseId,
+          courseFormStateToUpdateBody(formState),
+        );
+        toast({ variant: "success", title: "دوره به‌روزرسانی شد" });
+      }
       setDialogOpen(false);
       resetForm();
       void loadData();
@@ -170,7 +202,12 @@ export default function CoursesListPage() {
       if (validation) {
         setFieldError(validation);
       } else {
-        setFormError(toApiError(err, "خطا در ثبت دوره"));
+        setFormError(
+          toApiError(
+            err,
+            dialogMode === "create" ? "خطا در ثبت دوره" : "خطا در ویرایش دوره",
+          ),
+        );
       }
     } finally {
       setSubmitting(false);
@@ -191,10 +228,7 @@ export default function CoursesListPage() {
             variant="primary"
             size="md"
             disabled={activeDepartments.length === 0}
-            onClick={() => {
-              resetForm();
-              setDialogOpen(true);
-            }}
+            onClick={openCreateDialog}
           >
             افزودن دوره
           </Button>
@@ -244,6 +278,24 @@ export default function CoursesListPage() {
                     ? formatCount(row.duration_sessions)
                     : "—",
               },
+              {
+                key: "actions",
+                header: "",
+                align: "end",
+                cell: (row) => (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openEditDialog(row);
+                    }}
+                  >
+                    ویرایش
+                  </Button>
+                ),
+              },
             ]}
             data={tableData}
             loading={loading}
@@ -269,6 +321,7 @@ export default function CoursesListPage() {
                   subtitle={row.department_name}
                   meta={formatToman(row.current_price)}
                   badges={<ActiveBadge isActive={row.is_active} />}
+                  onClick={() => openEditDialog(row)}
                 />
               ))
             )}
@@ -279,9 +332,9 @@ export default function CoursesListPage() {
       <FormDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        title="افزودن دوره"
-        submitLabel="ثبت"
-        onSubmit={() => void handleCreate()}
+        title={dialogMode === "create" ? "افزودن دوره" : "ویرایش دوره"}
+        submitLabel={dialogMode === "create" ? "ثبت" : "ذخیره"}
+        onSubmit={() => void handleSubmit()}
         submitLoading={submitting}
         submitDisabled={!isCourseFormValid(formState)}
         formError={formError}

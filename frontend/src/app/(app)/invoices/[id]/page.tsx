@@ -30,21 +30,27 @@ import {
   createPayment,
   createRefund,
   getClass,
+  getCourse,
   getEnrollment,
   getInvoice,
   getPerson,
   listPayments,
   listRefunds,
 } from "@/lib/api/finance";
+import { getUser } from "@/lib/api/users";
 import type {
   CourseClassRead,
+  CourseRead,
   EnrollmentRead,
   InstallmentRead,
   InvoiceDetailRead,
   PaymentRead,
   PersonRead,
   RefundRead,
+  UserRead,
 } from "@/lib/api/types";
+import { InvoicePrintActions } from "@/components/invoice/invoice-print-actions";
+import type { InvoiceData } from "@/lib/pdf/types";
 import { canManageFinance } from "@/lib/auth/role";
 import { refundableBalance } from "@/lib/finance/preflight";
 import { formatDateDisplay, formatToman } from "@/lib/locale";
@@ -73,6 +79,8 @@ export default function InvoiceDetailPage() {
   const [courseClass, setCourseClass] = React.useState<CourseClassRead | null>(
     null,
   );
+  const [course, setCourse] = React.useState<CourseRead | null>(null);
+  const [teacher, setTeacher] = React.useState<UserRead | null>(null);
   const [payments, setPayments] = React.useState<PaymentRead[]>([]);
   const [refunds, setRefunds] = React.useState<RefundRead[]>([]);
   const [financeLoading, setFinanceLoading] = React.useState(false);
@@ -110,10 +118,16 @@ export default function InvoiceDetailPage() {
         getPerson(enrollmentData.person_id),
         getClass(enrollmentData.class_id),
       ]);
+      const [courseData, teacherData] = await Promise.all([
+        getCourse(classData.course_id),
+        getUser(classData.teacher_id),
+      ]);
       setInvoice(invoiceData);
       setEnrollment(enrollmentData);
       setPerson(personData);
       setCourseClass(classData);
+      setCourse(courseData);
+      setTeacher(teacherData);
     } catch (err) {
       setError(toApiError(err, "خطا در بارگذاری فاکتور"));
     } finally {
@@ -252,11 +266,21 @@ export default function InvoiceDetailPage() {
     );
   }
 
-  if (error || !invoice || !enrollment || !person || !courseClass) {
+  if (error || !invoice || !enrollment || !person || !courseClass || !course) {
     return <ErrorState error={error ?? toApiError(null)} />;
   }
 
   const headerTitle = `${person.full_name} — ${courseClass.name}`;
+
+  const pdfData: InvoiceData = {
+    invoice,
+    installments: invoice.installments,
+    enrollment,
+    person,
+    courseClass,
+    course,
+    teacher,
+  };
 
   return (
     <>
@@ -272,7 +296,18 @@ export default function InvoiceDetailPage() {
       <T1DetailSkeleton
         title={headerTitle}
         permissionBanner={readOnly ? <PermissionBanner /> : undefined}
-        statusAction={<StatusBadge domain="invoice" value={invoice.status} />}
+        statusAction={
+          <div className="flex flex-wrap items-center gap-[var(--primitive-space-2)]">
+            <InvoicePrintActions
+              data={pdfData}
+              showPreview
+              onError={(message) =>
+                toast({ variant: "error", title: message })
+              }
+            />
+            <StatusBadge domain="invoice" value={invoice.status} />
+          </div>
+        }
         tabs={[
           {
             id: "invoice",

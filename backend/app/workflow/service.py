@@ -453,21 +453,23 @@ def on_enrollment_created(
     enrollment_id: int,
     *,
     actor_id: int | None = None,
+    skip_timeline_log: bool = False,
 ) -> None:
     enrollment = enrollment_service.get_enrollment(db, org_id, enrollment_id)
-    activity_service.log_activity(
-        db,
-        org_id,
-        enrollment.person_id,
-        "enrollment_created",
-        payload={
-            "channel": "enrollment",
-            "action": "created",
-            "enrollment_id": enrollment_id,
-            "status": enrollment.status.value,
-        },
-        actor_id=actor_id,
-    )
+    if not skip_timeline_log:
+        activity_service.log_activity(
+            db,
+            org_id,
+            enrollment.person_id,
+            "enrollment_created",
+            payload={
+                "channel": "enrollment",
+                "action": "created",
+                "enrollment_id": enrollment_id,
+                "status": enrollment.status.value,
+            },
+            actor_id=actor_id,
+        )
     notifications_service.notify_payment_recorded(
         db, org_id, enrollment.person_id, enrollment.final_amount
     )
@@ -480,6 +482,7 @@ def on_first_payment(
     enrollment_id: int,
     *,
     actor_id: int | None = None,
+    skip_activity: bool = False,
 ) -> None:
     enrollment = enrollment_service.get_enrollment(db, org_id, enrollment_id)
     person = person_service.get_person(db, org_id, enrollment.person_id)
@@ -492,7 +495,7 @@ def on_first_payment(
     if person.status == PersonStatus.lead:
         person.status = PersonStatus.student
 
-    if activated:
+    if activated and not skip_activity:
         activity_service.log_activity(
             db,
             org_id,

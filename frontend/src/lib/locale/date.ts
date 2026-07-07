@@ -81,6 +81,17 @@ export function addDaysToStorageDate(
   return dayjs(storageDate).add(days, "day").format("YYYY-MM-DD");
 }
 
+/** Add calendar months to a storage date and return YYYY-MM-DD. */
+export function addMonthsToStorageDate(
+  storageDate: StorageDate,
+  months: number,
+): StorageDate {
+  if (!ISO_DATE.test(storageDate)) {
+    throw new Error(`Invalid storage date: ${storageDate}`);
+  }
+  return dayjs(storageDate).add(months, "month").format("YYYY-MM-DD");
+}
+
 /** Today as Jalali display date */
 export function todayDisplay(): DisplayDate {
   if (localeConfig.calendar !== "jalali") {

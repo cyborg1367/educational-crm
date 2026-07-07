@@ -6,14 +6,23 @@ import { useParams } from "next/navigation";
 
 import { DataTable, RelationshipCard } from "@/components/data-display";
 import type { PaginatedResponse } from "@/components/data-display/types";
+import { Badge } from "@/components/primitives/badge";
 import { StatusBadge } from "@/components/domain";
+import { ClassFormDialog } from "@/components/domain/class-form-dialog";
+import {
+  classFormStateFromRead,
+  classFormStateToUpdateBody,
+  emptyClassFormState,
+  isClassFormValid,
+  type ClassFormState,
+} from "@/components/domain/class-form-fields";
 import { ErrorState, useToast } from "@/components/feedback";
 import { BlockSkeleton } from "@/components/feedback/skeleton";
 import { Breadcrumb } from "@/components/layout";
 import { T1DetailSkeleton } from "@/components/skeletons";
 import { Button } from "@/components/ui/button";
-import { toApiError } from "@/lib/api/errors";
-import type { ApiError } from "@/lib/api/error";
+import { toApiError, fieldErrorFromApi } from "@/lib/api/errors";
+import type { ApiError, ApiFieldError } from "@/lib/api/error";
 import {
   createAttendance,
   getClass,
@@ -21,16 +30,20 @@ import {
   listAttendances,
   listEnrollments,
   updateAttendance,
+  updateClass,
 } from "@/lib/api/finance";
+import { listCourses } from "@/lib/api/courses";
 import { getPerson } from "@/lib/api/people";
-import { listUsers } from "@/lib/api/users";
+import { getMe, listUsers } from "@/lib/api/users";
 import type {
   AttendanceRead,
   CourseClassRead,
   CourseRead,
   EnrollmentRead,
   PersonRead,
+  UserRead,
 } from "@/lib/api/types";
+import { canManageClasses, getCurrentRole } from "@/lib/auth/role";
 import {
   formatDateDisplay,
   formatDateTimeDisplay,
@@ -39,6 +52,7 @@ import {
   type StorageDate,
 } from "@/lib/locale";
 import { cn } from "@/lib/utils";
+import { weekdayLabel } from "@/lib/terminology";
 
 const emptyPage = <T,>(): PaginatedResponse<T> => ({
   items: [],
@@ -210,6 +224,61 @@ export default function ClassDetailPage() {
   const [tabLoading, setTabLoading] = React.useState(false);
   const [savingRowId, setSavingRowId] = React.useState<number | null>(null);
 
+  const [canManage, setCanManage] = React.useState(false);
+  const [departmentId, setDepartmentId] = React.useState<number | null>(null);
+  const [courses, setCourses] = React.useState<CourseRead[]>([]);
+  const [teachers, setTeachers] = React.useState<UserRead[]>([]);
+  const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [formState, setFormState] = React.useState<ClassFormState>(
+    emptyClassFormState(),
+  );
+  const [selectedCourse, setSelectedCourse] = React.useState<CourseRead | null>(
+    null,
+  );
+  const [formError, setFormError] = React.useState<ApiError | null>(null);
+  const [fieldError, setFieldError] = React.useState<ApiFieldError | null>(null);
+
+  React.useEffect(() => {
+    setCanManage(canManageClasses(getCurrentRole()));
+  }, []);
+
+  const availableCourses = React.useMemo(() => {
+    const role = getCurrentRole();
+    if (role !== "department_manager" || departmentId == null) {
+      return courses;
+    }
+    return courses.filter((course) => course.department_id === departmentId);
+  }, [courses, departmentId]);
+
+  React.useEffect(() => {
+    if (!formState.courseId) {
+      setSelectedCourse(course);
+      return;
+    }
+    const courseId = Number(formState.courseId);
+    const cached = courses.find((item) => item.id === courseId);
+    if (cached) {
+      setSelectedCourse(cached);
+      return;
+    }
+    let cancelled = false;
+    void getCourse(courseId)
+      .then((loaded) => {
+        if (!cancelled) {
+          setSelectedCourse(loaded);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSelectedCourse(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [formState.courseId, course, courses]);
+
   const loadClass = React.useCallback(async () => {
     if (!Number.isFinite(classId)) {
       setError({
@@ -227,11 +296,26 @@ export default function ClassDetailPage() {
       const cls = await getClass(classId);
       setCourseClass(cls);
 
-      const [courseData, usersRes] = await Promise.all([
+      const [courseData, usersRes, me, coursesRes] = await Promise.all([
         getCourse(cls.course_id),
-        listUsers({ limit: 500 }),
+        listUsers({ limit: 500 }).catch(() => ({
+          items: [],
+          total_count: 0,
+          limit: 500,
+          offset: 0,
+          has_more: false,
+        })),
+        getMe(),
+        listCourses({ limit: 500, is_active: true }),
       ]);
       setCourse(courseData);
+      setDepartmentId(me.department_id);
+      setCourses(coursesRes.items);
+      setTeachers(
+        usersRes.items.filter(
+          (user) => user.role === "teacher" && user.is_active,
+        ),
+      );
       setTeacherName(
         usersRes.items.find((user) => user.id === cls.teacher_id)?.name ?? "—",
       );
@@ -241,6 +325,51 @@ export default function ClassDetailPage() {
       setLoading(false);
     }
   }, [classId]);
+
+  const openEditDialog = () => {
+    if (!courseClass) return;
+    setFormState(classFormStateFromRead(courseClass, course));
+    setSelectedCourse(course);
+    setFormError(null);
+    setFieldError(null);
+    setDialogOpen(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!courseClass || !isClassFormValid(formState)) {
+      return;
+    }
+    setSubmitting(true);
+    setFormError(null);
+    setFieldError(null);
+    try {
+      const updated = await updateClass(
+        courseClass.id,
+        classFormStateToUpdateBody(formState, selectedCourse),
+      );
+      setCourseClass(updated);
+      setTeacherName(
+        teachers.find((teacher) => teacher.id === updated.teacher_id)?.name ??
+          "—",
+      );
+      if (updated.course_id !== course?.id) {
+        const nextCourse = await getCourse(updated.course_id);
+        setCourse(nextCourse);
+        setSelectedCourse(nextCourse);
+      }
+      toast({ variant: "success", title: "کلاس به‌روزرسانی شد" });
+      setDialogOpen(false);
+    } catch (err) {
+      const validation = fieldErrorFromApi(err);
+      if (validation) {
+        setFieldError(validation);
+      } else {
+        setFormError(toApiError(err, "خطا در ویرایش کلاس"));
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const loadTabData = React.useCallback(async () => {
     if (!courseClass) return;
@@ -438,7 +567,19 @@ export default function ClassDetailPage() {
           </span>
         }
         statusAction={
-          <StatusBadge domain="class" value={courseClass.status} />
+          <div className="flex flex-wrap items-center gap-[var(--primitive-space-2)]">
+            {canManage ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={openEditDialog}
+              >
+                ویرایش
+              </Button>
+            ) : null}
+            <StatusBadge domain="class" value={courseClass.status} />
+          </div>
         }
         tabs={[
           {
@@ -526,6 +667,20 @@ export default function ClassDetailPage() {
                 />
                 <KeyValueRow label="نام کلاس" value={courseClass.name} />
                 <KeyValueRow label="دوره" value={course?.title ?? "—"} />
+                <KeyValueRow
+                  label="روزهای هفته"
+                  value={
+                    courseClass.weekdays && courseClass.weekdays.length > 0 ? (
+                      <div className="flex flex-wrap gap-[var(--primitive-space-2)]">
+                        {courseClass.weekdays.map((day) => (
+                          <Badge key={day}>{weekdayLabel(day)}</Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      "—"
+                    )
+                  }
+                />
               </dl>
             ),
           },
@@ -538,6 +693,24 @@ export default function ClassDetailPage() {
             href={course ? `/courses/${course.id}` : undefined}
           />
         }
+      />
+
+      <ClassFormDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        mode="edit"
+        title="ویرایش کلاس"
+        submitLabel="ذخیره"
+        state={formState}
+        onChange={(patch) => setFormState((prev) => ({ ...prev, ...patch }))}
+        courses={availableCourses}
+        teachers={teachers}
+        selectedCourse={selectedCourse}
+        onSubmit={() => void handleUpdate()}
+        submitLoading={submitting}
+        submitDisabled={!isClassFormValid(formState)}
+        formError={formError}
+        fieldError={fieldError}
       />
     </>
   );

@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Enum, ForeignKey, String, func
+from sqlalchemy import JSON, Date, DateTime, Enum, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -19,6 +19,7 @@ class CourseClass(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    weekdays: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     status: Mapped[ClassStatus] = mapped_column(
         Enum(ClassStatus, name="class_status", native_enum=False),
         nullable=False,

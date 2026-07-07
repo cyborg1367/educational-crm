@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -20,6 +20,9 @@ class Course(Base):
     level: Mapped[str | None] = mapped_column(String(100), nullable=True)
     current_price: Mapped[int] = mapped_column(Integer, nullable=False)
     duration_sessions: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    total_hours: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    session_duration: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sessions_per_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     org_id: Mapped[int] = mapped_column(
         ForeignKey("organizations.id"), nullable=False, index=True

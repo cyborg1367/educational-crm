@@ -83,7 +83,9 @@ def issue_invoice(
     Returns 409 if the enrollment already has an invoice.
     Returns 422 if installment amounts do not sum to total or sequences are duplicated.
     """
-    invoice = finance_service.issue_invoice(db, current_user.org_id, body)
+    invoice = finance_service.issue_invoice(
+        db, current_user.org_id, body, actor_id=current_user.id
+    )
     invoice.installments = finance_service.get_installments_for_invoice(
         db, current_user.org_id, invoice.id
     )

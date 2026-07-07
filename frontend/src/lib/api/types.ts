@@ -43,10 +43,31 @@ export type CourseClassRead = {
   name: string;
   start_date: StorageDate;
   end_date: StorageDate | null;
+  weekdays: string[] | null;
   status: ClassStatus;
   org_id: number;
   created_at: string;
   updated_at: string;
+};
+
+export type CourseClassCreate = {
+  course_id: number;
+  teacher_id: number;
+  name: string;
+  start_date: StorageDate;
+  end_date?: StorageDate | null;
+  weekdays: string[];
+  status?: ClassStatus;
+};
+
+export type CourseClassUpdate = {
+  course_id?: number;
+  teacher_id?: number;
+  name?: string;
+  start_date?: StorageDate;
+  end_date?: StorageDate | null;
+  weekdays?: string[];
+  status?: ClassStatus;
 };
 
 export type InstallmentStatus =
@@ -264,6 +285,9 @@ export type CourseRead = {
   level: string | null;
   current_price: number;
   duration_sessions: number | null;
+  total_hours: number | null;
+  session_duration: number | null;
+  sessions_per_week: number | null;
   is_active: boolean;
   org_id: number;
   created_at: string;
@@ -277,6 +301,22 @@ export type CourseCreate = {
   level?: string | null;
   current_price: number;
   duration_sessions?: number | null;
+  total_hours?: number | null;
+  session_duration?: number | null;
+  sessions_per_week?: number | null;
+  is_active?: boolean;
+};
+
+export type CourseUpdate = {
+  department_id?: number;
+  title?: string;
+  description?: string | null;
+  level?: string | null;
+  current_price?: number;
+  duration_sessions?: number | null;
+  total_hours?: number | null;
+  session_duration?: number | null;
+  sessions_per_week?: number | null;
   is_active?: boolean;
 };
 
@@ -372,6 +412,7 @@ export type InstallmentPlanItem = {
 export type InvoiceCreate = {
   enrollment_id: number;
   installments: InstallmentPlanItem[];
+  record_upfront_payment?: boolean;
 };
 
 export type PaymentRead = {
@@ -527,6 +568,7 @@ export type EnrollmentCreate = {
   discount_snapshot?: number;
   start_date?: StorageDate | null;
   status?: EnrollmentStatus;
+  defer_timeline_log?: boolean;
 };
 
 export type EnrollmentDrop = {
