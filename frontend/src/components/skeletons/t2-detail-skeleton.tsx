@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 
 export type T2DetailSkeletonProps = {
   title: React.ReactNode;
+  subtitle?: React.ReactNode;
   headerAction?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
@@ -12,6 +13,7 @@ export type T2DetailSkeletonProps = {
 
 function T2DetailSkeleton({
   title,
+  subtitle,
   headerAction,
   children,
   className,
@@ -25,9 +27,16 @@ function T2DetailSkeleton({
     >
       <PageZone name="Header">
         <div className="flex flex-wrap items-center justify-between gap-[var(--primitive-space-4)]">
-          <h1 className="text-[length:var(--primitive-font-size-2xl)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
-            {title}
-          </h1>
+          <div className="flex flex-col gap-[var(--primitive-space-1)]">
+            <h1 className="text-[length:var(--primitive-font-size-2xl)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
+              {title}
+            </h1>
+            {subtitle ? (
+              <p className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
+                {subtitle}
+              </p>
+            ) : null}
+          </div>
           {headerAction ? (
             <div className="shrink-0">{headerAction}</div>
           ) : null}

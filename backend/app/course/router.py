@@ -20,6 +20,9 @@ def list_courses(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     pagination: Annotated[PaginationParams, Depends()],
+    department_id: Annotated[
+        int | None, Query(description="Filter by owning department.")
+    ] = None,
     is_active: Annotated[
         bool | None, Query(description="Filter by active flag.")
     ] = None,
@@ -31,6 +34,7 @@ def list_courses(
     items, total_count = course_service.list_courses(
         db,
         current_user.org_id,
+        department_id=department_id,
         is_active=is_active,
         limit=pagination.limit,
         offset=pagination.offset,

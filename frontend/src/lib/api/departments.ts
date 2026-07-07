@@ -1,5 +1,6 @@
 import { fetchJson } from "@/lib/api/client";
 import type {
+  CourseRead,
   DepartmentCreate,
   DepartmentRead,
   PaginatedResponse,
@@ -30,6 +31,12 @@ export function listDepartments(
 
 export function getDepartment(id: number): Promise<DepartmentRead> {
   return fetchJson<DepartmentRead>(`/departments/${id}`);
+}
+
+export function getDepartmentRoadmap(
+  id: number,
+): Promise<{ courses: CourseRead[] }> {
+  return fetchJson(`/departments/${id}/roadmap`);
 }
 
 export function createDepartment(

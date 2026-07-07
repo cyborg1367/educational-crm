@@ -78,3 +78,16 @@ export function updateRoadmapItem(
     { method: "PATCH", body },
   );
 }
+
+export function deleteRoadmap(id: number): Promise<void> {
+  return fetchJson<void>(`/roadmaps/${id}`, { method: "DELETE" });
+}
+
+export function deleteRoadmapItem(
+  roadmapId: number,
+  itemId: number,
+): Promise<void> {
+  return fetchJson<void>(`/roadmaps/${roadmapId}/items/${itemId}`, {
+    method: "DELETE",
+  });
+}

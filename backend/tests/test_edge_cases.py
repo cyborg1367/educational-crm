@@ -14,6 +14,7 @@ from app.communication.enums import CommunicationChannel, CommunicationDirection
 from app.consultation import service as consultation_service
 from app.consultation.enums import ConsultationOutcome
 from app.consultation.schemas import ConsultationCreate
+from app.course import service as course_service
 from app.course.schemas import CourseCreate
 from app.course_class.model import CourseClass
 from app.department import service as department_service
@@ -29,7 +30,6 @@ from app.person.enums import PersonStatus
 from app.person.model import Person
 from app.person.schemas import PersonCreate
 from app.roadmap import service as roadmap_service
-from app.roadmap.schemas import RoadmapCreate, RoadmapItemCreate
 from app.task import service as task_service
 from app.task.enums import TaskStatus, TaskType
 from app.task.schemas import TaskCreate, TaskUpdate
@@ -230,42 +230,52 @@ def test_department_without_manager(db_session: Session, org_id: int) -> None:
     assert department.name == "Unmanaged Department"
 
 
-def test_roadmap_items_order(
+def test_roadmap_items_order_from_prerequisites(
     db_session: Session,
     org_id: int,
     department: Department,
-    course,
 ) -> None:
-    roadmap = roadmap_service.create_roadmap(
+    intro = course_service.create_course(
         db_session,
         org_id,
-        RoadmapCreate(department_id=department.id, name="Learning Path"),
+        CourseCreate(
+            department_id=department.id,
+            title="Intro",
+            current_price=1_000_000,
+        ),
     )
-    roadmap_service.create_roadmap_item(
+    mid = course_service.create_course(
         db_session,
         org_id,
-        roadmap.id,
-        RoadmapItemCreate(title="Step C", sequence=2, course_id=course.id),
+        CourseCreate(
+            department_id=department.id,
+            title="Mid",
+            current_price=1_500_000,
+            prerequisite_ids=[intro.id],
+        ),
     )
-    roadmap_service.create_roadmap_item(
+    course_service.create_course(
         db_session,
         org_id,
-        roadmap.id,
-        RoadmapItemCreate(title="Step A", sequence=0),
+        CourseCreate(
+            department_id=department.id,
+            title="Advanced",
+            current_price=2_000_000,
+            prerequisite_ids=[mid.id],
+        ),
     )
-    roadmap_service.create_roadmap_item(
-        db_session,
-        org_id,
-        roadmap.id,
-        RoadmapItemCreate(title="Step B", sequence=1),
+
+    roadmap = roadmap_service.get_roadmap_for_department(
+        db_session, org_id, department.id
     )
+    assert roadmap is not None
 
     items, total = roadmap_service.list_roadmap_items(
         db_session, org_id, roadmap.id, limit=10
     )
     assert total == 3
-    assert [item.sequence for item in items] == [0, 1, 2]
-    assert [item.title for item in items] == ["Step A", "Step B", "Step C"]
+    assert [item.sequence for item in items] == [1, 2, 3]
+    assert [item.title for item in items] == ["Intro", "Mid", "Advanced"]
 
 
 # --- Communication (append-only) ---

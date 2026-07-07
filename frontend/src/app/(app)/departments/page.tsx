@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { DataTable, EntitySummaryCard } from "@/components/data-display";
 import type { PaginatedResponse } from "@/components/data-display/types";
@@ -51,6 +53,7 @@ function ActiveBadge({ isActive }: { isActive: boolean }) {
 type DepartmentRow = DepartmentRead & { manager_name: string };
 
 export default function DepartmentsListPage() {
+  const router = useRouter();
   const { toast } = useToast();
 
   const [offset, setOffset] = React.useState(0);
@@ -191,7 +194,18 @@ export default function DepartmentsListPage() {
         table={
           <DataTable
             columns={[
-              { key: "name", header: "نام" },
+              {
+                key: "name",
+                header: "نام",
+                cell: (row) => (
+                  <Link
+                    href={`/departments/${row.id}`}
+                    className="text-[var(--semantic-color-text-primary)] hover:underline"
+                  >
+                    {row.name}
+                  </Link>
+                ),
+              },
               {
                 key: "manager_name",
                 header: "مدیر",
@@ -233,6 +247,7 @@ export default function DepartmentsListPage() {
                   title={row.name}
                   subtitle={row.manager_name}
                   badges={<ActiveBadge isActive={row.is_active} />}
+                  onClick={() => router.push(`/departments/${row.id}`)}
                 />
               ))
             )}

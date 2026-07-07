@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
@@ -91,6 +91,21 @@ def update_roadmap(
     return roadmap_service.update_roadmap(db, current_user.org_id, roadmap_id, body)
 
 
+@router.delete("/{roadmap_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_roadmap(
+    roadmap_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> Response:
+    """Delete a roadmap.
+
+    Removes the roadmap, its items, and clears journey references.
+    Returns 404 if the roadmap is not found in the org.
+    """
+    roadmap_service.delete_roadmap(db, current_user.org_id, roadmap_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/{roadmap_id}/items", response_model=PaginatedResponse[RoadmapItemRead])
 def list_roadmap_items(
     roadmap_id: int,
@@ -174,3 +189,24 @@ def update_roadmap_item(
     return roadmap_service.update_roadmap_item(
         db, current_user.org_id, roadmap_id, item_id, body
     )
+
+
+@router.delete(
+    "/{roadmap_id}/items/{item_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_roadmap_item(
+    roadmap_id: int,
+    item_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> Response:
+    """Delete a roadmap item.
+
+    Removes a single step from a roadmap.
+    Returns 404 if the roadmap or item is not found in the org.
+    """
+    roadmap_service.delete_roadmap_item(
+        db, current_user.org_id, roadmap_id, item_id
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

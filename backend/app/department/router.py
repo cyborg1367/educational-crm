@@ -7,6 +7,8 @@ from app.auth.deps import get_current_user
 from app.core.db import get_db
 from app.core.openapi import PROTECTED_RESPONSES
 from app.core.pagination import PaginatedResponse, PaginationParams
+from app.course import service as course_service
+from app.course.schemas import CourseRead, DepartmentRoadmapResponse
 from app.department import service as department_service
 from app.department.model import Department
 from app.department.schemas import DepartmentCreate, DepartmentRead, DepartmentUpdate
@@ -36,6 +38,25 @@ def list_departments(
         total_count,
         limit=pagination.limit,
         offset=pagination.offset,
+    )
+
+
+@router.get("/{department_id}/roadmap", response_model=DepartmentRoadmapResponse)
+def get_department_roadmap(
+    department_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> DepartmentRoadmapResponse:
+    """Get the department learning roadmap graph data.
+
+    Returns all active courses in the department with prerequisite links.
+    Returns 404 if the department is not found in the org.
+    """
+    courses = course_service.get_department_roadmap(
+        db, current_user.org_id, department_id
+    )
+    return DepartmentRoadmapResponse(
+        courses=[CourseRead.model_validate(course) for course in courses]
     )
 
 
