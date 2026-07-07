@@ -4,6 +4,8 @@ import type {
   AttendanceRead,
   AttendanceUpdate,
   CourseClassRead,
+  CourseClassCreate,
+  CourseClassUpdate,
   CourseRead,
   EnrollmentCreate,
   EnrollmentDrop,
@@ -93,6 +95,17 @@ export function listClasses(
   return fetchJson(
     `/classes${buildQuery({ limit, offset, status: params.status })}`,
   );
+}
+
+export function createClass(body: CourseClassCreate): Promise<CourseClassRead> {
+  return fetchJson<CourseClassRead>("/classes", { method: "POST", body });
+}
+
+export function updateClass(
+  id: number,
+  body: CourseClassUpdate,
+): Promise<CourseClassRead> {
+  return fetchJson<CourseClassRead>(`/classes/${id}`, { method: "PATCH", body });
 }
 
 export function getCourse(id: number): Promise<CourseRead> {

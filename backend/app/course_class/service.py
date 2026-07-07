@@ -4,12 +4,14 @@ from sqlalchemy.orm import Session
 from app.core.errors import NotFoundError, ValidationError
 from app.core.pagination import paginate_query
 from app.course import service as course_service
+from app.course.model import Course
 from app.course_class.enums import ClassStatus
 from app.course_class.model import CourseClass
 from app.course_class.schemas import CourseClassCreate, CourseClassUpdate
 from app.tenancy.scoping import scoped
 from app.user import service as user_service
 from app.user.enums import UserRole
+from app.user.model import User
 
 
 def list_classes(
@@ -38,8 +40,20 @@ def get_class(db: Session, org_id: int, class_id: int) -> CourseClass:
     return course_class
 
 
-def _validate_course(db: Session, org_id: int, course_id: int) -> None:
-    course_service.get_course(db, org_id, course_id)
+def _validate_course(
+    db: Session, org_id: int, course_id: int, *, actor: User | None = None
+) -> Course:
+    course = course_service.get_course(db, org_id, course_id)
+    if actor is not None and actor.role == UserRole.department_manager:
+        if (
+            actor.department_id is None
+            or course.department_id != actor.department_id
+        ):
+            raise ValidationError(
+                "department managers may only create classes for their department courses",
+                field="course_id",
+            )
+    return course
 
 
 def _validate_teacher(db: Session, org_id: int, teacher_id: int) -> None:
@@ -51,8 +65,10 @@ def _validate_teacher(db: Session, org_id: int, teacher_id: int) -> None:
         )
 
 
-def create_class(db: Session, org_id: int, data: CourseClassCreate) -> CourseClass:
-    _validate_course(db, org_id, data.course_id)
+def create_class(
+    db: Session, org_id: int, data: CourseClassCreate, *, actor: User | None = None
+) -> CourseClass:
+    _validate_course(db, org_id, data.course_id, actor=actor)
     _validate_teacher(db, org_id, data.teacher_id)
 
     course_class = CourseClass(
@@ -61,6 +77,7 @@ def create_class(db: Session, org_id: int, data: CourseClassCreate) -> CourseCla
         name=data.name,
         start_date=data.start_date,
         end_date=data.end_date,
+        weekdays=data.weekdays,
         status=data.status,
         org_id=org_id,
     )
@@ -71,13 +88,18 @@ def create_class(db: Session, org_id: int, data: CourseClassCreate) -> CourseCla
 
 
 def update_class(
-    db: Session, org_id: int, class_id: int, data: CourseClassUpdate
+    db: Session,
+    org_id: int,
+    class_id: int,
+    data: CourseClassUpdate,
+    *,
+    actor: User | None = None,
 ) -> CourseClass:
     course_class = get_class(db, org_id, class_id)
     updates = data.model_dump(exclude_unset=True)
 
     if "course_id" in updates:
-        _validate_course(db, org_id, updates["course_id"])
+        _validate_course(db, org_id, updates["course_id"], actor=actor)
     if "teacher_id" in updates:
         _validate_teacher(db, org_id, updates["teacher_id"])
 

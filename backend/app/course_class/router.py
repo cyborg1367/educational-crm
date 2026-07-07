@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.auth.deps import get_current_user
+from app.auth.deps import get_current_user, require_role
 from app.core.db import get_db
 from app.core.openapi import PROTECTED_RESPONSES
 from app.core.pagination import PaginatedResponse, PaginationParams
@@ -11,6 +11,7 @@ from app.course_class import service as class_service
 from app.course_class.enums import ClassStatus
 from app.course_class.model import CourseClass
 from app.course_class.schemas import CourseClassCreate, CourseClassRead, CourseClassUpdate
+from app.user.enums import UserRole
 from app.user.model import User
 from app.workflow import service as workflow_service
 
@@ -63,15 +64,28 @@ def get_class(
 def create_class(
     body: CourseClassCreate,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(
+                UserRole.admin,
+                UserRole.admission,
+                UserRole.department_manager,
+            )
+        ),
+    ],
 ) -> CourseClass:
     """Create a new class.
 
     Schedules a class instance for a course with an assigned teacher.
+    Department managers may only create classes for courses in their department.
+    Returns 403 if the caller role is not permitted.
     Returns 404 if the course or teacher is not found.
     Returns 422 if teacher_id does not reference a user with the teacher role.
     """
-    return class_service.create_class(db, current_user.org_id, body)
+    return class_service.create_class(
+        db, current_user.org_id, body, actor=current_user
+    )
 
 
 @router.patch("/{class_id}", response_model=CourseClassRead)
@@ -79,7 +93,16 @@ def update_class(
     class_id: int,
     body: CourseClassUpdate,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(
+                UserRole.admin,
+                UserRole.admission,
+                UserRole.department_manager,
+            )
+        ),
+    ],
 ) -> CourseClass:
     """Update a class.
 
@@ -92,7 +115,7 @@ def update_class(
     was_completed = existing.status == ClassStatus.completed
 
     course_class = class_service.update_class(
-        db, current_user.org_id, class_id, body
+        db, current_user.org_id, class_id, body, actor=current_user
     )
 
     if not was_completed and course_class.status == ClassStatus.completed:

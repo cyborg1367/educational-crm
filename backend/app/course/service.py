@@ -45,6 +45,9 @@ def create_course(db: Session, org_id: int, data: CourseCreate) -> Course:
         level=data.level,
         current_price=data.current_price,
         duration_sessions=data.duration_sessions,
+        total_hours=data.total_hours,
+        session_duration=data.session_duration,
+        sessions_per_week=data.sessions_per_week,
         is_active=data.is_active,
         org_id=org_id,
     )

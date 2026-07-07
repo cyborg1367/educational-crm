@@ -49,6 +49,13 @@ export function canManageEnrollments(role: UserRole = getDevUserRole()): boolean
   return role === "admin" || role === "admission";
 }
 
+/** Admin, admission, and department managers may create classes. */
+export function canManageClasses(role: UserRole = getDevUserRole()): boolean {
+  return (
+    role === "admin" || role === "admission" || role === "department_manager"
+  );
+}
+
 /** Admission and admin may refer a person to departments for consultation. */
 export function canReferToDepartment(role: UserRole = getDevUserRole()): boolean {
   return role === "admin" || role === "admission";

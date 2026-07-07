@@ -25,6 +25,13 @@ class InvoiceCreate(BaseModel):
         min_length=1,
         description="Installment schedule. Amounts must sum to enrollment final_amount.",
     )
+    record_upfront_payment: bool = Field(
+        default=False,
+        description=(
+            "When true, records a payment for sequence-1 installment immediately "
+            "(e.g. prepayment collected during enrollment)."
+        ),
+    )
 
 
 class InvoiceRead(BaseModel):

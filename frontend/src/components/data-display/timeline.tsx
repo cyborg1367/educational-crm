@@ -24,6 +24,10 @@ import { formatDateTimeDisplay } from "@/lib/locale/date";
 import { formatToman } from "@/lib/locale";
 import { mergeTimelineEntries, type TimelineEntry } from "@/lib/timeline/merge";
 import {
+  installmentPositionLabel,
+  remainingInstallmentsLabel,
+} from "@/lib/timeline/copy";
+import {
   actionLabel,
   CONSULTATION_OUTCOME_LABELS,
   levelLabel,
@@ -99,7 +103,7 @@ function activityBorderColor(action: string): string {
   }
   if (
     action === "enrollment_created" ||
-    action === "enrollment_activated" ||
+    action === "enrollment_prepayment" ||
     action === "course_completed"
   ) {
     return "var(--semantic-color-status-success)";
@@ -172,15 +176,7 @@ function ActivityDetails({
     }
     case "consultation_assessment_saved": {
       const actor = actorName(actorId, usersMap);
-      const consultationId = payloadNumber(payload, "consultation_id");
-      return (
-        <>
-          {consultationId != null ? (
-            <p className={detailClassName}>مشاوره #{consultationId}</p>
-          ) : null}
-          {actor ? <p className={detailClassName}>توسط: {actor}</p> : null}
-        </>
-      );
+      return actor ? <p className={detailClassName}>توسط: {actor}</p> : null;
     }
     case "consultation_done": {
       const outcome = payloadString(payload, "outcome");
@@ -210,6 +206,43 @@ function ActivityDetails({
             <p className={detailClassName}>دوره پیشنهادی: {courseName}</p>
           ) : null}
           {actor ? <p className={detailClassName}>توسط: {actor}</p> : null}
+        </>
+      );
+    }
+    case "enrollment_prepayment": {
+      const className = payloadString(payload, "class_name");
+      const amount = payloadNumber(payload, "upfront_amount");
+      const remaining = payloadNumber(payload, "remaining_installments");
+      const enrollmentId = payloadNumber(payload, "enrollment_id");
+      const actor = actorName(actorId, usersMap);
+      return (
+        <>
+          {className ? (
+            <p className={detailClassName}>کلاس: {className}</p>
+          ) : null}
+          {amount != null ? (
+            <p className={detailClassName}>
+              پیش‌پرداخت: {formatToman(amount)} تومان
+            </p>
+          ) : null}
+          {remaining != null ? (
+            <p className={detailClassName}>
+              {remainingInstallmentsLabel(remaining)}
+            </p>
+          ) : null}
+          {actor ? <p className={detailClassName}>توسط: {actor}</p> : null}
+          {enrollmentId != null ? (
+            <Link
+              href={`/enrollments/${enrollmentId}`}
+              className={cn(
+                detailClassName,
+                "inline-block font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-action-primary)]",
+                "hover:text-[var(--semantic-color-action-primaryHover)]",
+              )}
+            >
+              مشاهده ثبت‌نام ←
+            </Link>
+          ) : null}
         </>
       );
     }
@@ -253,7 +286,10 @@ function ActivityDetails({
     }
     case "payment_recorded": {
       const amount = payloadNumber(payload, "amount");
-      const installmentId = payloadNumber(payload, "installment_id");
+      const sequence = payloadNumber(payload, "installment_sequence");
+      const total = payloadNumber(payload, "total_installments");
+      const remaining = payloadNumber(payload, "remaining_unpaid_installments");
+      const actor = actorName(actorId, usersMap);
       return (
         <>
           {amount != null ? (
@@ -261,9 +297,17 @@ function ActivityDetails({
               مبلغ: {formatToman(amount)} تومان
             </p>
           ) : null}
-          {installmentId != null ? (
-            <p className={detailClassName}>قسط: #{installmentId}</p>
+          {sequence != null && total != null ? (
+            <p className={detailClassName}>
+              {installmentPositionLabel(sequence, total)}
+            </p>
           ) : null}
+          {remaining != null ? (
+            <p className={detailClassName}>
+              {remainingInstallmentsLabel(remaining)}
+            </p>
+          ) : null}
+          {actor ? <p className={detailClassName}>توسط: {actor}</p> : null}
         </>
       );
     }

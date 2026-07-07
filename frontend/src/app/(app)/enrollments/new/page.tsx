@@ -4,8 +4,8 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { ConfirmDialog } from "@/components/domain";
+import { EnrollmentPaymentPlanFields } from "@/components/domain/enrollment-payment-plan-fields";
 import { ErrorState, useToast } from "@/components/feedback";
-import { DatePicker } from "@/components/form/date-picker";
 import { FormField } from "@/components/form/form-field";
 import { FrozenField } from "@/components/form/frozen-field";
 import { MoneyInput } from "@/components/form/money-input";
@@ -25,44 +25,25 @@ import { updateTask } from "@/lib/api/tasks";
 import type {
   CourseClassRead,
   CourseRead,
-  InstallmentPlanItem,
   PersonRead,
 } from "@/lib/api/types";
 import { canManageEnrollments } from "@/lib/auth/role";
 import {
-  addDaysToStorageDate,
+  emptyPaymentPlanState,
+  isPaymentPlanValid,
+  paymentPlanToInvoiceInstallments,
+  type PaymentPlanState,
+} from "@/lib/enrollment/payment-plan";
+import {
   formatDateDisplay,
   formatToman,
-  todayStorage,
 } from "@/lib/locale";
-
-type WizardInstallment = InstallmentPlanItem & { id: string };
 
 const WIZARD_STEPS = [
   { id: "class", label: "انتخاب کلاس" },
   { id: "price", label: "بررسی قیمت" },
-  { id: "installments", label: "برنامه اقساط" },
+  { id: "installments", label: "برنامه پرداخت" },
 ] as const;
-
-function defaultInstallments(finalAmount: number): WizardInstallment[] {
-  const today = todayStorage();
-  const half = Math.floor(finalAmount / 2);
-  const remainder = finalAmount - half;
-  return [
-    {
-      id: "1",
-      sequence: 1,
-      amount: half,
-      due_date: addDaysToStorageDate(today, 30),
-    },
-    {
-      id: "2",
-      sequence: 2,
-      amount: remainder,
-      due_date: addDaysToStorageDate(today, 60),
-    },
-  ];
-}
 
 export default function NewEnrollmentPage() {
   return (
@@ -112,8 +93,8 @@ function NewEnrollmentWizard() {
     null,
   );
   const [discount, setDiscount] = React.useState<number>(0);
-  const [installments, setInstallments] = React.useState<WizardInstallment[]>(
-    [],
+  const [paymentPlan, setPaymentPlan] = React.useState<PaymentPlanState>(
+    emptyPaymentPlanState(0),
   );
 
   const [confirmOpen, setConfirmOpen] = React.useState(false);
@@ -126,8 +107,7 @@ function NewEnrollmentWizard() {
 
   const priceSnapshot = selectedCourse?.current_price ?? 0;
   const finalAmount = Math.max(0, priceSnapshot - (discount ?? 0));
-  const installmentSum = installments.reduce((sum, row) => sum + row.amount, 0);
-  const installmentSumValid = installmentSum === finalAmount && finalAmount > 0;
+  const paymentPlanValid = isPaymentPlanValid(paymentPlan, finalAmount);
 
   const loadInitial = React.useCallback(async () => {
     if (!Number.isFinite(personId)) {
@@ -207,7 +187,7 @@ function NewEnrollmentWizard() {
 
   const handleNext = () => {
     if (step === 1) {
-      setInstallments(defaultInstallments(finalAmount));
+      setPaymentPlan(emptyPaymentPlanState(finalAmount));
       setStep(2);
       return;
     }
@@ -219,7 +199,7 @@ function NewEnrollmentWizard() {
   };
 
   const handleSubmit = async () => {
-    if (!person || !selectedClass || !installmentSumValid) return;
+    if (!person || !selectedClass || !paymentPlanValid) return;
     setSubmitting(true);
     try {
       const enrollment = await createEnrollment({
@@ -227,15 +207,13 @@ function NewEnrollmentWizard() {
         class_id: selectedClass.id,
         discount_snapshot: discount,
         status: "pre_enroll",
+        defer_timeline_log: true,
       });
 
       await createInvoice({
         enrollment_id: enrollment.id,
-        installments: installments.map(({ sequence, amount, due_date }) => ({
-          sequence,
-          amount,
-          due_date,
-        })),
+        installments: paymentPlanToInvoiceInstallments(paymentPlan),
+        record_upfront_payment: true,
       });
 
       if (taskId != null && Number.isFinite(taskId)) {
@@ -258,15 +236,6 @@ function NewEnrollmentWizard() {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const updateInstallment = (
-    id: string,
-    patch: Partial<Pick<WizardInstallment, "amount" | "due_date">>,
-  ) => {
-    setInstallments((rows) =>
-      rows.map((row) => (row.id === id ? { ...row, ...patch } : row)),
-    );
   };
 
   if (readOnly) {
@@ -320,7 +289,7 @@ function NewEnrollmentWizard() {
             ? !step1Valid
             : step === 1
               ? !step2Valid
-              : !installmentSumValid
+              : !paymentPlanValid
         }
         isLastStep={step === 2}
       >
@@ -391,48 +360,13 @@ function NewEnrollmentWizard() {
         ) : null}
 
         {step === 2 ? (
-          <div className="flex flex-col gap-[var(--primitive-space-4)]">
-            {installments.map((row) => (
-              <div
-                key={row.id}
-                className="grid gap-[var(--primitive-space-3)] rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)] p-[var(--primitive-space-4)] md:grid-cols-3"
-              >
-                <FormField label={`قسط ${row.sequence}`}>
-                  <MoneyInput
-                    value={row.amount}
-                    onValueChange={(value) =>
-                      updateInstallment(row.id, { amount: value ?? 0 })
-                    }
-                  />
-                </FormField>
-                <FormField label="سررسید" className="md:col-span-2">
-                  <DatePicker
-                    value={row.due_date}
-                    onChange={(value) => {
-                      if (value) {
-                        updateInstallment(row.id, { due_date: value });
-                      }
-                    }}
-                  />
-                </FormField>
-              </div>
-            ))}
-
-            <div className="flex flex-col gap-[var(--primitive-space-2)]">
-              <p className="text-end text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
-                جمع اقساط: {formatToman(installmentSum)} / مبلغ نهایی:{" "}
-                {formatToman(finalAmount)}
-              </p>
-              {!installmentSumValid ? (
-                <p
-                  role="alert"
-                  className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-status-danger)]"
-                >
-                  جمع اقساط باید برابر مبلغ نهایی باشد
-                </p>
-              ) : null}
-            </div>
-          </div>
+          <EnrollmentPaymentPlanFields
+            finalAmount={finalAmount}
+            priceSnapshot={priceSnapshot}
+            discount={discount}
+            state={paymentPlan}
+            onChange={setPaymentPlan}
+          />
         ) : null}
       </WizardSkeleton>
 

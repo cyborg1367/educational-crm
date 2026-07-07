@@ -18,6 +18,18 @@ class CourseRead(BaseModel):
     duration_sessions: int | None = Field(
         description="Expected number of sessions, if known."
     )
+    total_hours: int | None = Field(
+        description="Total course hours, if known.",
+        examples=[48],
+    )
+    session_duration: float | None = Field(
+        description="Hours per session, if known.",
+        examples=[1.5],
+    )
+    sessions_per_week: int | None = Field(
+        description="Sessions per week, if known.",
+        examples=[2],
+    )
     is_active: bool = Field(description="Whether the course is offered.")
     org_id: int = Field(description="Owning organization. Immutable.")
     created_at: datetime = Field(description="Record creation timestamp (UTC).")
@@ -50,6 +62,24 @@ class CourseCreate(BaseModel):
         description="Expected number of sessions. Must be > 0 when set.",
         examples=[24],
     )
+    total_hours: int | None = Field(
+        default=None,
+        ge=1,
+        description="Total course hours. Must be > 0 when set.",
+        examples=[48],
+    )
+    session_duration: float | None = Field(
+        default=None,
+        gt=0,
+        description="Hours per session. Must be > 0 when set.",
+        examples=[1.5],
+    )
+    sessions_per_week: int | None = Field(
+        default=None,
+        ge=1,
+        description="Sessions per week. Must be > 0 when set.",
+        examples=[2],
+    )
     is_active: bool = Field(default=True, description="Whether the course is offered.")
 
 
@@ -80,5 +110,20 @@ class CourseUpdate(BaseModel):
         default=None,
         ge=1,
         description="Updated session count. Must be > 0 when set.",
+    )
+    total_hours: int | None = Field(
+        default=None,
+        ge=1,
+        description="Updated total course hours. Must be > 0 when set.",
+    )
+    session_duration: float | None = Field(
+        default=None,
+        gt=0,
+        description="Updated hours per session. Must be > 0 when set.",
+    )
+    sessions_per_week: int | None = Field(
+        default=None,
+        ge=1,
+        description="Updated sessions per week. Must be > 0 when set.",
     )
     is_active: bool | None = Field(default=None, description="Updated active flag.")

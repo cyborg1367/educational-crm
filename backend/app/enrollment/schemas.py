@@ -59,6 +59,13 @@ class EnrollmentCreate(BaseModel):
         default=EnrollmentStatus.pre_enroll,
         description="Initial enrollment status.",
     )
+    defer_timeline_log: bool = Field(
+        default=False,
+        description=(
+            "When true, skip the enrollment_created timeline entry. "
+            "Use when a combined prepayment log will follow on invoice issue."
+        ),
+    )
 
 
 class EnrollmentUpdate(BaseModel):

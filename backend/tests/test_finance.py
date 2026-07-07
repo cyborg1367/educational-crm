@@ -7,11 +7,13 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.activity import service as activity_service
+from app.activity import service as activity_service
 from app.course import service as course_service
 from app.course.model import Course
 from app.course.schemas import CourseUpdate
 from app.course_class.model import CourseClass
 from app.enrollment import service as enrollment_service
+from app.enrollment.enums import EnrollmentStatus
 from app.enrollment.model import Enrollment
 from app.enrollment.schemas import EnrollmentCreate
 from app.finance import service as finance_service
@@ -123,6 +125,71 @@ def test_finance_invariant_invalid_sum(
     assert "Installment amounts must sum to invoice total_amount" in exc_info.value.detail
     assert "10000000" in exc_info.value.detail
     assert "9000000" in exc_info.value.detail
+
+
+def test_issue_invoice_records_upfront_payment(
+    db_session: Session,
+    org_id: int,
+    person: Person,
+    course: Course,
+    admin_user: User,
+    request: pytest.FixtureRequest,
+) -> None:
+    course_class = request.getfixturevalue("class")
+    course.current_price = 10_000_000
+    db_session.commit()
+
+    enrollment = _create_enrollment(db_session, org_id, person, course_class)
+    enrollment.status = EnrollmentStatus.pre_enroll
+    db_session.commit()
+
+    invoice = finance_service.issue_invoice(
+        db_session,
+        org_id,
+        InvoiceCreate(
+            enrollment_id=enrollment.id,
+            installments=[
+                InstallmentPlanItem(sequence=1, amount=3_000_000, due_date=date(2026, 2, 1)),
+                InstallmentPlanItem(sequence=2, amount=7_000_000, due_date=date(2026, 3, 1)),
+            ],
+            record_upfront_payment=True,
+        ),
+        actor_id=admin_user.id,
+    )
+
+    installments = finance_service.get_installments_for_invoice(
+        db_session, org_id, invoice.id
+    )
+    upfront = next(i for i in installments if i.sequence == 1)
+    remaining = next(i for i in installments if i.sequence == 2)
+
+    assert upfront.status == InstallmentStatus.paid
+    assert upfront.paid_amount == 3_000_000
+    assert remaining.status == InstallmentStatus.pending
+    assert invoice.status == InvoiceStatus.partially_paid
+
+    payments, total = finance_service.list_payments(db_session, org_id)
+    assert total == 1
+    assert payments[0].amount == 3_000_000
+
+    refreshed_enrollment = enrollment_service.get_enrollment(
+        db_session, org_id, enrollment.id
+    )
+    assert refreshed_enrollment.status == EnrollmentStatus.active
+
+    activities, _ = activity_service.list_activities(
+        db_session, org_id, person_id=person.id
+    )
+    prepayment_activities = [
+        a for a in activities if a.action == "enrollment_prepayment"
+    ]
+    assert len(prepayment_activities) == 1
+    payload = prepayment_activities[0].payload
+    assert payload["upfront_amount"] == 3_000_000
+    assert payload["remaining_installments"] == 1
+    assert payload["total_installments"] == 2
+    assert not any(a.action == "payment_recorded" for a in activities)
+    assert not any(a.action == "enrollment_activated" for a in activities)
 
 
 def test_price_snapshot_immutable(
