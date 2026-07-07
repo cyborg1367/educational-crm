@@ -282,13 +282,13 @@ export type CourseRead = {
   department_id: number;
   title: string;
   description: string | null;
-  level: string | null;
   current_price: number;
   duration_sessions: number | null;
   total_hours: number | null;
   session_duration: number | null;
   sessions_per_week: number | null;
   is_active: boolean;
+  prerequisite_ids: number[];
   org_id: number;
   created_at: string;
   updated_at: string;
@@ -298,26 +298,26 @@ export type CourseCreate = {
   department_id: number;
   title: string;
   description?: string | null;
-  level?: string | null;
   current_price: number;
   duration_sessions?: number | null;
   total_hours?: number | null;
   session_duration?: number | null;
   sessions_per_week?: number | null;
   is_active?: boolean;
+  prerequisite_ids?: number[];
 };
 
 export type CourseUpdate = {
   department_id?: number;
   title?: string;
   description?: string | null;
-  level?: string | null;
   current_price?: number;
   duration_sessions?: number | null;
   total_hours?: number | null;
   session_duration?: number | null;
   sessions_per_week?: number | null;
   is_active?: boolean;
+  prerequisite_ids?: number[];
 };
 
 export type RoadmapRead = {

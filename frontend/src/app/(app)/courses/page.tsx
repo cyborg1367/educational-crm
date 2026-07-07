@@ -345,6 +345,7 @@ export default function CoursesListPage() {
             setFormState((prev) => ({ ...prev, ...patch }))
           }
           departments={departments}
+          editingCourseId={editingCourseId}
           fieldError={fieldError}
         />
       </FormDialog>

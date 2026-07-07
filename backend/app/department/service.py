@@ -5,6 +5,7 @@ from app.core.errors import NotFoundError
 from app.core.pagination import paginate_query
 from app.department.model import Department
 from app.department.schemas import DepartmentCreate, DepartmentUpdate
+from app.roadmap import service as roadmap_service
 from app.tenancy.scoping import scoped
 from app.user import service as user_service
 
@@ -45,6 +46,8 @@ def create_department(
     db.add(department)
     db.commit()
     db.refresh(department)
+    roadmap_service.sync_department_roadmap(db, org_id, department.id)
+    db.commit()
     return department
 
 
@@ -62,4 +65,6 @@ def update_department(
 
     db.commit()
     db.refresh(department)
+    roadmap_service.sync_department_roadmap(db, org_id, department_id)
+    db.commit()
     return department

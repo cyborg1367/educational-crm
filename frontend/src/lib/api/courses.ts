@@ -22,7 +22,12 @@ function buildQuery(
 }
 
 export function listCourses(
-  params: { is_active?: boolean; limit?: number; offset?: number } = {},
+  params: {
+    department_id?: number;
+    is_active?: boolean;
+    limit?: number;
+    offset?: number;
+  } = {},
 ): Promise<PaginatedResponse<CourseRead>> {
   const limit = params.limit ?? DEFAULT_LIMIT;
   const offset = params.offset ?? 0;
@@ -30,6 +35,7 @@ export function listCourses(
     `/courses${buildQuery({
       limit,
       offset,
+      department_id: params.department_id,
       is_active: params.is_active,
     })}`,
   );

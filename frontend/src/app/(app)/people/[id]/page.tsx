@@ -26,6 +26,7 @@ import { ErrorState, useToast } from "@/components/feedback";
 import { FormDialog } from "@/components/domain/form-dialog";
 import { ReferralFormFields } from "@/components/domain/referral-form-fields";
 import { Breadcrumb } from "@/components/layout";
+import { RoadmapGraph } from "@/components/roadmap";
 import { Badge } from "@/components/primitives/badge";
 import { T1DetailSkeleton } from "@/components/skeletons";
 import { BlockSkeleton } from "@/components/feedback/skeleton";
@@ -34,7 +35,7 @@ import { fieldErrorFromApi, toApiError } from "@/lib/api/errors";
 import type { ApiError, ApiFieldError } from "@/lib/api/error";
 import { createActivity } from "@/lib/api/activities";
 import { createConsultation, listConsultations } from "@/lib/api/consultations";
-import { getDepartment, listDepartments } from "@/lib/api/departments";
+import { getDepartment, getDepartmentRoadmap, listDepartments } from "@/lib/api/departments";
 import {
   deletePerson,
   getPerson,
@@ -62,6 +63,7 @@ import {
 import type {
   ConsultationRead,
   CourseClassRead,
+  CourseRead,
   DepartmentRead,
   EnrollmentRead,
   JourneyRead,
@@ -123,6 +125,9 @@ export default function PersonDetailPage() {
   const [tasks, setTasks] = React.useState<TaskRead[]>([]);
   const [departments, setDepartments] = React.useState<DepartmentRead[]>([]);
   const [classes, setClasses] = React.useState<CourseClassRead[]>([]);
+  const [journeyRoadmapCourses, setJourneyRoadmapCourses] = React.useState<
+    CourseRead[]
+  >([]);
   const [consultations, setConsultations] = React.useState<ConsultationRead[]>(
     [],
   );
@@ -170,6 +175,14 @@ export default function PersonDetailPage() {
     return map;
   }, [classes]);
 
+  const courseIdByClassId = React.useMemo(() => {
+    const map = new Map<number, number>();
+    for (const cls of classes) {
+      map.set(cls.id, cls.course_id);
+    }
+    return map;
+  }, [classes]);
+
   const personJourneys = React.useMemo(
     () => journeys.filter((j) => j.person_id === personId),
     [journeys, personId],
@@ -211,6 +224,33 @@ export default function PersonDetailPage() {
       b.created_at.localeCompare(a.created_at),
     )[0];
   }, [personJourneys]);
+
+  const activeJourney = React.useMemo(
+    () => personJourneys.find((journey) => journey.status === "active") ?? null,
+    [personJourneys],
+  );
+
+  const completedCourseIds = React.useMemo(
+    () =>
+      personEnrollments
+        .filter((enrollment) => enrollment.status === "completed")
+        .map((enrollment) => courseIdByClassId.get(enrollment.class_id))
+        .filter((courseId): courseId is number => courseId != null),
+    [personEnrollments, courseIdByClassId],
+  );
+
+  const enrolledCourseIds = React.useMemo(
+    () =>
+      personEnrollments
+        .filter(
+          (enrollment) =>
+            enrollment.status === "active" ||
+            enrollment.status === "pre_enroll",
+        )
+        .map((enrollment) => courseIdByClassId.get(enrollment.class_id))
+        .filter((courseId): courseId is number => courseId != null),
+    [personEnrollments, courseIdByClassId],
+  );
 
   const latestEnrollment = personEnrollments[0] ?? null;
 
@@ -280,6 +320,28 @@ export default function PersonDetailPage() {
       setTabLoading(false);
     }
   }, [person]);
+
+  React.useEffect(() => {
+    if (!activeJourney) {
+      setJourneyRoadmapCourses([]);
+      return;
+    }
+    let cancelled = false;
+    void getDepartmentRoadmap(activeJourney.department_id)
+      .then((res) => {
+        if (!cancelled) {
+          setJourneyRoadmapCourses(res.courses);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setJourneyRoadmapCourses([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeJourney]);
 
   const refreshConsultations = React.useCallback(async () => {
     try {
@@ -747,6 +809,27 @@ export default function PersonDetailPage() {
                 onRowClick={(row) => router.push(`/enrollments/${row.id}`)}
                 emptyMessage="ثبت‌نامی یافت نشد"
               />
+                {activeJourney && journeyRoadmapCourses.length > 0 ? (
+                  <div className="flex flex-col gap-[var(--primitive-space-3)]">
+                    <h3 className="text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
+                      مسیر آموزشی در{" "}
+                      {departmentNameById.get(activeJourney.department_id) ?? "—"}
+                    </h3>
+                    <div
+                      style={{
+                        height: 300,
+                        border: "1px solid #EBEBEB",
+                        borderRadius: 12,
+                      }}
+                    >
+                      <RoadmapGraph
+                        courses={journeyRoadmapCourses}
+                        completedCourseIds={completedCourseIds}
+                        enrolledCourseIds={enrolledCourseIds}
+                      />
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ),
           },

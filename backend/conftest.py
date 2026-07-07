@@ -149,7 +149,6 @@ def course(db_session: Session, org_id: int, department: Department) -> Course:
         department_id=department.id,
         title="Test Course",
         description="A course for tests",
-        level="beginner",
         current_price=5_000_000,
         duration_sessions=12,
         is_active=True,

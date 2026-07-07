@@ -1,6 +1,7 @@
 from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class CourseRead(BaseModel):
@@ -10,7 +11,6 @@ class CourseRead(BaseModel):
     department_id: int = Field(description="Department that owns this course.")
     title: str = Field(description="Course title.")
     description: str | None = Field(description="Course description.")
-    level: str | None = Field(description="Difficulty or proficiency level.")
     current_price: int = Field(
         description="Current list price in Toman.",
         examples=[1000000],
@@ -31,9 +31,41 @@ class CourseRead(BaseModel):
         examples=[2],
     )
     is_active: bool = Field(description="Whether the course is offered.")
+    prerequisite_ids: list[int] = Field(
+        default_factory=list,
+        description="IDs of prerequisite courses in the same department.",
+    )
     org_id: int = Field(description="Owning organization. Immutable.")
     created_at: datetime = Field(description="Record creation timestamp (UTC).")
     updated_at: datetime = Field(description="Last update timestamp (UTC).")
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_prerequisite_ids(cls, data: Any) -> Any:
+        if hasattr(data, "prerequisites"):
+            prereqs = data.prerequisites
+            return {
+                **{
+                    key: getattr(data, key)
+                    for key in (
+                        "id",
+                        "department_id",
+                        "title",
+                        "description",
+                        "current_price",
+                        "duration_sessions",
+                        "total_hours",
+                        "session_duration",
+                        "sessions_per_week",
+                        "is_active",
+                        "org_id",
+                        "created_at",
+                        "updated_at",
+                    )
+                },
+                "prerequisite_ids": [prereq.id for prereq in prereqs],
+            }
+        return data
 
 
 class CourseCreate(BaseModel):
@@ -45,12 +77,6 @@ class CourseCreate(BaseModel):
         examples=["IELTS Preparation"],
     )
     description: str | None = Field(default=None, description="Course description.")
-    level: str | None = Field(
-        default=None,
-        max_length=100,
-        description="Difficulty or proficiency level.",
-        examples=["B2"],
-    )
     current_price: int = Field(
         gt=0,
         description="List price in Toman. Must be > 0.",
@@ -81,6 +107,10 @@ class CourseCreate(BaseModel):
         examples=[2],
     )
     is_active: bool = Field(default=True, description="Whether the course is offered.")
+    prerequisite_ids: list[int] = Field(
+        default_factory=list,
+        description="Prerequisite course IDs in the same department.",
+    )
 
 
 class CourseUpdate(BaseModel):
@@ -95,11 +125,6 @@ class CourseUpdate(BaseModel):
         description="Updated course title.",
     )
     description: str | None = Field(default=None, description="Updated description.")
-    level: str | None = Field(
-        default=None,
-        max_length=100,
-        description="Updated proficiency level.",
-    )
     current_price: int | None = Field(
         default=None,
         gt=0,
@@ -127,3 +152,13 @@ class CourseUpdate(BaseModel):
         description="Updated sessions per week. Must be > 0 when set.",
     )
     is_active: bool | None = Field(default=None, description="Updated active flag.")
+    prerequisite_ids: list[int] | None = Field(
+        default=None,
+        description="Updated prerequisite course IDs in the same department.",
+    )
+
+
+class DepartmentRoadmapResponse(BaseModel):
+    courses: list[CourseRead] = Field(
+        description="Active courses in the department with prerequisite links."
+    )
