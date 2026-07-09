@@ -26,3 +26,9 @@ export {
   isNavItemActive,
   type SidebarNavProps,
 } from "@/components/layout/sidebar-nav";
+export {
+  ViewModeToggle,
+  useListViewMode,
+  type ListViewMode,
+  type ViewModeToggleProps,
+} from "@/components/layout/view-mode-toggle";
