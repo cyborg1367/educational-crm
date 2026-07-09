@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
+import dayjs from "dayjs";
 
 import {
   CalendarAgenda,
-  mapClassStartDates,
+  mapClassSessions,
   mapInstallmentDueDates,
   mapTaskDueDates,
   mergeCalendarEvents,
@@ -14,39 +15,48 @@ import { CalendarPageSkeleton } from "@/components/skeletons";
 import type { CalendarViewMode } from "@/components/skeletons/types";
 import type { ApiError } from "@/lib/api/error";
 import { toApiError } from "@/lib/api/errors";
-import { listClasses, listInstallments, listInvoices } from "@/lib/api/finance";
+import type {
+  CourseClassRead,
+  InstallmentRead,
+  TaskRead,
+} from "@/lib/api/types";
+import { listAllInstallments, listClasses } from "@/lib/api/finance";
 import { listTasks } from "@/lib/api/tasks";
+import { todayStorage, type StorageDate } from "@/lib/locale/date";
+
+const AGENDA_DAYS_AHEAD = 30;
 
 export default function CalendarPage() {
   const [mode, setMode] = React.useState<CalendarViewMode>("month");
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<ApiError | null>(null);
-  const [events, setEvents] = React.useState<
-    ReturnType<typeof mergeCalendarEvents>
-  >([]);
+  const [visibleMonth, setVisibleMonth] = React.useState<StorageDate>(() =>
+    todayStorage(),
+  );
+  const [classes, setClasses] = React.useState<CourseClassRead[]>([]);
+  const [installments, setInstallments] = React.useState<InstallmentRead[]>([]);
+  const [tasks, setTasks] = React.useState<TaskRead[]>([]);
 
   const loadData = React.useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [classesRes, tasksRes, invoicesRes] = await Promise.all([
+      // Installments come from a single org-wide, date-bounded request —
+      // previously this page issued one request per invoice.
+      const today = todayStorage();
+      const [classesRes, tasksRes, installmentsRes] = await Promise.all([
         listClasses({ limit: 500 }),
         listTasks({ limit: 500 }),
-        listInvoices({ limit: 500 }),
+        listAllInstallments({
+          due_from: dayjs(today).subtract(6, "month").format("YYYY-MM-DD"),
+          due_to: dayjs(today).add(12, "month").format("YYYY-MM-DD"),
+          limit: 500,
+        }),
       ]);
 
-      const installmentPages = await Promise.all(
-        invoicesRes.items.map((invoice) => listInstallments(invoice.id, { limit: 500 })),
-      );
-      const installments = installmentPages.flatMap((page) => page.items);
-
-      setEvents(
-        mergeCalendarEvents(
-          mapClassStartDates(classesRes.items),
-          mapInstallmentDueDates(installments),
-          mapTaskDueDates(tasksRes.items),
-        ),
-      );
+      setClasses(classesRes.items);
+      setTasks(tasksRes.items);
+      setInstallments(installmentsRes.items);
     } catch (err) {
       setError(toApiError(err, "خطا در بارگذاری تقویم"));
     } finally {
@@ -58,6 +68,27 @@ export default function CalendarPage() {
     void loadData();
   }, [loadData]);
 
+  const events = React.useMemo(() => {
+    // Expand class weekday schedules into per-session events for the window
+    // the user can currently see: the visible month (with a little slack)
+    // plus the agenda range from today.
+    const today = todayStorage();
+    const from = (visibleMonth < today ? visibleMonth : today) as StorageDate;
+    const monthEnd = dayjs(visibleMonth)
+      .add(32, "day")
+      .format("YYYY-MM-DD") as StorageDate;
+    const agendaEnd = dayjs(today)
+      .add(AGENDA_DAYS_AHEAD, "day")
+      .format("YYYY-MM-DD") as StorageDate;
+    const to = monthEnd > agendaEnd ? monthEnd : agendaEnd;
+
+    return mergeCalendarEvents(
+      mapClassSessions(classes, { from, to }),
+      mapInstallmentDueDates(installments),
+      mapTaskDueDates(tasks),
+    );
+  }, [classes, installments, tasks, visibleMonth]);
+
   if (error) {
     return <ErrorState error={error} />;
   }
@@ -65,7 +96,13 @@ export default function CalendarPage() {
   return (
     <CalendarPageSkeleton mode={mode} onModeChange={setMode}>
       <div className={loading ? "pointer-events-none opacity-70" : undefined}>
-        <CalendarAgenda events={events} mode={mode} />
+        <CalendarAgenda
+          events={events}
+          mode={mode}
+          month={visibleMonth}
+          onMonthChange={setVisibleMonth}
+          agendaDaysAhead={AGENDA_DAYS_AHEAD}
+        />
       </div>
     </CalendarPageSkeleton>
   );
