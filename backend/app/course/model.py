@@ -2,14 +2,14 @@ from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
-    Column,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
     Integer,
     String,
-    Table,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -18,22 +18,37 @@ from app.core.db import Base
 from app.department.model import Department
 from app.organization.model import Organization
 
-course_prerequisites = Table(
-    "course_prerequisites",
-    Base.metadata,
-    Column(
-        "course_id",
-        Integer,
-        ForeignKey("courses.id", ondelete="CASCADE"),
-        primary_key=True,
-    ),
-    Column(
-        "prerequisite_id",
-        Integer,
-        ForeignKey("courses.id", ondelete="CASCADE"),
-        primary_key=True,
-    ),
-)
+
+class CoursePrerequisite(Base):
+    __tablename__ = "course_prerequisites"
+    __table_args__ = (
+        UniqueConstraint(
+            "course_id", "prerequisite_course_id", name="uq_course_prerequisites_pair"
+        ),
+        CheckConstraint(
+            "course_id <> prerequisite_course_id", name="ck_course_prerequisites_not_self"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    course_id: Mapped[int] = mapped_column(
+        ForeignKey("courses.id"), nullable=False
+    )
+    prerequisite_course_id: Mapped[int] = mapped_column(
+        ForeignKey("courses.id"), nullable=False
+    )
+    org_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
 
 
 class Course(Base):
@@ -66,10 +81,18 @@ class Course(Base):
 
     organization: Mapped[Organization] = relationship()
     department: Mapped[Department] = relationship()
+    prerequisite_links: Mapped[list["CoursePrerequisite"]] = relationship(
+        "CoursePrerequisite",
+        primaryjoin="Course.id == CoursePrerequisite.course_id",
+        foreign_keys="[CoursePrerequisite.course_id]",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
     prerequisites: Mapped[list["Course"]] = relationship(
         "Course",
-        secondary=course_prerequisites,
-        primaryjoin="Course.id == course_prerequisites.c.course_id",
-        secondaryjoin="Course.id == course_prerequisites.c.prerequisite_id",
+        secondary=CoursePrerequisite.__table__,
+        primaryjoin="Course.id == CoursePrerequisite.course_id",
+        secondaryjoin="Course.id == CoursePrerequisite.prerequisite_course_id",
+        viewonly=True,
         lazy="selectin",
     )

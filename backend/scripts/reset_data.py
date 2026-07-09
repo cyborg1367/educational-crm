@@ -69,6 +69,7 @@ SEQUENCE_TABLES = [
     "tasks",
     "activities",
     "communications",
+    "course_prerequisites",
 ]
 
 

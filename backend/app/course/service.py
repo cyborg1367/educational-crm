@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import NotFoundError, ValidationError
 from app.core.pagination import paginate_query
-from app.course.model import Course
+from app.course.model import Course, CoursePrerequisite
 from app.course.schemas import CourseCreate, CourseUpdate
 from app.department import service as department_service
 from app.roadmap import service as roadmap_service
@@ -78,7 +78,8 @@ def _set_prerequisites(
         )
 
     if not prerequisite_ids:
-        course.prerequisites = []
+        course.prerequisite_links = []
+        db.flush()
         return
 
     stmt = scoped(select(Course), Course, org_id).where(
@@ -93,13 +94,17 @@ def _set_prerequisites(
             "Prerequisites must belong to the same department",
             field="prerequisite_ids",
         )
-    course.prerequisites = prereqs
+    course.prerequisite_links = [
+        CoursePrerequisite(prerequisite_course_id=prereq.id, org_id=org_id)
+        for prereq in prereqs
+    ]
+    db.flush()
 
 
 def create_course(db: Session, org_id: int, data: CourseCreate) -> Course:
     _validate_department(db, org_id, data.department_id)
 
-    payload = data.model_dump(exclude={"prerequisite_ids"})
+    payload = data.model_dump(exclude={"prerequisite_ids", "prerequisite_course_ids"})
     course = Course(
         **payload,
         org_id=org_id,
