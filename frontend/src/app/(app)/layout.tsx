@@ -55,11 +55,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return null;
   }
 
+  const hideCommandPaletteButton =
+    pathname === "/courses" || pathname?.startsWith("/courses/");
+
   return (
     <>
       <AppShell
         navTree={navTree}
-        onOpenCommandPalette={() => setPaletteOpen(true)}
+        onOpenCommandPalette={
+          hideCommandPaletteButton ? undefined : () => setPaletteOpen(true)
+        }
         topbarEnd={
           <Button
             type="button"

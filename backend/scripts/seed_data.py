@@ -1,4 +1,4 @@
-"""Seed realistic test data for org_id=1. Idempotent — skips existing records."""
+"""Seed focused demo data for org_id=1 (Programming + AI). Wipes tenant data except admin."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 # Register all ORM models before use.
 from app.activity import model as _activity_model  # noqa: F401
 from app.attendance import model as _attendance_model  # noqa: F401
+from app.attendance import waiver_model as _waiver_model  # noqa: F401
 from app.communication import model as _communication_model  # noqa: F401
 from app.consultation import model as _consultation_model  # noqa: F401
 from app.course import model as _course_model  # noqa: F401
@@ -19,8 +20,6 @@ from app.department import model as _department_model  # noqa: F401
 from app.enrollment import model as _enrollment_model  # noqa: F401
 from app.finance import model as _finance_model  # noqa: F401
 from app.journey import model as _journey_model  # noqa: F401
-from app.journey import service as journey_service
-from app.journey.model import Journey
 from app.organization import model as _organization_model  # noqa: F401
 from app.person import model as _person_model  # noqa: F401
 from app.roadmap import model as _roadmap_model  # noqa: F401
@@ -32,166 +31,309 @@ from sqlalchemy import delete, func, select
 from app.activity.model import Activity
 from app.activity.service import log_activity
 from app.attendance.model import Attendance
-from app.auth.security import hash_password
+from app.attendance.waiver_model import JourneyRoadmapWaiver
+from app.communication.model import Communication
+from app.communication.enums import CommunicationChannel, CommunicationDirection
 from app.consultation.enums import ConsultationOutcome
 from app.consultation.model import Consultation
 from app.core.db import SessionLocal
-from app.course.model import Course
+from app.course.model import Course, CoursePrerequisite
 from app.course_class.enums import ClassStatus
 from app.course_class.model import CourseClass
 from app.department.model import Department
 from app.enrollment.enums import EnrollmentStatus
 from app.enrollment.model import Enrollment
 from app.finance import service as finance_service
+from app.finance.model import Installment, Invoice, Payment, Refund
 from app.finance.schemas import InstallmentPlanItem, InvoiceCreate
+from app.journey import service as journey_service
+from app.journey.model import Journey
 from app.organization.model import Organization
 from app.person.enums import PersonStatus
 from app.person.model import Person
+from app.roadmap.model import Roadmap, RoadmapItem
 from app.task.enums import TaskStatus, TaskType
 from app.task.model import Task
-from app.user.enums import UserRole
 from app.user.model import User
 
 ORG_ID = 1
-SEED_MARKER_EMAIL = "manager@crm.local"
+ADMIN_EMAIL = "admin@example.com"
 
-USER_SPECS = [
-    ("admin@crm.local", "Admin1234!", UserRole.admin, "مدیر سیستم", None),
-    ("admission@crm.local", "Admission1234!", UserRole.admission, "کارشناس پذیرش", None),
-    ("finance@crm.local", "Finance1234!", UserRole.finance, "کارشناس مالی", None),
-    ("teacher@crm.local", "Teacher1234!", UserRole.teacher, "استاد احمدی", "دپارتمان فناوری و اطلاعات"),
-    ("manager@crm.local", "Manager1234!", UserRole.department_manager, "مدیر دپارتمان", "دپارتمان فناوری و اطلاعات"),
+DEPT_PROGRAMMING = "دپارتمان فناوری و اطلاعات"
+DEPT_AI = "دپارتمان هوش مصنوعی"
+
+# (title, department, level, price_toman, description, duration_sessions)
+COURSE_SPECS: list[tuple[str, str, str, int, str, int]] = [
+    (
+        "مبانی برنامه‌نویسی",
+        DEPT_PROGRAMMING,
+        "مقدماتی",
+        3_500_000,
+        "منطق برنامه‌نویسی، متغیرها، حلقه‌ها و توابع — بدون پیش‌نیاز.",
+        10,
+    ),
+    (
+        "Python مقدماتی",
+        DEPT_PROGRAMMING,
+        "مقدماتی",
+        4_800_000,
+        "سینتکس Python، ساختار داده پایه و حل مسئله.",
+        12,
+    ),
+    (
+        "ساختمان داده و الگوریتم",
+        DEPT_PROGRAMMING,
+        "متوسط",
+        5_500_000,
+        "آرایه، لیست پیوندی، درخت، گراف و تحلیل پیچیدگی.",
+        14,
+    ),
+    (
+        "توسعه وب با JavaScript",
+        DEPT_PROGRAMMING,
+        "متوسط",
+        6_200_000,
+        "ES6+، DOM، async/await و مبانی React.",
+        16,
+    ),
+    (
+        "Backend با Python",
+        DEPT_PROGRAMMING,
+        "پیشرفته",
+        7_000_000,
+        "REST API، FastAPI، پایگاه‌داده و احراز هویت.",
+        14,
+    ),
+    (
+        "پروژه نهایی برنامه‌نویسی",
+        DEPT_PROGRAMMING,
+        "پروژه",
+        4_000_000,
+        "پیاده‌سازی محصول واقعی با راهنمایی منتور.",
+        8,
+    ),
+    (
+        "ریاضیات برای یادگیری ماشین",
+        DEPT_AI,
+        "مقدماتی",
+        4_200_000,
+        "جبر خطی، احتمال و آمار برای ML.",
+        10,
+    ),
+    (
+        "Python برای علم داده",
+        DEPT_AI,
+        "مقدماتی",
+        5_000_000,
+        "NumPy، Pandas، مصورسازی و پاک‌سازی داده.",
+        12,
+    ),
+    (
+        "یادگیری ماشین مقدماتی",
+        DEPT_AI,
+        "متوسط",
+        7_500_000,
+        "رگرسیون، طبقه‌بندی، خوشه‌بندی و ارزیابی مدل.",
+        16,
+    ),
+    (
+        "یادگیری عمیق",
+        DEPT_AI,
+        "پیشرفته",
+        9_000_000,
+        "شبکه عصبی، CNN، RNN و آموزش با PyTorch.",
+        18,
+    ),
+    (
+        "پردازش زبان طبیعی (NLP)",
+        DEPT_AI,
+        "پیشرفته",
+        8_500_000,
+        "توکنایزیشن، embedding، ترنسفورمر و LLM.",
+        14,
+    ),
+    (
+        "پروژه MLOps",
+        DEPT_AI,
+        "پروژه",
+        5_500_000,
+        "استقرار مدل، مانیتورینگ و pipeline تولید.",
+        10,
+    ),
 ]
 
-DEPARTMENT_SPECS = [
-    ("دپارتمان فناوری و اطلاعات", "admin"),
-    ("دپارتمان هوش مصنوعی", "admin"),
-    ("دپارتمان زبان کودکان", "admin"),
-    ("دپارتمان زبان بزرگسال", "admin"),
-    ("دپارتمان علوم مالی", "admin"),
+# Roadmap shells only — items are synced from course prerequisite DAGs.
+ROADMAP_SPECS: list[tuple[str, str]] = [
+    ("مسیر کامل برنامه‌نویسی", DEPT_PROGRAMMING),
+    ("مسیر هوش مصنوعی", DEPT_AI),
 ]
 
-COURSE_SPECS = [
-    ("Python مقدماتی", "دپارتمان فناوری و اطلاعات", 4_500_000),
-    ("JavaScript پیشرفته", "دپارتمان فناوری و اطلاعات", 5_500_000),
-    ("IELTS آمادگی", "دپارتمان زبان بزرگسال", 8_000_000),
-    ("TOEFL آمادگی", "دپارتمان زبان بزرگسال", 7_500_000),
-    ("UI/UX مقدماتی", "دپارتمان فناوری و اطلاعات", 6_000_000),
-    ("Figma پیشرفته", "دپارتمان فناوری و اطلاعات", 5_000_000),
+# course title -> prerequisite course titles (same department only).
+# Multiple roots per department are intentional (no inbound edges):
+# - Programming: «مبانی برنامه‌نویسی» and «توسعه وب با JavaScript»
+# - AI: «ریاضیات برای یادگیری ماشین» and «Python برای علم داده»
+COURSE_PREREQUISITES: dict[str, list[str]] = {
+    "Python مقدماتی": ["مبانی برنامه‌نویسی"],
+    "ساختمان داده و الگوریتم": ["Python مقدماتی"],
+    "Backend با Python": ["ساختمان داده و الگوریتم"],
+    "پروژه نهایی برنامه‌نویسی": ["Backend با Python", "توسعه وب با JavaScript"],
+    "یادگیری ماشین مقدماتی": [
+        "Python برای علم داده",
+        "ریاضیات برای یادگیری ماشین",
+    ],
+    "یادگیری عمیق": ["یادگیری ماشین مقدماتی"],
+    "پردازش زبان طبیعی (NLP)": ["یادگیری ماشین مقدماتی"],
+    "پروژه MLOps": ["یادگیری عمیق", "پردازش زبان طبیعی (NLP)"],
+}
+
+# (class_name, course_title, status, start, end, weekdays)
+CLASS_SPECS: list[tuple[str, str, ClassStatus, date, date, list[str]]] = [
+    (
+        "Python مقدماتی — بهار ۱۴۰۵",
+        "Python مقدماتی",
+        ClassStatus.active,
+        date(2026, 3, 1),
+        date(2026, 6, 1),
+        ["شنبه", "دوشنبه"],
+    ),
+    (
+        "مبانی برنامه‌نویسی — ترم جاری",
+        "مبانی برنامه‌نویسی",
+        ClassStatus.active,
+        date(2026, 2, 15),
+        date(2026, 5, 15),
+        ["یکشنبه", "چهارشنبه"],
+    ),
+    (
+        "JavaScript وب — تابستان ۱۴۰۵",
+        "توسعه وب با JavaScript",
+        ClassStatus.planned,
+        date(2026, 7, 1),
+        date(2026, 10, 1),
+        ["شنبه", "سه‌شنبه"],
+    ),
+    (
+        "Backend Python — پاییز ۱۴۰۴",
+        "Backend با Python",
+        ClassStatus.completed,
+        date(2025, 9, 1),
+        date(2025, 12, 15),
+        ["دوشنبه", "چهارشنبه"],
+    ),
+    (
+        "یادگیری ماشین — بهار ۱۴۰۵",
+        "یادگیری ماشین مقدماتی",
+        ClassStatus.active,
+        date(2026, 3, 15),
+        date(2026, 7, 15),
+        ["شنبه", "دوشنبه"],
+    ),
+    (
+        "علم داده Python — زمستان ۱۴۰۴",
+        "Python برای علم داده",
+        ClassStatus.completed,
+        date(2025, 11, 1),
+        date(2026, 2, 1),
+        ["یکشنبه", "سه‌شنبه"],
+    ),
+    (
+        "یادگیری عمیق — پاییز ۱۴۰۵",
+        "یادگیری عمیق",
+        ClassStatus.planned,
+        date(2026, 9, 1),
+        date(2027, 1, 1),
+        ["دوشنبه", "پنج‌شنبه"],
+    ),
 ]
 
-CLASS_SPECS = [
-    ("Python 101", "Python", "teacher", ClassStatus.active, date(2026, 1, 1), date(2026, 4, 1)),
-    ("Python 102", "Python", "teacher", ClassStatus.completed, date(2025, 9, 1), date(2025, 12, 1)),
-    ("IELTS Intensive", "IELTS", "teacher", ClassStatus.active, date(2026, 2, 1), date(2026, 5, 1)),
-    ("UI/UX Bootcamp", "UI/UX", "teacher", ClassStatus.planned, date(2026, 8, 1), date(2026, 11, 1)),
+# (full_name, phone, status, interests)
+PERSON_SPECS: list[tuple[str, str, PersonStatus, list[str] | None]] = [
+    ("آرین محمدی", "09121010001", PersonStatus.prospect, ["programming"]),
+    ("هلیا رستمی", "09121010002", PersonStatus.prospect, ["ai"]),
+    ("پویا نیکزاد", "09121010003", PersonStatus.prospect, None),
+    ("سارا کاظمی", "09121010004", PersonStatus.lead, ["programming"]),
+    ("امیرحسین مرادی", "09121010005", PersonStatus.lead, ["ai", "programming"]),
+    ("نیلوفر جلالی", "09121010006", PersonStatus.lead, ["ai"]),
+    ("رضا طاهری", "09121010007", PersonStatus.student, ["programming"]),
+    ("مینا شفیعی", "09121010008", PersonStatus.student, ["programming"]),
+    ("کاوه انصاری", "09121010009", PersonStatus.student, ["ai"]),
+    ("الهام بحرینی", "09121010010", PersonStatus.student, ["ai"]),
+    ("بابک رضوی", "09121010011", PersonStatus.student, ["programming", "ai"]),
+    ("شیدا عباسی", "09121010012", PersonStatus.student, ["programming"]),
+    ("مهدی یزدانی", "09121010013", PersonStatus.dormant, ["programming"]),
+    ("نگار فلاح", "09121010014", PersonStatus.dormant, ["ai"]),
+    ("حامد قربانی", "09121010015", PersonStatus.alumni, ["programming"]),
+    ("لادن حمیدی", "09121010016", PersonStatus.alumni, ["ai"]),
+    ("فرزاد امینی", "09121010017", PersonStatus.student, ["ai"]),
+    ("زینب کریمی", "09121010018", PersonStatus.lead, ["programming"]),
 ]
 
-PERSON_SPECS: list[tuple[str, str, PersonStatus]] = [
-    ("علی رضایی", "09121000001", PersonStatus.prospect),
-    ("مریم حسینی", "09121000002", PersonStatus.prospect),
-    ("رضا کریمی", "09121000003", PersonStatus.prospect),
-    ("زهرا محمدی", "09121000004", PersonStatus.prospect),
-    ("حسین نوری", "09121000005", PersonStatus.prospect),
-    ("فاطمه اکبری", "09121000006", PersonStatus.lead),
-    ("امیر جعفری", "09121000007", PersonStatus.lead),
-    ("سارا موسوی", "09121000008", PersonStatus.lead),
-    ("مهدی قاسمی", "09121000009", PersonStatus.lead),
-    ("نرگس صادقی", "09121000010", PersonStatus.lead),
-    ("پریسا حیدری", "09121000011", PersonStatus.student),
-    ("کامران شریفی", "09121000012", PersonStatus.student),
-    ("لیلا باقری", "09121000013", PersonStatus.student),
-    ("دانیال فرهادی", "09121000014", PersonStatus.student),
-    ("الهام رحیمی", "09121000015", PersonStatus.student),
-    ("بهرام نظری", "09121000016", PersonStatus.student),
-    ("شیما توکلی", "09121000017", PersonStatus.student),
-    ("آرمان پورمحمدی", "09121000018", PersonStatus.dormant),
-    ("نگین زارعی", "09121000019", PersonStatus.dormant),
-    ("سعید منصوری", "09121000020", PersonStatus.alumni),
-]
-
-CONSULTATION_OUTCOMES: list[ConsultationOutcome | None] = [
-    ConsultationOutcome.pre_enroll,
-    ConsultationOutcome.pre_enroll,
-    ConsultationOutcome.pre_enroll,
-    ConsultationOutcome.pre_enroll,
-    ConsultationOutcome.pre_enroll,
-    ConsultationOutcome.follow_up,
-    ConsultationOutcome.follow_up,
-    ConsultationOutcome.follow_up,
-    ConsultationOutcome.refer_other_dept,
-    ConsultationOutcome.refer_other_dept,
-    ConsultationOutcome.not_suitable,
-    ConsultationOutcome.not_suitable,
-    ConsultationOutcome.closed,
-    ConsultationOutcome.closed,
-    None,
+# (person_name, department, outcome | None, goal, recommended_course | None, notes)
+CONSULTATION_SPECS: list[
+    tuple[str, str, ConsultationOutcome | None, str, str | None, str]
+] = [
+    ("سارا کاظمی", DEPT_PROGRAMMING, None, "یادگیری Python از صفر", "Python مقدماتی", "در انتظار ارزیابی"),
+    ("امیرحسین مرادی", DEPT_AI, None, "ورود به مسیر ML", "یادگیری ماشین مقدماتی", "نیاز به بررسی پیش‌نیاز ریاضی"),
+    ("نیلوفر جلالی", DEPT_AI, None, "تغییر مسیر شغلی به AI", "Python برای علم داده", "مشاوره اولیه انجام نشده"),
+    ("زینب کریمی", DEPT_PROGRAMMING, None, "برنامه‌نویسی برای استارتاپ", "مبانی برنامه‌نویسی", "تماس برای تعیین وقت"),
+    ("آرین محمدی", DEPT_PROGRAMMING, ConsultationOutcome.follow_up, "آشنایی با برنامه‌نویسی", None, "نیاز به تماس مجدد"),
+    ("هلیا رستمی", DEPT_AI, ConsultationOutcome.follow_up, "علاقه به NLP", None, "منتظر ارسال رزومه"),
+    ("پویا نیکزاد", DEPT_PROGRAMMING, ConsultationOutcome.not_suitable, "دوره خیلی فشرده", None, "زمان کافی ندارد"),
+    ("رضا طاهری", DEPT_PROGRAMMING, ConsultationOutcome.pre_enroll, "توسعه‌دهنده وب", "Python مقدماتی", "آماده ثبت‌نام"),
+    ("مینا شفیعی", DEPT_PROGRAMMING, ConsultationOutcome.pre_enroll, "تغییر شغل به IT", "Python مقدماتی", "ثبت‌نام در کلاس بهار"),
+    ("کاوه انصاری", DEPT_AI, ConsultationOutcome.pre_enroll, "ML برای تحلیل داده", "یادگیری ماشین مقدماتی", "پیش‌نیاز Python دارد"),
+    ("الهام بحرینی", DEPT_AI, ConsultationOutcome.pre_enroll, "پروژه تحقیقاتی", "یادگیری ماشین مقدماتی", "دانشجوی ارشد"),
+    ("بابک رضوی", DEPT_PROGRAMMING, ConsultationOutcome.closed, "مشاوره عمومی", None, "فعلاً ثبت‌نام نمی‌کند"),
+    ("امیرحسین مرادی", DEPT_PROGRAMMING, ConsultationOutcome.refer_other_dept, "علاقه به AI", None, "ارجاع به دپارتمان هوش مصنوعی"),
+    ("شیدا عباسی", DEPT_PROGRAMMING, ConsultationOutcome.pre_enroll, "شروع از مبانی", "مبانی برنامه‌نویسی", "پیش‌ثبت‌نام"),
+    ("فرزاد امینی", DEPT_AI, ConsultationOutcome.closed, "تکمیل مسیر علم داده", "Python برای علم داده", "دوره را تمام کرده"),
 ]
 
 
-def _get_user_by_email(db, email: str) -> User | None:
-    return db.scalars(select(User).where(User.email == email)).first()
+def _get_admin(db) -> User:
+    admin = db.scalars(select(User).where(User.email == ADMIN_EMAIL)).first()
+    if admin is None:
+        raise RuntimeError(f"Admin user {ADMIN_EMAIL} not found — run migrations first.")
+    return admin
 
 
-def _get_user_by_role_key(db, role_key: str) -> User:
-    mapping = {
-        "admin": "admin@crm.local",
-        "admission": "admission@crm.local",
-        "finance": "finance@crm.local",
-        "teacher": "teacher@crm.local",
-        "manager": "manager@crm.local",
-    }
-    email = mapping[role_key]
-    user = _get_user_by_email(db, email)
-    if user is None:
-        raise RuntimeError(f"Expected seed user {email} to exist")
-    return user
+def wipe_demo_data(db) -> None:
+    """Remove all tenant data except organization and bootstrap admin."""
+    print("Wiping existing demo data…")
+    for model in (
+        Refund,
+        Payment,
+        Installment,
+        Invoice,
+        Attendance,
+        JourneyRoadmapWaiver,
+        Enrollment,
+        Task,
+        Activity,
+        Communication,
+        Consultation,
+        Journey,
+        RoadmapItem,
+        Roadmap,
+        CourseClass,
+        CoursePrerequisite,
+        Course,
+        Person,
+        Department,
+    ):
+        db.execute(delete(model).where(model.org_id == ORG_ID))
 
-
-def _already_seeded(db) -> bool:
-    return _get_user_by_email(db, SEED_MARKER_EMAIL) is not None
-
-
-def seed_users(db) -> dict[str, User]:
-    users: dict[str, User] = {}
-    for email, password, role, name, _dept_name in USER_SPECS:
-        existing = _get_user_by_email(db, email)
-        if existing:
-            users[email] = existing
-            print(f"  skip user {email}")
-            continue
-        user = User(
-            name=name,
-            email=email,
-            password_hash=hash_password(password),
-            role=role,
-            department_id=None,
-            is_active=True,
-            org_id=ORG_ID,
-        )
-        db.add(user)
-        db.flush()
-        users[email] = user
-        print(f"  created user {email}")
+    db.execute(delete(User).where(User.org_id == ORG_ID, User.id != 1))
     db.commit()
-    return users
+    print("  wiped — only admin@example.com remains")
 
 
-def seed_departments(db) -> dict[str, Department]:
-    admin = _get_user_by_role_key(db, "admin")
+def seed_departments(db, admin: User) -> dict[str, Department]:
     departments: dict[str, Department] = {}
-    for name, manager_key in DEPARTMENT_SPECS:
-        existing = db.scalars(
-            select(Department).where(Department.org_id == ORG_ID, Department.name == name)
-        ).first()
-        if existing:
-            departments[name] = existing
-            print(f"  skip department {name}")
-            continue
-        manager = _get_user_by_role_key(db, manager_key)
+    for name in (DEPT_PROGRAMMING, DEPT_AI):
         dept = Department(
             name=name,
-            manager_id=manager.id,
+            manager_id=admin.id,
             is_active=True,
             org_id=ORG_ID,
         )
@@ -200,39 +342,22 @@ def seed_departments(db) -> dict[str, Department]:
         departments[name] = dept
         print(f"  created department {name}")
     db.commit()
-
-    tech_dept = departments.get("دپارتمان فناوری و اطلاعات") or db.scalars(
-        select(Department).where(
-            Department.org_id == ORG_ID,
-            Department.name == "دپارتمان فناوری و اطلاعات",
-        )
-    ).one()
-    for email in ("teacher@crm.local", "manager@crm.local"):
-        user = _get_user_by_email(db, email)
-        if user and user.department_id != tech_dept.id:
-            user.department_id = tech_dept.id
-    db.commit()
     return departments
 
 
 def seed_courses(db, departments: dict[str, Department]) -> dict[str, Course]:
     courses: dict[str, Course] = {}
-    for title, dept_name, price in COURSE_SPECS:
-        existing = db.scalars(
-            select(Course).where(Course.org_id == ORG_ID, Course.title == title)
-        ).first()
-        if existing:
-            courses[title] = existing
-            print(f"  skip course {title}")
-            continue
-        dept = departments.get(dept_name) or db.scalars(
-            select(Department).where(Department.org_id == ORG_ID, Department.name == dept_name)
-        ).one()
+    for title, dept_name, level, price, description, sessions in COURSE_SPECS:
         course = Course(
-            department_id=dept.id,
+            department_id=departments[dept_name].id,
             title=title,
+            description=description,
+            level=level,
             current_price=price,
-            duration_sessions=12,
+            duration_sessions=sessions,
+            total_hours=sessions * 2,
+            session_duration=2.0,
+            sessions_per_week=2,
             is_active=True,
             org_id=ORG_ID,
         )
@@ -244,41 +369,149 @@ def seed_courses(db, departments: dict[str, Department]) -> dict[str, Course]:
     return courses
 
 
-def _course_key_match(title: str, key: str) -> bool:
-    return title.startswith(key) or key in title
+def seed_course_prerequisites(db, courses: dict[str, Course]) -> None:
+    created = 0
+    for course_title, prerequisite_titles in COURSE_PREREQUISITES.items():
+        course = courses[course_title]
+        for prerequisite_title in prerequisite_titles:
+            prerequisite = courses[prerequisite_title]
+            if prerequisite.department_id != course.department_id:
+                raise RuntimeError(
+                    f"Cross-department prerequisite is not allowed: {course_title} -> {prerequisite_title}"
+                )
+            db.add(
+                CoursePrerequisite(
+                    course_id=course.id,
+                    prerequisite_course_id=prerequisite.id,
+                    org_id=ORG_ID,
+                )
+            )
+            created += 1
+    db.commit()
+    print(f"  created {created} course prerequisites")
 
 
-def seed_classes(db, courses: dict[str, Course]) -> dict[str, CourseClass]:
-    classes: dict[str, CourseClass] = {}
-    course_by_key: dict[str, Course] = {}
-    for title, course in courses.items():
-        for key in ("Python", "IELTS", "UI/UX"):
-            if _course_key_match(title, key):
-                course_by_key[key] = course
+def seed_roadmaps(
+    db,
+    departments: dict[str, Department],
+    courses: dict[str, Course],
+) -> None:
+    from app.roadmap import service as roadmap_service
 
-    for name, course_key, teacher_key, status, start, end in CLASS_SPECS:
-        existing = db.scalars(
-            select(CourseClass).where(CourseClass.org_id == ORG_ID, CourseClass.name == name)
-        ).first()
-        if existing:
-            classes[name] = existing
-            print(f"  skip class {name}")
+    for roadmap_name, dept_name in ROADMAP_SPECS:
+        roadmap = Roadmap(
+            department_id=departments[dept_name].id,
+            name=roadmap_name,
+            is_active=True,
+            org_id=ORG_ID,
+        )
+        db.add(roadmap)
+        db.flush()
+        items = roadmap_service.sync_roadmap_items_from_courses(
+            db, ORG_ID, roadmap.id
+        )
+        print(f"  created roadmap {roadmap_name} ({len(items)} steps from courses)")
+    # sync_roadmap_items_from_courses already commits per roadmap.
+
+
+def assign_journey_roadmaps(db) -> None:
+    """Attach each journey to its department's active roadmap for demo progress."""
+    roadmaps_by_department: dict[int, int] = {}
+    for roadmap in db.scalars(
+        select(Roadmap).where(Roadmap.org_id == ORG_ID, Roadmap.is_active.is_(True))
+    ).all():
+        if roadmap.department_id not in roadmaps_by_department:
+            roadmaps_by_department[roadmap.department_id] = roadmap.id
+
+    updated = 0
+    for journey in db.scalars(select(Journey).where(Journey.org_id == ORG_ID)).all():
+        roadmap_id = roadmaps_by_department.get(journey.department_id)
+        if roadmap_id is not None and journey.roadmap_id != roadmap_id:
+            journey.roadmap_id = roadmap_id
+            updated += 1
+    db.commit()
+    print(f"  assigned roadmaps to {updated} journeys")
+
+
+def seed_roadmap_waivers(db, admin: User, people: list[Person]) -> None:
+    """Demonstrate clean mid-path placement via waiver (حامد) vs open gap (فرزاد)."""
+    people_by_name = {person.full_name: person for person in people}
+    hamed = people_by_name["حامد قربانی"]
+    journey = db.scalars(
+        select(Journey).where(
+            Journey.org_id == ORG_ID,
+            Journey.person_id == hamed.id,
+        )
+    ).first()
+    if journey is None or journey.roadmap_id is None:
+        print("  skipped waivers — journey/roadmap missing for حامد قربانی")
+        return
+
+    enrollments = list(
+        db.scalars(
+            select(Enrollment).where(
+                Enrollment.org_id == ORG_ID,
+                Enrollment.person_id == hamed.id,
+                Enrollment.status != EnrollmentStatus.dropped,
+            )
+        ).all()
+    )
+    enrolled_course_ids: set[int] = set()
+    for enrollment in enrollments:
+        course_class = db.get(CourseClass, enrollment.class_id)
+        if course_class is not None:
+            enrolled_course_ids.add(course_class.course_id)
+
+    items = list(
+        db.scalars(
+            select(RoadmapItem)
+            .where(
+                RoadmapItem.org_id == ORG_ID,
+                RoadmapItem.roadmap_id == journey.roadmap_id,
+            )
+            .order_by(RoadmapItem.sequence)
+        ).all()
+    )
+    live_sequences = [
+        item.sequence
+        for item in items
+        if item.course_id is not None and item.course_id in enrolled_course_ids
+    ]
+    if not live_sequences:
+        print("  skipped waivers — no mid-path enrollment on roadmap for حامد")
+        return
+
+    anchor_sequence = min(live_sequences)
+    created = 0
+    for item in items:
+        if item.course_id is None or item.sequence >= anchor_sequence:
             continue
-        course = course_by_key.get(course_key)
-        if course is None:
-            for title, c in courses.items():
-                if _course_key_match(title, course_key):
-                    course = c
-                    break
-        if course is None:
-            raise RuntimeError(f"No course matching key {course_key}")
-        teacher = _get_user_by_role_key(db, teacher_key)
+        db.add(
+            JourneyRoadmapWaiver(
+                journey_id=journey.id,
+                roadmap_item_id=item.id,
+                course_id=item.course_id,
+                reason="جایابی سطح: دانش قبلی تأیید شد (seed)",
+                waived_by=admin.id,
+                org_id=ORG_ID,
+            )
+        )
+        created += 1
+    db.commit()
+    print(f"  created {created} roadmap waivers for حامد قربانی")
+    print("  فرزاد امینی left without waivers to demo path gap")
+
+
+def seed_classes(db, courses: dict[str, Course], admin: User) -> dict[str, CourseClass]:
+    classes: dict[str, CourseClass] = {}
+    for name, course_title, status, start, end, weekdays in CLASS_SPECS:
         course_class = CourseClass(
-            course_id=course.id,
-            teacher_id=teacher.id,
+            course_id=courses[course_title].id,
+            teacher_id=admin.id,
             name=name,
             start_date=start,
             end_date=end,
+            weekdays=weekdays,
             status=status,
             org_id=ORG_ID,
         )
@@ -291,34 +524,16 @@ def seed_classes(db, courses: dict[str, Course]) -> dict[str, CourseClass]:
 
 
 def seed_people(db) -> list[Person]:
-    existing_count = db.scalar(
-        select(func.count()).select_from(Person).where(Person.org_id == ORG_ID)
-    )
-    if existing_count and existing_count >= len(PERSON_SPECS):
-        people = list(
-            db.scalars(
-                select(Person).where(Person.org_id == ORG_ID).order_by(Person.id).limit(len(PERSON_SPECS))
-            ).all()
-        )
-        print(f"  skip people ({len(people)} already exist)")
-        return people
-
     now = datetime.now(UTC)
     people: list[Person] = []
-    created = 0
-    for index, (full_name, phone, status) in enumerate(PERSON_SPECS):
-        existing = db.scalars(
-            select(Person).where(Person.org_id == ORG_ID, Person.phone == phone)
-        ).first()
-        if existing:
-            people.append(existing)
-            continue
-        created_at = now - timedelta(days=180 - index * 9)
+    for index, (full_name, phone, status, interests) in enumerate(PERSON_SPECS):
+        created_at = now - timedelta(days=120 - index * 5)
         person = Person(
             full_name=full_name,
             phone=phone,
             status=status,
-            source="وب‌سایت" if index % 2 == 0 else "معرفی",
+            interests=interests,
+            source="website" if index % 3 == 0 else "friend_referral",
             org_id=ORG_ID,
             created_at=created_at,
             updated_at=created_at,
@@ -326,97 +541,80 @@ def seed_people(db) -> list[Person]:
         db.add(person)
         db.flush()
         people.append(person)
-        created += 1
     db.commit()
-    if created:
-        print(f"  created {created} people")
-    elif people:
-        print(f"  skip people ({len(people)} already exist)")
+    print(f"  created {len(people)} people")
     return people
 
 
-def seed_consultations(db, people: list[Person], departments: dict[str, Department]) -> list[Consultation]:
-    existing_count = db.scalar(
-        select(func.count()).select_from(Consultation).where(Consultation.org_id == ORG_ID)
-    )
-    if existing_count and existing_count >= len(CONSULTATION_OUTCOMES):
-        return list(
-            db.scalars(
-                select(Consultation)
-                .where(Consultation.org_id == ORG_ID)
-                .order_by(Consultation.id)
-                .limit(len(CONSULTATION_OUTCOMES))
-            ).all()
-        )
-
-    admission = _get_user_by_role_key(db, "admission")
-    dept_names = list(departments.keys()) or [
-        "دپارتمان فناوری و اطلاعات",
-        "دپارتمان هوش مصنوعی",
-        "دپارتمان زبان بزرگسال",
-    ]
+def seed_consultations(
+    db,
+    admin: User,
+    people: list[Person],
+    departments: dict[str, Department],
+    courses: dict[str, Course],
+) -> list[Consultation]:
+    people_by_name = {p.full_name: p for p in people}
     consultations: list[Consultation] = []
-    for index, outcome in enumerate(CONSULTATION_OUTCOMES):
-        person = people[index % len(people)]
-        dept_name = dept_names[index % len(dept_names)]
-        dept = departments.get(dept_name) or db.scalars(
-            select(Department).where(Department.org_id == ORG_ID, Department.name == dept_name)
-        ).one()
+    now = datetime.now(UTC)
+
+    for index, (person_name, dept_name, outcome, goal, course_title, notes) in enumerate(
+        CONSULTATION_SPECS
+    ):
+        person = people_by_name[person_name]
+        dept = departments[dept_name]
+        journey = journey_service.get_or_create_journey(db, ORG_ID, person.id, dept.id)
+
         refer_dept_id: int | None = None
         if outcome == ConsultationOutcome.refer_other_dept:
-            ai_dept = departments.get("دپارتمان هوش مصنوعی")
-            if ai_dept is None:
-                ai_dept = db.scalars(
-                    select(Department).where(
-                        Department.org_id == ORG_ID,
-                        Department.name == "دپارتمان هوش مصنوعی",
-                    )
-                ).first()
-            refer_dept_id = ai_dept.id if ai_dept else None
+            other = DEPT_AI if dept_name == DEPT_PROGRAMMING else DEPT_PROGRAMMING
+            refer_dept_id = departments[other].id
 
+        created_at = now - timedelta(days=45 - index * 2)
         consultation = Consultation(
             person_id=person.id,
             department_id=dept.id,
-            consultant_id=admission.id,
-            current_level="متوسط" if index % 2 else "مبتدی",
-            need="یادگیری مهارت جدید",
-            goal="ارتقای شغلی",
+            consultant_id=admin.id,
+            journey_id=journey.id,
+            current_level="مبتدی" if index % 2 == 0 else "متوسط",
+            need="ارتقای مهارت فنی",
+            goal=goal,
+            recommended_course_id=courses[course_title].id if course_title else None,
             outcome=outcome,
             refer_to_department_id=refer_dept_id,
-            notes="مشاوره اولیه",
+            notes=notes,
             org_id=ORG_ID,
+            created_at=created_at,
+            updated_at=created_at,
         )
         db.add(consultation)
         db.flush()
         consultations.append(consultation)
+
     db.commit()
     print(f"  created {len(consultations)} consultations")
     return consultations
 
 
-def seed_journeys(db) -> int:
-    consultations = list(
-        db.scalars(
-            select(Consultation).where(Consultation.org_id == ORG_ID).order_by(Consultation.id)
-        ).all()
-    )
-    created = 0
-    for consultation in consultations:
-        existing = db.scalars(
-            select(Journey).where(
-                Journey.org_id == ORG_ID,
-                Journey.person_id == consultation.person_id,
-                Journey.department_id == consultation.department_id,
-            )
-        ).first()
-        if existing is not None:
-            continue
-        journey_service.get_or_create_journey(
-            db, ORG_ID, consultation.person_id, consultation.department_id
-        )
-        created += 1
-    print(f"  created {created} journeys")
-    return created
+def _consultation_for_person_dept(
+    consultations: list[Consultation],
+    person_id: int,
+    department_id: int,
+) -> Consultation | None:
+    matches = [
+        c
+        for c in consultations
+        if c.person_id == person_id
+        and c.department_id == department_id
+        and c.outcome == ConsultationOutcome.pre_enroll
+    ]
+    if matches:
+        return matches[-1]
+    matches = [
+        c
+        for c in consultations
+        if c.person_id == person_id and c.department_id == department_id
+    ]
+    return matches[-1] if matches else None
 
 
 def seed_enrollments(
@@ -424,83 +622,89 @@ def seed_enrollments(
     people: list[Person],
     classes: dict[str, CourseClass],
     courses: dict[str, Course],
+    departments: dict[str, Department],
+    consultations: list[Consultation],
 ) -> list[Enrollment]:
-    existing_count = db.scalar(
-        select(func.count()).select_from(Enrollment).where(Enrollment.org_id == ORG_ID)
-    )
-    if existing_count and existing_count >= 10:
-        return list(
-            db.scalars(
-                select(Enrollment).where(Enrollment.org_id == ORG_ID).order_by(Enrollment.id).limit(10)
-            ).all()
-        )
-
-    python_101 = classes["Python 101"]
-    python_102 = classes["Python 102"]
-    ielts = classes["IELTS Intensive"]
-
-    python_course = next(c for t, c in courses.items() if "Python" in t)
-    ielts_course = next(c for t, c in courses.items() if "IELTS" in t)
-
-    enrollment_people = people[6:16]
-    specs: list[tuple[Person, CourseClass, Course, EnrollmentStatus]] = [
-        (enrollment_people[0], python_101, python_course, EnrollmentStatus.active),
-        (enrollment_people[1], python_101, python_course, EnrollmentStatus.active),
-        (enrollment_people[2], python_101, python_course, EnrollmentStatus.active),
-        (enrollment_people[3], python_101, python_course, EnrollmentStatus.active),
-        (enrollment_people[4], python_101, python_course, EnrollmentStatus.active),
-        (enrollment_people[5], python_102, python_course, EnrollmentStatus.completed),
-        (enrollment_people[6], python_102, python_course, EnrollmentStatus.completed),
-        (enrollment_people[7], ielts, ielts_course, EnrollmentStatus.active),
-        (enrollment_people[8], ielts, ielts_course, EnrollmentStatus.pre_enroll),
-        (enrollment_people[9], ielts, ielts_course, EnrollmentStatus.dropped),
+    """Enroll students across classes with varied enrollment statuses."""
+    specs: list[tuple[str, str, EnrollmentStatus, int]] = [
+        ("رضا طاهری", "Python مقدماتی — بهار ۱۴۰۵", EnrollmentStatus.active, 1),
+        ("مینا شفیعی", "Python مقدماتی — بهار ۱۴۰۵", EnrollmentStatus.active, 2),
+        ("کاوه انصاری", "یادگیری ماشین — بهار ۱۴۰۵", EnrollmentStatus.active, 2),
+        ("الهام بحرینی", "یادگیری ماشین — بهار ۱۴۰۵", EnrollmentStatus.active, 3),
+        ("بابک رضوی", "مبانی برنامه‌نویسی — ترم جاری", EnrollmentStatus.active, 3),
+        ("شیدا عباسی", "مبانی برنامه‌نویسی — ترم جاری", EnrollmentStatus.pre_enroll, 4),
+        ("فرزاد امینی", "علم داده Python — زمستان ۱۴۰۴", EnrollmentStatus.completed, 5),
+        ("حامد قربانی", "Backend Python — پاییز ۱۴۰۴", EnrollmentStatus.completed, 6),
+        ("لادن حمیدی", "علم داده Python — زمستان ۱۴۰۴", EnrollmentStatus.completed, 6),
+        ("مهدی یزدانی", "Python مقدماتی — بهار ۱۴۰۵", EnrollmentStatus.dropped, 4),
+        ("نگار فلاح", "یادگیری ماشین — بهار ۱۴۰۵", EnrollmentStatus.dropped, 5),
     ]
 
+    people_by_name = {p.full_name: p for p in people}
+    course_dept_by_id = {c.id: c.department_id for c in courses.values()}
     enrollments: list[Enrollment] = []
-    for person, course_class, course, status in specs:
+    now = datetime.now(UTC)
+
+    for person_name, class_name, status, month in specs:
+        person = people_by_name[person_name]
+        course_class = classes[class_name]
+        course = next(c for c in courses.values() if c.id == course_class.course_id)
+        dept_id = course_dept_by_id[course.id]
+        journey = db.scalars(
+            select(Journey).where(
+                Journey.org_id == ORG_ID,
+                Journey.person_id == person.id,
+                Journey.department_id == dept_id,
+            )
+        ).first()
+        if journey is None:
+            journey = journey_service.get_or_create_journey(db, ORG_ID, person.id, dept_id)
+
+        consultation = _consultation_for_person_dept(consultations, person.id, dept_id)
+        created_at = datetime(2026, month, 10, 10, 0, tzinfo=UTC)
+
         enrollment = Enrollment(
             person_id=person.id,
             class_id=course_class.id,
+            consultation_id=consultation.id if consultation else None,
+            journey_id=journey.id,
             status=status,
             price_snapshot=course.current_price,
             discount_snapshot=0,
             final_amount=course.current_price,
             start_date=course_class.start_date,
             org_id=ORG_ID,
+            created_at=created_at,
+            updated_at=created_at,
         )
         db.add(enrollment)
         db.flush()
         enrollments.append(enrollment)
+
     db.commit()
     print(f"  created {len(enrollments)} enrollments")
     return enrollments
 
 
-def seed_invoices(db, enrollments: list[Enrollment]) -> None:
-    from app.finance.model import Invoice
-
-    created = 0
+def seed_invoices(db, enrollments: list[Enrollment]) -> list[Enrollment]:
+    """Issue two-installment invoices for non-dropped enrollments."""
+    invoiced: list[Enrollment] = []
     for index, enrollment in enumerate(enrollments):
-        invoice_row = db.scalars(
-            select(Invoice).where(
-                Invoice.org_id == ORG_ID,
-                Invoice.enrollment_id == enrollment.id,
-            )
-        ).first()
-        if invoice_row is not None:
+        if enrollment.status == EnrollmentStatus.dropped:
             continue
 
         half = enrollment.final_amount // 2
         remainder = enrollment.final_amount - half
-        if index in (4, 9):
-            first_due = date(2026, 3, 15)
-            second_due = date(2026, 6, 1)
-        elif index == 8:
-            first_due = date(2026, 9, 1)
-            second_due = date(2026, 11, 1)
+
+        if enrollment.status == EnrollmentStatus.pre_enroll:
+            first_due = date(2026, 7, 15)
+            second_due = date(2026, 9, 1)
+        elif index % 3 == 0:
+            first_due = date(2026, 5, 1)
+            second_due = date(2026, 7, 1)
         else:
-            first_due = date(2026, 2, 1)
-            second_due = date(2026, 5, 1)
+            first_due = date(2026, 6, 1)
+            second_due = date(2026, 8, 1)
 
         finance_service.issue_invoice(
             db,
@@ -513,109 +717,100 @@ def seed_invoices(db, enrollments: list[Enrollment]) -> None:
                 ],
             ),
         )
-        created += 1
+        invoiced.append(enrollment)
 
-        if enrollment.status == EnrollmentStatus.dropped:
-            finance_service.cancel_installments_on_drop(db, ORG_ID, enrollment.id)
-
-    print(f"  created invoices for {created} enrollments")
+    print(f"  created invoices for {len(invoiced)} enrollments")
+    return invoiced
 
 
-def seed_payments(db, enrollments: list[Enrollment]) -> None:
-    finance_user = _get_user_by_role_key(db, "finance")
-    from app.finance.model import Invoice
-
-    payment_plan: list[tuple[int, int, int | None]] = [
-        (0, 1, None),
-        (1, 1, None),
-        (2, 1, None),
-        (2, 2, None),
-        (3, 1, None),
-        (5, 1, None),
-        (5, 2, None),
-        (6, 1, None),
+def seed_payments(db, admin: User, enrollments: list[Enrollment]) -> None:
+    """Record payments so dashboard revenue/collection widgets have data."""
+    payment_plan: list[tuple[int, int, int | None, date]] = [
+        (0, 1, None, date(2026, 7, 5)),
+        (0, 2, None, date(2026, 7, 6)),
+        (1, 1, None, date(2026, 7, 3)),
+        (2, 1, None, date(2026, 6, 20)),
+        (3, 1, None, date(2026, 7, 1)),
+        (4, 1, None, date(2026, 6, 15)),
+        (6, 1, None, date(2026, 5, 10)),
+        (6, 2, None, date(2026, 6, 1)),
+        (7, 1, None, date(2026, 4, 5)),
+        (7, 2, None, date(2026, 5, 5)),
+        (8, 1, None, date(2026, 5, 12)),
+        (8, 2, None, date(2026, 6, 12)),
     ]
 
-    for enrollment_index, sequence, partial_amount in payment_plan:
+    for enrollment_index, sequence, partial_amount, payment_date in payment_plan:
+        if enrollment_index >= len(enrollments):
+            continue
         enrollment = enrollments[enrollment_index]
+        if enrollment.status == EnrollmentStatus.dropped:
+            continue
+
         invoice = db.scalars(
-            select(Invoice).where(Invoice.org_id == ORG_ID, Invoice.enrollment_id == enrollment.id)
+            select(Invoice).where(
+                Invoice.org_id == ORG_ID,
+                Invoice.enrollment_id == enrollment.id,
+            )
         ).first()
         if invoice is None:
             continue
+
         installments = finance_service.get_installments_for_invoice(db, ORG_ID, invoice.id)
-        installment = next(i for i in installments if i.sequence == sequence)
-        if installment.paid_amount > 0:
+        installment = next((i for i in installments if i.sequence == sequence), None)
+        if installment is None or installment.paid_amount > 0:
             continue
+
         amount = partial_amount if partial_amount is not None else installment.amount
-        if enrollment_index == 3 and sequence == 1:
+        if enrollment_index == 2 and sequence == 1:
             amount = installment.amount // 2
+
         finance_service.record_payment(
             db,
             ORG_ID,
             installment.id,
             amount,
-            finance_user.id,
-            payment_date=date(2026, 2, 15),
+            admin.id,
+            payment_date=payment_date,
         )
 
-    for enrollment_index in (3, 4):
-        enrollment = enrollments[enrollment_index]
-        invoice = db.scalars(
-            select(Invoice).where(Invoice.org_id == ORG_ID, Invoice.enrollment_id == enrollment.id)
-        ).first()
-        if invoice is None:
-            continue
-        installments = finance_service.get_installments_for_invoice(db, ORG_ID, invoice.id)
-        for inst in installments:
-            finance_service.recompute_installment_status(inst)
     db.commit()
     print("  recorded payments")
 
 
-def seed_tasks(db, people: list[Person]) -> None:
-    existing_count = db.scalar(select(func.count()).select_from(Task).where(Task.org_id == ORG_ID))
-    if existing_count and existing_count >= 10:
-        print("  skip tasks")
-        return
-
-    admission = _get_user_by_role_key(db, "admission")
-    manager = _get_user_by_role_key(db, "manager")
+def seed_tasks(db, admin: User, people: list[Person]) -> None:
     today = date.today()
-
-    task_specs: list[tuple[TaskType, str, TaskStatus, User]] = [
-        (TaskType.follow_up_registration, "پیگیری ثبت‌نام", TaskStatus.open, admission),
-        (TaskType.follow_up_registration, "تماس مجدد با متقاضی", TaskStatus.open, admission),
-        (TaskType.follow_up_registration, "ارسال اطلاعات دوره", TaskStatus.done, admission),
-        (TaskType.installment_overdue, "اقساط معوق", TaskStatus.open, manager),
-        (TaskType.installment_overdue, "یادآوری پرداخت", TaskStatus.open, manager),
-        (TaskType.pre_enroll_unpaid, "پیش‌ثبت‌نام بدون پرداخت", TaskStatus.open, admission),
-        (TaskType.pre_enroll_unpaid, "پیگیری پیش‌پرداخت", TaskStatus.done, admission),
-        (TaskType.post_course_consultation, "مشاوره پس از دوره", TaskStatus.open, manager),
-        (TaskType.post_course_consultation, "ارزیابی پایان دوره", TaskStatus.cancelled, manager),
-        (TaskType.custom, "کار سفارشی", TaskStatus.open, manager),
+    task_specs: list[tuple[TaskType, str, TaskStatus, str]] = [
+        (TaskType.follow_up_registration, "پیگیری ثبت‌نام سارا کاظمی", TaskStatus.open, "سارا کاظمی"),
+        (TaskType.follow_up_registration, "تماس مجدد هلیا رستمی", TaskStatus.open, "هلیا رستمی"),
+        (TaskType.pre_enroll_unpaid, "پیش‌ثبت‌نام بدون پرداخت — شیدا عباسی", TaskStatus.open, "شیدا عباسی"),
+        (TaskType.installment_overdue, "یادآوری قسط معوق", TaskStatus.open, "کاوه انصاری"),
+        (TaskType.post_course_consultation, "مشاوره پس از دوره — حامد قربانی", TaskStatus.open, "حامد قربانی"),
+        (TaskType.referral, "پیگیری ارجاع امیرحسین به AI", TaskStatus.open, "امیرحسین مرادی"),
+        (TaskType.custom, "ارسال بروشور دوره‌های تابستان", TaskStatus.done, "زینب کریمی"),
+        (TaskType.dormant_followup, "پیگیری سرنخ راکد", TaskStatus.open, "مهدی یزدانی"),
     ]
 
-    for index, (task_type, title, status, assignee) in enumerate(task_specs):
+    people_by_name = {p.full_name: p for p in people}
+    for index, (task_type, title, status, person_name) in enumerate(task_specs):
+        person = people_by_name[person_name]
         task = Task(
-            person_id=people[index % len(people)].id,
+            person_id=person.id,
             type=task_type,
             title=title,
-            description="وظیفه نمونه برای تست",
+            description="وظیفه نمونه برای دمو",
             due_date=today + timedelta(days=index + 1),
-            assignee_id=assignee.id,
+            assignee_id=admin.id,
             status=status,
             org_id=ORG_ID,
             completed_at=datetime.now(UTC) if status == TaskStatus.done else None,
         )
         db.add(task)
     db.commit()
-    print("  created 10 tasks")
+    print(f"  created {len(task_specs)} tasks")
 
 
-def _first_installment_for_enrollment(db, enrollment_id: int):
-    from app.finance.model import Installment, Invoice
-
+def _first_installment_for_enrollment(db, enrollment_id: int) -> Installment | None:
     invoice = db.scalars(
         select(Invoice).where(
             Invoice.org_id == ORG_ID,
@@ -633,160 +828,32 @@ def _first_installment_for_enrollment(db, enrollment_id: int):
 
 def seed_activities(
     db,
+    admin: User,
     people: list[Person],
     consultations: list[Consultation],
     enrollments: list[Enrollment],
+    departments: dict[str, Department],
 ) -> None:
-    existing_count = db.scalar(
-        select(func.count()).select_from(Activity).where(Activity.org_id == ORG_ID)
-    )
-    if existing_count:
-        db.execute(delete(Activity).where(Activity.org_id == ORG_ID))
-        db.commit()
-        print(f"  cleared {existing_count} old activities (timeline demo rebuild)")
-
-    admission = _get_user_by_role_key(db, "admission")
-    finance_user = _get_user_by_role_key(db, "finance")
+    people_by_name = {p.full_name: p for p in people}
     created = 0
 
-    demo_enrollment = enrollments[0]
-    demo_person_id = demo_enrollment.person_id
-    demo_consultation = next(
-        (c for c in consultations if c.person_id == demo_person_id),
-        consultations[0],
-    )
-    demo_installment = _first_installment_for_enrollment(db, demo_enrollment.id)
-    demo_task = db.scalars(
-        select(Task).where(Task.org_id == ORG_ID).order_by(Task.id).limit(1)
-    ).first()
-
-    log_activity(
-        db,
-        ORG_ID,
-        demo_person_id,
-        "consultation_done",
-        payload={
-            "consultation_id": demo_consultation.id,
-            "outcome": (
-                demo_consultation.outcome.value if demo_consultation.outcome else None
-            ),
-        },
-        actor_id=admission.id,
-    )
-    created += 1
-
-    log_activity(
-        db,
-        ORG_ID,
-        demo_person_id,
-        "enrollment_created",
-        payload={
-            "enrollment_id": demo_enrollment.id,
-            "class_id": demo_enrollment.class_id,
-            "status": demo_enrollment.status.value,
-        },
-        actor_id=admission.id,
-    )
-    created += 1
-
-    if demo_installment is not None:
-        log_activity(
-            db,
-            ORG_ID,
-            demo_person_id,
-            "payment_recorded",
-            payload={
-                "enrollment_id": demo_enrollment.id,
-                "installment_id": demo_installment.id,
-                "amount": demo_installment.paid_amount or demo_installment.amount // 2,
-                "invoice_id": demo_installment.invoice_id,
-            },
-            actor_id=finance_user.id,
-        )
-        created += 1
-
-    if demo_task is not None:
-        log_activity(
-            db,
-            ORG_ID,
-            demo_person_id,
-            "task_created",
-            payload={
-                "task_id": demo_task.id,
-                "task_type": demo_task.type.value,
-                "title": demo_task.title,
-                "due_date": demo_task.due_date.isoformat(),
-            },
-            actor_id=admission.id,
-        )
-        created += 1
-
-    log_activity(
-        db,
-        ORG_ID,
-        demo_person_id,
-        "manual_note",
-        payload={"note": "علاقه‌مند به کلاس عصر — پیگیری هفته آینده"},
-        actor_id=admission.id,
-    )
-    created += 1
-
-    completed_enrollment = next(
-        (e for e in enrollments if e.status == EnrollmentStatus.completed),
-        enrollments[5],
-    )
-    log_activity(
-        db,
-        ORG_ID,
-        completed_enrollment.person_id,
-        "course_completed",
-        payload={
-            "enrollment_id": completed_enrollment.id,
-            "class_id": completed_enrollment.class_id,
-        },
-        actor_id=admission.id,
-    )
-    created += 1
-
-    dropped_enrollment = next(
-        (e for e in enrollments if e.status == EnrollmentStatus.dropped),
-        enrollments[-1],
-    )
-    log_activity(
-        db,
-        ORG_ID,
-        dropped_enrollment.person_id,
-        "enrollment_dropped",
-        payload={
-            "enrollment_id": dropped_enrollment.id,
-            "reason": "عدم پرداخت به موقع",
-            "notes": "پس از دو بار یادآوری",
-        },
-        actor_id=admission.id,
-    )
-    created += 1
-
-    refund_enrollment = enrollments[3]
-    refund_installment = _first_installment_for_enrollment(db, refund_enrollment.id)
-    if refund_installment is not None:
-        log_activity(
-            db,
-            ORG_ID,
-            refund_enrollment.person_id,
-            "payment_refunded",
-            payload={
-                "enrollment_id": refund_enrollment.id,
-                "installment_id": refund_installment.id,
-                "amount": refund_installment.paid_amount or 500_000,
-                "reason": "انصراف از دوره",
-            },
-            actor_id=finance_user.id,
-        )
-        created += 1
-
-    for consultation in consultations[:5]:
-        if consultation.person_id == demo_person_id:
+    for consultation in consultations:
+        if consultation.outcome is None:
+            if consultation.person_id == people_by_name["سارا کاظمی"].id:
+                log_activity(
+                    db,
+                    ORG_ID,
+                    consultation.person_id,
+                    "consultation_assessment_saved",
+                    payload={
+                        "consultation_id": consultation.id,
+                        "fields": ["current_level", "goal"],
+                    },
+                    actor_id=admin.id,
+                )
+                created += 1
             continue
+
         log_activity(
             db,
             ORG_ID,
@@ -794,15 +861,34 @@ def seed_activities(
             "consultation_done",
             payload={
                 "consultation_id": consultation.id,
-                "outcome": (
-                    consultation.outcome.value if consultation.outcome else None
-                ),
+                "outcome": consultation.outcome.value,
+                "goal": consultation.goal,
             },
-            actor_id=admission.id,
+            actor_id=admin.id,
         )
         created += 1
 
-    for enrollment in enrollments[1:5]:
+        if consultation.outcome == ConsultationOutcome.refer_other_dept:
+            log_activity(
+                db,
+                ORG_ID,
+                consultation.person_id,
+                "consultation_referred",
+                payload={
+                    "consultation_id": consultation.id,
+                    "department_id": consultation.refer_to_department_id,
+                    "department_name": (
+                        DEPT_AI
+                        if consultation.refer_to_department_id
+                        == departments[DEPT_AI].id
+                        else DEPT_PROGRAMMING
+                    ),
+                },
+                actor_id=admin.id,
+            )
+            created += 1
+
+    for enrollment in enrollments:
         log_activity(
             db,
             ORG_ID,
@@ -813,88 +899,89 @@ def seed_activities(
                 "class_id": enrollment.class_id,
                 "status": enrollment.status.value,
             },
-            actor_id=admission.id,
+            actor_id=admin.id,
         )
         created += 1
 
         installment = _first_installment_for_enrollment(db, enrollment.id)
-        if installment is None:
-            continue
+        if installment is not None and installment.paid_amount > 0:
+            log_activity(
+                db,
+                ORG_ID,
+                enrollment.person_id,
+                "payment_recorded",
+                payload={
+                    "enrollment_id": enrollment.id,
+                    "installment_id": installment.id,
+                    "amount": installment.paid_amount,
+                    "invoice_id": installment.invoice_id,
+                },
+                actor_id=admin.id,
+            )
+            created += 1
+
+    completed = next(
+        (e for e in enrollments if e.status == EnrollmentStatus.completed),
+        None,
+    )
+    if completed:
         log_activity(
             db,
             ORG_ID,
-            enrollment.person_id,
-            "payment_recorded",
+            completed.person_id,
+            "course_completed",
             payload={
-                "enrollment_id": enrollment.id,
-                "installment_id": installment.id,
-                "amount": installment.paid_amount or installment.amount // 2,
-                "invoice_id": installment.invoice_id,
+                "enrollment_id": completed.id,
+                "class_id": completed.class_id,
             },
-            actor_id=finance_user.id,
+            actor_id=admin.id,
         )
         created += 1
+
+    dropped = next((e for e in enrollments if e.status == EnrollmentStatus.dropped), None)
+    if dropped:
+        log_activity(
+            db,
+            ORG_ID,
+            dropped.person_id,
+            "enrollment_dropped",
+            payload={
+                "enrollment_id": dropped.id,
+                "reason": "عدم پرداخت به موقع",
+            },
+            actor_id=admin.id,
+        )
+        created += 1
+
+    demo_person = people[6]
+    log_activity(
+        db,
+        ORG_ID,
+        demo_person.id,
+        "manual_note",
+        payload={"note": "علاقه‌مند به کلاس عصر — پیگیری هفته آینده"},
+        actor_id=admin.id,
+    )
+    created += 1
 
     print(f"  created {created} activities")
 
 
 def seed_communications(db, people: list[Person]) -> None:
-    from app.communication.enums import CommunicationChannel, CommunicationDirection
-    from app.communication.model import Communication
-
-    expected_count = 6
-    existing_count = db.scalar(
-        select(func.count())
-        .select_from(Communication)
-        .where(Communication.org_id == ORG_ID)
-    )
-    if existing_count:
-        db.execute(delete(Communication).where(Communication.org_id == ORG_ID))
-        db.commit()
-        if existing_count != expected_count:
-            print(f"  cleared {existing_count} old communications (timeline demo rebuild)")
-
-    demo_people = people[6:9]
-    specs: list[tuple[Person, CommunicationChannel, CommunicationDirection, str]] = [
-        (
-            demo_people[0],
-            CommunicationChannel.phone,
-            CommunicationDirection.outbound,
-            "تماس برای تأیید زمان کلاس و پرداخت اولین قسط.",
-        ),
-        (
-            demo_people[0],
-            CommunicationChannel.sms,
-            CommunicationDirection.outbound,
-            "یادآوری جلسه مشاوره فردا ساعت ۱۰.",
-        ),
-        (
-            demo_people[0],
-            CommunicationChannel.email,
-            CommunicationDirection.inbound,
-            "درخواست تغییر زمان کلاس به شیفت عصر.",
-        ),
-        (
-            demo_people[1],
-            CommunicationChannel.phone,
-            CommunicationDirection.inbound,
-            "پرسش درباره تخفیف خواهر و برادر.",
-        ),
-        (
-            demo_people[2],
-            CommunicationChannel.in_person,
-            CommunicationDirection.outbound,
-            "مراجعه حضوری برای تکمیل فرم ثبت‌نام.",
-        ),
-        (
-            people[5],
-            CommunicationChannel.chat,
-            CommunicationDirection.inbound,
-            "سؤال درباره پیش‌نیاز دوره Python.",
-        ),
+    people_by_name = {p.full_name: p for p in people}
+    specs: list[tuple[str, CommunicationChannel, CommunicationDirection, str]] = [
+        ("رضا طاهری", CommunicationChannel.phone, CommunicationDirection.outbound, "تأیید زمان کلاس Python و پرداخت قسط اول."),
+        ("سارا کاظمی", CommunicationChannel.sms, CommunicationDirection.outbound, "یادآوری جلسه مشاوره فردا ساعت ۱۰."),
+        ("مینا شفیعی", CommunicationChannel.email, CommunicationDirection.inbound, "درخواست تغییر شیفت کلاس به عصر."),
+        ("کاوه انصاری", CommunicationChannel.phone, CommunicationDirection.inbound, "پرسش درباره پیش‌نیاز یادگیری ماشین."),
+        ("امیرحسین مرادی", CommunicationChannel.in_person, CommunicationDirection.outbound, "ارجاع حضوری به دپارتمان AI."),
+        ("شیدا عباسی", CommunicationChannel.chat, CommunicationDirection.inbound, "سؤال درباره پیش‌پرداخت پیش‌ثبت‌نام."),
+        ("هلیا رستمی", CommunicationChannel.phone, CommunicationDirection.outbound, "پیگیری مدارک مشاوره."),
+        ("حامد قربانی", CommunicationChannel.email, CommunicationDirection.outbound, "دعوت به مشاوره پس از دوره."),
     ]
 
-    for person, channel, direction, content in specs:
+    for person_name, channel, direction, content in specs:
+        person = people_by_name[person_name]
         db.add(
             Communication(
                 person_id=person.id,
@@ -910,48 +997,54 @@ def seed_communications(db, people: list[Person]) -> None:
 
 
 def seed_attendances(db, enrollments: list[Enrollment]) -> None:
-    existing_count = db.scalar(
-        select(func.count()).select_from(Attendance).where(Attendance.org_id == ORG_ID)
-    )
-    if existing_count and existing_count >= 20:
-        print("  skip attendances")
-        return
-
-    python_101_enrollments = enrollments[:5]
+    python_enrollments = enrollments[:2]
     session_dates = [
-        date(2026, 1, 8),
-        date(2026, 1, 15),
-        date(2026, 1, 22),
-        date(2026, 1, 29),
+        date(2026, 3, 8),
+        date(2026, 3, 15),
+        date(2026, 3, 22),
+        date(2026, 4, 5),
     ]
     present_pattern = [
         [True, True, False, True],
         [True, False, True, True],
-        [False, True, True, False],
-        [True, True, True, True],
-        [True, False, False, True],
     ]
 
-    for enrollment_index, enrollment in enumerate(python_101_enrollments):
+    count = 0
+    for enrollment_index, enrollment in enumerate(python_enrollments):
         for session_index, session_date in enumerate(session_dates):
-            existing = db.scalars(
-                select(Attendance).where(
-                    Attendance.org_id == ORG_ID,
-                    Attendance.enrollment_id == enrollment.id,
-                    Attendance.session_date == session_date,
+            db.add(
+                Attendance(
+                    enrollment_id=enrollment.id,
+                    session_date=session_date,
+                    present=present_pattern[enrollment_index][session_index],
+                    org_id=ORG_ID,
                 )
-            ).first()
-            if existing:
-                continue
-            attendance = Attendance(
-                enrollment_id=enrollment.id,
-                session_date=session_date,
-                present=present_pattern[enrollment_index][session_index],
-                org_id=ORG_ID,
             )
-            db.add(attendance)
+            count += 1
     db.commit()
-    print("  created attendances")
+    print(f"  created {count} attendances")
+
+
+def seed_dropped_invoices(db, enrollments: list[Enrollment]) -> None:
+    """Issue then cancel invoices for dropped enrollments (timeline realism)."""
+    for enrollment in enrollments:
+        if enrollment.status != EnrollmentStatus.dropped:
+            continue
+        half = enrollment.final_amount // 2
+        remainder = enrollment.final_amount - half
+        finance_service.issue_invoice(
+            db,
+            ORG_ID,
+            InvoiceCreate(
+                enrollment_id=enrollment.id,
+                installments=[
+                    InstallmentPlanItem(sequence=1, amount=half, due_date=date(2026, 4, 1)),
+                    InstallmentPlanItem(sequence=2, amount=remainder, due_date=date(2026, 6, 1)),
+                ],
+            ),
+        )
+        finance_service.cancel_installments_on_drop(db, ORG_ID, enrollment.id)
+    print("  handled dropped-enrollment invoices")
 
 
 def main() -> None:
@@ -962,68 +1055,54 @@ def main() -> None:
             print(f"Organization id={ORG_ID} not found. Run migrations first.")
             return
 
-        if _already_seeded(db):
-            print("Seed data already present — backfilling…")
-            seed_journeys(db)
-            enrollments = list(
-                db.scalars(
-                    select(Enrollment)
-                    .where(Enrollment.org_id == ORG_ID)
-                    .order_by(Enrollment.id)
-                    .limit(10)
-                ).all()
-            )
-            consultations = list(
-                db.scalars(
-                    select(Consultation)
-                    .where(Consultation.org_id == ORG_ID)
-                    .order_by(Consultation.id)
-                ).all()
-            )
-            people = list(
-                db.scalars(
-                    select(Person).where(Person.org_id == ORG_ID).order_by(Person.id)
-                ).all()
-            )
-            seed_activities(db, people, consultations, enrollments)
-            seed_communications(db, people)
-            return
-
-        print("Seeding users…")
-        seed_users(db)
+        admin = _get_admin(db)
+        wipe_demo_data(db)
 
         print("Seeding departments…")
-        departments = seed_departments(db)
+        departments = seed_departments(db, admin)
 
         print("Seeding courses…")
         courses = seed_courses(db, departments)
+        print("Seeding course prerequisites…")
+        seed_course_prerequisites(db, courses)
+
+        print("Seeding roadmaps (prerequisites)…")
+        seed_roadmaps(db, departments, courses)
 
         print("Seeding classes…")
-        classes = seed_classes(db, courses)
+        classes = seed_classes(db, courses, admin)
 
         print("Seeding people…")
         people = seed_people(db)
 
         print("Seeding consultations…")
-        consultations = seed_consultations(db, people, departments)
-
-        print("Seeding journeys…")
-        seed_journeys(db)
+        consultations = seed_consultations(db, admin, people, departments, courses)
 
         print("Seeding enrollments…")
-        enrollments = seed_enrollments(db, people, classes, courses)
+        enrollments = seed_enrollments(
+            db, people, classes, courses, departments, consultations
+        )
+
+        print("Assigning journey roadmaps…")
+        assign_journey_roadmaps(db)
+
+        print("Seeding roadmap waivers (placement)…")
+        seed_roadmap_waivers(db, admin, people)
 
         print("Seeding invoices…")
         seed_invoices(db, enrollments)
 
+        print("Seeding dropped-enrollment invoices…")
+        seed_dropped_invoices(db, enrollments)
+
         print("Seeding payments…")
-        seed_payments(db, enrollments)
+        seed_payments(db, admin, enrollments)
 
         print("Seeding tasks…")
-        seed_tasks(db, people)
+        seed_tasks(db, admin, people)
 
         print("Seeding activities…")
-        seed_activities(db, people, consultations, enrollments)
+        seed_activities(db, admin, people, consultations, enrollments, departments)
 
         print("Seeding communications…")
         seed_communications(db, people)
@@ -1031,7 +1110,25 @@ def main() -> None:
         print("Seeding attendances…")
         seed_attendances(db, enrollments)
 
+        pending = sum(1 for c in consultations if c.outcome is None)
+        invoice_count = db.scalar(
+            select(func.count()).select_from(Invoice).where(Invoice.org_id == ORG_ID)
+        )
+        activity_count = db.scalar(
+            select(func.count()).select_from(Activity).where(Activity.org_id == ORG_ID)
+        )
+
         print("Done.")
+        print(f"  Login: {ADMIN_EMAIL} / changeme123")
+        print(f"  Departments: {DEPT_PROGRAMMING}, {DEPT_AI}")
+        print(
+            f"  Courses: {len(courses)}, Classes: {len(classes)}, People: {len(people)}"
+        )
+        print(
+            f"  Consultations: {len(consultations)} ({pending} pending), "
+            f"Enrollments: {len(enrollments)}, Invoices: {invoice_count}, "
+            f"Activities: {activity_count}"
+        )
     finally:
         db.close()
 

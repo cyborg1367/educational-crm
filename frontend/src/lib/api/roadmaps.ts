@@ -47,6 +47,12 @@ export function updateRoadmap(
   return fetchJson<RoadmapRead>(`/roadmaps/${id}`, { method: "PATCH", body });
 }
 
+export function syncRoadmapItems(
+  roadmapId: number,
+): Promise<PaginatedResponse<RoadmapItemRead>> {
+  return fetchJson(`/roadmaps/${roadmapId}/sync`, { method: "POST" });
+}
+
 export function listRoadmapItems(
   roadmapId: number,
   params: { limit?: number; offset?: number } = {},

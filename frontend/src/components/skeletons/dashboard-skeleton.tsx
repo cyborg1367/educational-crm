@@ -33,7 +33,7 @@ function DashboardSkeleton({
   return (
     <div
       className={cn(
-        "mx-auto flex w-full max-w-[1280px] flex-col gap-[var(--semantic-space-sectionGap)]",
+        "mx-auto flex w-full max-w-[1360px] flex-col gap-[var(--semantic-space-sectionGap)]",
         className,
       )}
     >

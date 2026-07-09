@@ -33,12 +33,14 @@ import {
   updateClass,
 } from "@/lib/api/finance";
 import { listCourses } from "@/lib/api/courses";
+import { listDepartments } from "@/lib/api/departments";
 import { getPerson } from "@/lib/api/people";
 import { getMe, listUsers } from "@/lib/api/users";
 import type {
   AttendanceRead,
   CourseClassRead,
   CourseRead,
+  DepartmentRead,
   EnrollmentRead,
   PersonRead,
   UserRead,
@@ -227,6 +229,7 @@ export default function ClassDetailPage() {
   const [canManage, setCanManage] = React.useState(false);
   const [departmentId, setDepartmentId] = React.useState<number | null>(null);
   const [courses, setCourses] = React.useState<CourseRead[]>([]);
+  const [departments, setDepartments] = React.useState<DepartmentRead[]>([]);
   const [teachers, setTeachers] = React.useState<UserRead[]>([]);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
@@ -296,21 +299,24 @@ export default function ClassDetailPage() {
       const cls = await getClass(classId);
       setCourseClass(cls);
 
-      const [courseData, usersRes, me, coursesRes] = await Promise.all([
-        getCourse(cls.course_id),
-        listUsers({ limit: 500 }).catch(() => ({
-          items: [],
-          total_count: 0,
-          limit: 500,
-          offset: 0,
-          has_more: false,
-        })),
-        getMe(),
-        listCourses({ limit: 500, is_active: true }),
-      ]);
+      const [courseData, usersRes, me, coursesRes, departmentsRes] =
+        await Promise.all([
+          getCourse(cls.course_id),
+          listUsers({ limit: 500 }).catch(() => ({
+            items: [],
+            total_count: 0,
+            limit: 500,
+            offset: 0,
+            has_more: false,
+          })),
+          getMe(),
+          listCourses({ limit: 500, is_active: true }),
+          listDepartments({ limit: 100 }),
+        ]);
       setCourse(courseData);
       setDepartmentId(me.department_id);
       setCourses(coursesRes.items);
+      setDepartments(departmentsRes.items);
       setTeachers(
         usersRes.items.filter(
           (user) => user.role === "teacher" && user.is_active,
@@ -704,6 +710,7 @@ export default function ClassDetailPage() {
         state={formState}
         onChange={(patch) => setFormState((prev) => ({ ...prev, ...patch }))}
         courses={availableCourses}
+        departments={departments}
         teachers={teachers}
         selectedCourse={selectedCourse}
         onSubmit={() => void handleUpdate()}

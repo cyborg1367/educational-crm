@@ -35,7 +35,7 @@ function T1DetailSkeleton({
       <PageZone name="Header">
         <div className="flex flex-col gap-[var(--primitive-space-4)]">
           <div className="flex flex-wrap items-start justify-between gap-[var(--primitive-space-4)]">
-            <h1 className="text-[length:var(--primitive-font-size-2xl)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
+            <h1 className="text-[length:var(--primitive-font-size-2xl)] font-[var(--primitive-font-weight-semibold)] tracking-tight text-[var(--semantic-color-text-primary)]">
               {title}
             </h1>
             {statusAction ? (
@@ -53,7 +53,7 @@ function T1DetailSkeleton({
 
         <PageZone
           name="Secondary"
-          className="md:w-[320px] md:shrink-0"
+          className="md:w-[340px] md:shrink-0"
         >
           {secondary}
         </PageZone>

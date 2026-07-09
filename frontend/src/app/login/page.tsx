@@ -1,8 +1,10 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 
+import { LoginHeroPanel } from "@/components/auth/login-hero-panel";
 import { ErrorState } from "@/components/feedback";
 import { FormField } from "@/components/form/form-field";
 import { TextInput } from "@/components/form/text-input";
@@ -94,47 +96,75 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--background)] p-[var(--semantic-space-pageMargin)]">
-      <div className="w-full max-w-md rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] p-[var(--semantic-space-cardPadding)] shadow-[var(--primitive-elevation-1)]">
-        <h1 className="text-center text-[length:var(--primitive-font-size-2xl)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
-          ورود به سیستم
-        </h1>
-        <p className="mt-[var(--primitive-space-2)] text-center text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
-          Educational CRM
-        </p>
-        <p className="mt-[var(--primitive-space-2)] text-center text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]">
-          dev: admin@example.com / changeme123
-        </p>
+      <div className="flex w-full max-w-[920px] overflow-hidden rounded-[var(--primitive-radius-xl)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] shadow-[var(--primitive-elevation-3)]">
+        <LoginHeroPanel />
 
-        <form
-          onSubmit={handleSubmit}
-          className="mt-[var(--semantic-space-sectionGap)] flex flex-col gap-[var(--primitive-space-4)]"
-        >
-          {error ? <ErrorState error={error} className="py-[var(--primitive-space-2)]" /> : null}
+        <div className="flex flex-1 flex-col justify-center p-[var(--primitive-space-10)] sm:p-[var(--primitive-space-12)]">
+          <div className="mx-auto w-full max-w-[360px]">
+            <div className="mb-[var(--semantic-space-sectionGap)] flex items-center gap-[var(--primitive-space-4)]">
+              <Image
+                src="/images/kadoos-logo.png"
+                alt="موسسه فنی و آموزشی کادوس"
+                width={52}
+                height={52}
+                className="size-[52px] shrink-0 object-contain"
+                priority
+              />
+              <div>
+                <p className="text-[length:var(--primitive-font-size-lg)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
+                  کادوس
+                </p>
+                <p className="text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]">
+                  سیستم مدیریت آموزشی
+                </p>
+              </div>
+            </div>
 
-          <FormField label="ایمیل" required>
-            <TextInput
-              type="text"
-              inputMode="email"
-              autoCapitalize="none"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-            />
-          </FormField>
+            <div className="mb-[var(--semantic-space-sectionGap)]">
+              <h1 className="text-[length:var(--primitive-font-size-2xl)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
+                ورود به سیستم
+              </h1>
+              <p className="mt-[var(--primitive-space-2)] text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
+                برای ادامه، اطلاعات حساب کاربری خود را وارد کنید.
+              </p>
+            </div>
 
-          <FormField label="رمز عبور" required>
-            <TextInput
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-            />
-          </FormField>
+            <form
+              onSubmit={handleSubmit}
+              className="flex flex-col gap-[var(--primitive-space-4)]"
+            >
+              {error ? <ErrorState error={error} className="py-[var(--primitive-space-2)]" /> : null}
 
-          <Button type="submit" variant="primary" size="lg" loading={loading} className="w-full">
-            ورود
-          </Button>
-        </form>
+              <FormField label="ایمیل" required>
+                <TextInput
+                  type="text"
+                  inputMode="email"
+                  autoCapitalize="none"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
+                />
+              </FormField>
+
+              <FormField label="رمز عبور" required>
+                <TextInput
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                />
+              </FormField>
+
+              <Button type="submit" variant="primary" size="lg" loading={loading} className="mt-[var(--primitive-space-2)] w-full">
+                ورود
+              </Button>
+            </form>
+
+            <p className="mt-[var(--primitive-space-6)] text-center text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]">
+              dev: admin@example.com / changeme123
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

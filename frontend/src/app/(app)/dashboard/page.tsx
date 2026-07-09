@@ -44,7 +44,7 @@ import {
 } from "@/lib/consultation/assessment";
 import type { UserRole } from "@/lib/nav/types";
 import { isConsultationIntakeTask } from "@/lib/task/consultation-task";
-import { formatCount, formatDateDisplay, formatToman, todayDisplay, todayStorage } from "@/lib/locale";
+import { formatCount, formatDateDisplay, formatPhoneDisplay, formatToman, todayDisplay, todayStorage } from "@/lib/locale";
 import { STALE_LEAD_DAYS } from "@/lib/person/stale-lead";
 import { TASK_TYPE_LABELS, terminologyLabel } from "@/lib/terminology";
 
@@ -82,8 +82,8 @@ function WidgetTable<T>({
   onRowClick?: (row: T) => void;
 }) {
   return (
-    <div className="rounded-[var(--primitive-radius-md)] bg-[var(--semantic-color-surface-card)] p-[var(--semantic-space-cardPadding)] shadow-[var(--primitive-elevation-1)]">
-      <h3 className="mb-[var(--primitive-space-3)] text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-secondary)]">
+    <div className="rounded-[var(--primitive-radius-lg)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] p-[var(--semantic-space-cardPadding)] shadow-[var(--primitive-elevation-1)]">
+      <h3 className="mb-[var(--primitive-space-4)] text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-secondary)]">
         {title}
       </h3>
       <DataTable
@@ -213,12 +213,13 @@ export default function DashboardPage() {
 
   const header = (
     <div>
-      <p className="text-[length:var(--primitive-font-size-lg)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-primary)]">
+      <p className="text-[length:var(--primitive-font-size-2xl)] font-[var(--primitive-font-weight-semibold)] tracking-tight text-[var(--semantic-color-text-primary)]">
         داشبورد
       </p>
-      <p className="mt-[var(--primitive-space-1)] text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
+      <p className="mt-[var(--primitive-space-2)] text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
         {todayDisplay()}
       </p>
+      <div className="mt-[var(--primitive-space-3)] h-0.5 w-10 rounded-full bg-[var(--primitive-color-brand-500)]" aria-hidden />
     </div>
   );
 
@@ -284,7 +285,7 @@ export default function DashboardPage() {
                   title="سرنخ‌های راکد"
                   columns={[
                     { key: "full_name", header: "نام" },
-                    { key: "phone", header: "تلفن", cell: (row) => row.phone ?? "—" },
+                    { key: "phone", header: "تلفن", cell: (row) => row.phone ? formatPhoneDisplay(row.phone) : "—" },
                     {
                       key: "created_at",
                       header: "ایجاد",
@@ -359,8 +360,8 @@ export default function DashboardPage() {
                 {
                   colSpan: 12,
                   content: (
-                    <div className="rounded-[var(--primitive-radius-md)] bg-[var(--semantic-color-surface-card)] p-[var(--semantic-space-cardPadding)] shadow-[var(--primitive-elevation-1)]">
-                      <h3 className="mb-[var(--primitive-space-3)] text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-secondary)]">
+                    <div className="rounded-[var(--primitive-radius-lg)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] p-[var(--semantic-space-cardPadding)] shadow-[var(--primitive-elevation-1)]">
+                      <h3 className="mb-[var(--primitive-space-4)] text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-secondary)]">
                         دستور کار کلاس‌ها
                       </h3>
                       <CalendarAgenda events={mapClassStartDates(classes)} mode="agenda" />

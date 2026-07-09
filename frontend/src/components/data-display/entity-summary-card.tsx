@@ -34,11 +34,12 @@ function EntitySummaryCardShell({
 }) {
   const interactive = Boolean(href || onClick);
   const sharedClassName = cn(
-    "block rounded-[var(--primitive-radius-md)] bg-[var(--semantic-color-surface-card)] p-[var(--semantic-space-cardPadding)]",
-    "shadow-[var(--primitive-elevation-1)] transition-colors",
+    "block rounded-[var(--primitive-radius-lg)] border border-[var(--semantic-color-surface-border)]",
+    "bg-[var(--semantic-color-surface-card)] p-[var(--semantic-space-cardPadding)]",
+    "shadow-[var(--primitive-elevation-1)] transition-all duration-[var(--primitive-motion-duration-fast)]",
     interactive && [
-      "cursor-pointer hover:bg-[var(--primitive-color-neutral-50)]",
-      "active:bg-[var(--primitive-color-neutral-100)]",
+      "cursor-pointer hover:border-[var(--primitive-color-neutral-300)] hover:shadow-[var(--primitive-elevation-2)]",
+      "active:bg-[var(--primitive-color-neutral-50)]",
       focusVisibleStyles,
     ],
     className,

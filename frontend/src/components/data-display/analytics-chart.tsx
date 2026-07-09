@@ -290,7 +290,8 @@ function AnalyticsChart({ data, className, height = 240 }: AnalyticsChartProps) 
   return (
     <div
       className={cn(
-        "rounded-[var(--primitive-radius-md)] bg-[var(--semantic-color-surface-card)] p-[var(--semantic-space-cardPadding)]",
+        "rounded-[var(--primitive-radius-lg)] border border-[var(--semantic-color-surface-border)]",
+        "bg-[var(--semantic-color-surface-card)] p-[var(--semantic-space-cardPadding)]",
         "shadow-[var(--primitive-elevation-1)]",
         className,
       )}

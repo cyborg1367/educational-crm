@@ -8,27 +8,23 @@ import { Checkbox } from "@/components/form/selection-control";
 import { Select } from "@/components/form/select";
 import { Textarea } from "@/components/form/textarea";
 import { TextInput } from "@/components/form/text-input";
-import { listCourses } from "@/lib/api/courses";
 import type { ApiFieldError } from "@/lib/api/error";
-import type {
-  CourseCreate,
-  CourseRead,
-  CourseUpdate,
-  DepartmentRead,
-} from "@/lib/api/types";
+import type { CourseCreate, CourseRead, CourseUpdate, DepartmentRead } from "@/lib/api/types";
 import { sortDepartmentsByInstituteCatalog } from "@/lib/department/institute-departments";
 import { formatCount } from "@/lib/locale";
+import { cn } from "@/lib/utils";
 
 export type CourseFormState = {
   title: string;
   departmentId: string;
+  prerequisiteCourseIds: string[];
   price: number | null;
+  durationSessions: string;
   totalHours: string;
   sessionDuration: string;
   sessionsPerWeek: string;
   description: string;
   isActive: boolean;
-  prerequisiteIds: number[];
 };
 
 export function emptyCourseFormState(
@@ -40,37 +36,26 @@ export function emptyCourseFormState(
   return {
     title: "",
     departmentId: sorted[0] ? String(sorted[0].id) : "",
+    prerequisiteCourseIds: [],
     price: null,
+    durationSessions: "",
     totalHours: "",
     sessionDuration: "",
     sessionsPerWeek: "",
     description: "",
     isActive: true,
-    prerequisiteIds: [],
   };
-}
-
-function computeDurationSessions(state: CourseFormState): number | null {
-  const totalHours = Number(state.totalHours);
-  const sessionDuration = Number(state.sessionDuration);
-  if (
-    !state.totalHours ||
-    !state.sessionDuration ||
-    !Number.isFinite(totalHours) ||
-    !Number.isFinite(sessionDuration) ||
-    totalHours <= 0 ||
-    sessionDuration <= 0
-  ) {
-    return null;
-  }
-  return Math.ceil(totalHours / sessionDuration);
 }
 
 export function courseFormStateToCreateBody(state: CourseFormState): CourseCreate {
   return {
     title: state.title.trim(),
     department_id: Number(state.departmentId),
+    prerequisite_course_ids: state.prerequisiteCourseIds.map(Number),
     current_price: state.price ?? 0,
+    duration_sessions: state.durationSessions
+      ? Number(state.durationSessions)
+      : null,
     total_hours: state.totalHours ? Number(state.totalHours) : null,
     session_duration: state.sessionDuration
       ? Number(state.sessionDuration)
@@ -80,7 +65,6 @@ export function courseFormStateToCreateBody(state: CourseFormState): CourseCreat
       : null,
     description: state.description.trim() || null,
     is_active: state.isActive,
-    prerequisite_ids: state.prerequisiteIds,
   };
 }
 
@@ -88,7 +72,10 @@ export function courseFormStateFromRead(course: CourseRead): CourseFormState {
   return {
     title: course.title,
     departmentId: String(course.department_id),
+    prerequisiteCourseIds: course.prerequisite_course_ids.map(String),
     price: course.current_price,
+    durationSessions:
+      course.duration_sessions != null ? String(course.duration_sessions) : "",
     totalHours: course.total_hours != null ? String(course.total_hours) : "",
     sessionDuration:
       course.session_duration != null ? String(course.session_duration) : "",
@@ -96,7 +83,6 @@ export function courseFormStateFromRead(course: CourseRead): CourseFormState {
       course.sessions_per_week != null ? String(course.sessions_per_week) : "",
     description: course.description ?? "",
     isActive: course.is_active,
-    prerequisiteIds: course.prerequisite_ids ?? [],
   };
 }
 
@@ -119,16 +105,23 @@ export function computeCourseScheduleSummary(state: CourseFormState): {
   totalSessions: number;
   weeks: number;
 } | null {
-  const totalSessions = computeDurationSessions(state);
+  const totalHours = Number(state.totalHours);
+  const sessionDuration = Number(state.sessionDuration);
   const sessionsPerWeek = Number(state.sessionsPerWeek);
   if (
-    totalSessions == null ||
+    !state.totalHours ||
+    !state.sessionDuration ||
     !state.sessionsPerWeek ||
+    !Number.isFinite(totalHours) ||
+    !Number.isFinite(sessionDuration) ||
     !Number.isFinite(sessionsPerWeek) ||
+    totalHours <= 0 ||
+    sessionDuration <= 0 ||
     sessionsPerWeek <= 0
   ) {
     return null;
   }
+  const totalSessions = Math.ceil(totalHours / sessionDuration);
   const weeks = Math.ceil(totalSessions / sessionsPerWeek);
   return { totalSessions, weeks };
 }
@@ -137,7 +130,8 @@ export type CourseFormFieldsProps = {
   state: CourseFormState;
   onChange: (patch: Partial<CourseFormState>) => void;
   departments: DepartmentRead[];
-  editingCourseId?: number | null;
+  courses: CourseRead[];
+  currentCourseId?: number | null;
   fieldError?: ApiFieldError | null;
 };
 
@@ -145,14 +139,10 @@ function CourseFormFields({
   state,
   onChange,
   departments,
-  editingCourseId = null,
+  courses,
+  currentCourseId = null,
   fieldError = null,
 }: CourseFormFieldsProps) {
-  const [departmentCourses, setDepartmentCourses] = React.useState<CourseRead[]>(
-    [],
-  );
-  const [coursesLoading, setCoursesLoading] = React.useState(false);
-
   const departmentOptions = sortDepartmentsByInstituteCatalog(
     departments.filter(
       (department) =>
@@ -164,54 +154,83 @@ function CourseFormFields({
   }));
 
   const scheduleSummary = computeCourseScheduleSummary(state);
-  const computedSessions = computeDurationSessions(state);
+
+  const selectableCourses = React.useMemo(
+    () => courses.filter((course) => course.id !== currentCourseId),
+    [courses, currentCourseId],
+  );
+
+  const departmentById = React.useMemo(
+    () => new Map(departments.map((department) => [department.id, department])),
+    [departments],
+  );
+
+  const prerequisiteDepartmentTabs = React.useMemo(() => {
+    const departmentIds = new Set<number>();
+    for (const course of selectableCourses) {
+      departmentIds.add(course.department_id);
+    }
+    if (state.departmentId) {
+      departmentIds.add(Number(state.departmentId));
+    }
+    const tabs = sortDepartmentsByInstituteCatalog(
+      [...departmentIds]
+        .map((id) => departmentById.get(id))
+        .filter((department): department is DepartmentRead => department != null),
+    ).map((department) => ({
+      id: String(department.id),
+      label: department.name,
+      count: selectableCourses.filter(
+        (course) => course.department_id === department.id,
+      ).length,
+    }));
+    return tabs;
+  }, [selectableCourses, departmentById, state.departmentId]);
+
+  const [prerequisiteDepartmentTab, setPrerequisiteDepartmentTab] =
+    React.useState(() => state.departmentId || "");
 
   React.useEffect(() => {
-    if (!state.departmentId) {
-      setDepartmentCourses([]);
+    if (
+      state.departmentId &&
+      prerequisiteDepartmentTabs.some((tab) => tab.id === state.departmentId)
+    ) {
+      setPrerequisiteDepartmentTab(state.departmentId);
+    }
+  }, [state.departmentId, prerequisiteDepartmentTabs]);
+
+  React.useEffect(() => {
+    if (prerequisiteDepartmentTabs.length === 0) {
+      setPrerequisiteDepartmentTab("");
       return;
     }
-    let cancelled = false;
-    setCoursesLoading(true);
-    void listCourses({
-      department_id: Number(state.departmentId),
-      is_active: true,
-      limit: 500,
-    })
-      .then((res) => {
-        if (!cancelled) {
-          setDepartmentCourses(res.items);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setDepartmentCourses([]);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setCoursesLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [state.departmentId]);
+    if (
+      prerequisiteDepartmentTab &&
+      prerequisiteDepartmentTabs.some((tab) => tab.id === prerequisiteDepartmentTab)
+    ) {
+      return;
+    }
+    setPrerequisiteDepartmentTab(prerequisiteDepartmentTabs[0]?.id ?? "");
+  }, [prerequisiteDepartmentTabs, prerequisiteDepartmentTab]);
 
-  const prerequisiteOptions = departmentCourses
-    .filter(
-      (course) =>
-        course.id !== editingCourseId &&
-        !state.prerequisiteIds.includes(course.id),
-    )
-    .map((course) => ({
-      value: String(course.id),
-      label: course.title,
-    }));
+  const prerequisiteOptions = React.useMemo(() => {
+    const activeDepartmentId = Number(prerequisiteDepartmentTab);
+    return selectableCourses
+      .filter((course) => course.department_id === activeDepartmentId)
+      .map((course) => ({
+        value: String(course.id),
+        label: course.title,
+      }));
+  }, [selectableCourses, prerequisiteDepartmentTab]);
 
-  const selectedPrerequisites = state.prerequisiteIds
-    .map((id) => departmentCourses.find((course) => course.id === id))
-    .filter((course): course is CourseRead => course != null);
+  const selectedPrerequisiteLabels = React.useMemo(() => {
+    const titleById = new Map(
+      selectableCourses.map((course) => [String(course.id), course.title]),
+    );
+    return state.prerequisiteCourseIds
+      .map((id) => titleById.get(id) ?? `دوره #${id}`)
+      .filter(Boolean);
+  }, [selectableCourses, state.prerequisiteCourseIds]);
 
   return (
     <div className="flex flex-col gap-[var(--primitive-space-5)]">
@@ -242,15 +261,28 @@ function CourseFormFields({
             <Select
               options={departmentOptions}
               value={state.departmentId}
-              onChange={(value) =>
-                onChange({ departmentId: value, prerequisiteIds: [] })
-              }
+              onChange={(value) => onChange({ departmentId: value })}
               placeholder={
                 departmentOptions.length === 0
                   ? "ابتدا دپارتمان تعریف کنید"
                   : "انتخاب دپارتمان"
               }
               disabled={departmentOptions.length === 0}
+            />
+          </FormField>
+
+          <FormField
+            label="تعداد جلسات"
+            error={fieldError?.field === "duration_sessions" ? fieldError : null}
+          >
+            <TextInput
+              type="number"
+              min={1}
+              value={state.durationSessions}
+              onChange={(event) =>
+                onChange({ durationSessions: event.target.value })
+              }
+              placeholder="اختیاری"
             />
           </FormField>
         </div>
@@ -263,73 +295,108 @@ function CourseFormFields({
         ) : null}
       </section>
 
-      {state.departmentId ? (
-        <section className="flex flex-col gap-[var(--primitive-space-4)]">
-          <h3 className="text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
-            پیش‌نیازها
-          </h3>
+      <section className="flex flex-col gap-[var(--primitive-space-4)]">
+        <h3 className="text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
+          پیش‌نیازها
+        </h3>
 
-          <FormField
-            label="پیش‌نیازهای این دوره"
-            error={
-              fieldError?.field === "prerequisite_ids" ? fieldError : null
-            }
-          >
+        <FormField
+          label="دوره‌های پیش‌نیاز"
+          error={
+            fieldError?.field === "prerequisite_course_ids" ? fieldError : null
+          }
+        >
+          {selectableCourses.length === 0 ? (
+            <p className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
+              هنوز دوره‌ای برای انتخاب پیش‌نیاز وجود ندارد.
+            </p>
+          ) : (
             <div className="flex flex-col gap-[var(--primitive-space-3)]">
-              <Select
-                options={prerequisiteOptions}
-                value=""
-                onChange={(value) => {
-                  if (!value) return;
-                  const id = Number(value);
-                  if (!state.prerequisiteIds.includes(id)) {
-                    onChange({
-                      prerequisiteIds: [...state.prerequisiteIds, id],
-                    });
-                  }
-                }}
-                placeholder={
-                  coursesLoading
-                    ? "در حال بارگذاری…"
-                    : prerequisiteOptions.length === 0
-                      ? "دوره‌ای برای انتخاب نیست"
-                      : "افزودن پیش‌نیاز"
-                }
-                disabled={coursesLoading || prerequisiteOptions.length === 0}
-              />
-              {selectedPrerequisites.length > 0 ? (
-                <div className="flex flex-wrap gap-[var(--primitive-space-2)]">
-                  {selectedPrerequisites.map((course) => (
+              {selectedPrerequisiteLabels.length > 0 ? (
+                <div className="flex flex-wrap gap-[var(--primitive-space-1_5)]">
+                  {selectedPrerequisiteLabels.map((label) => (
                     <span
-                      key={course.id}
-                      className="inline-flex items-center gap-[var(--primitive-space-1)] rounded-[var(--primitive-radius-full)] border border-[#E87722] bg-[color-mix(in_srgb,#E87722_12%,white)] px-[var(--primitive-space-2)] py-[var(--primitive-space-1)] text-[length:var(--primitive-font-size-xs)] text-[#E87722]"
+                      key={label}
+                      className={cn(
+                        "rounded-[var(--primitive-radius-full)] border border-[var(--primitive-color-brand-200)]",
+                        "bg-[var(--primitive-color-brand-50)] px-[var(--primitive-space-2)] py-0.5",
+                        "text-[length:var(--primitive-font-size-xs)] text-[var(--primitive-color-brand-700)]",
+                      )}
                     >
-                      {course.title}
-                      <button
-                        type="button"
-                        className="text-[#E87722] hover:opacity-70"
-                        onClick={() =>
-                          onChange({
-                            prerequisiteIds: state.prerequisiteIds.filter(
-                              (id) => id !== course.id,
-                            ),
-                          })
-                        }
-                        aria-label={`حذف ${course.title}`}
-                      >
-                        ×
-                      </button>
+                      {label}
                     </span>
                   ))}
                 </div>
               ) : null}
-              <p className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
-                دوره‌هایی که قبل از این دوره باید گذرانده شوند
-              </p>
+
+              {prerequisiteDepartmentTabs.length > 1 ? (
+                <div
+                  role="tablist"
+                  aria-label="فیلتر پیش‌نیاز بر اساس دپارتمان"
+                  className="flex gap-[var(--primitive-space-1)] overflow-x-auto border-b border-[var(--semantic-color-surface-border)]"
+                >
+                  {prerequisiteDepartmentTabs.map((tab) => {
+                    const selected = tab.id === prerequisiteDepartmentTab;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={selected}
+                        onClick={() => setPrerequisiteDepartmentTab(tab.id)}
+                        className={cn(
+                          "relative shrink-0 px-[var(--primitive-space-3)] py-[var(--primitive-space-2)]",
+                          "text-[length:var(--primitive-font-size-sm)] transition-colors",
+                          selected
+                            ? "font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-action-primary)] after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-[var(--semantic-color-action-primary)]"
+                            : "text-[var(--semantic-color-text-secondary)] hover:text-[var(--semantic-color-text-primary)]",
+                        )}
+                      >
+                        {tab.label}
+                        <span className="ms-[var(--primitive-space-1)] text-[length:var(--primitive-font-size-xs)] opacity-70">
+                          ({formatCount(tab.count)})
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+
+              {prerequisiteOptions.length === 0 ? (
+                <p className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
+                  در این دپارتمان دوره‌ای برای انتخاب نیست.
+                </p>
+              ) : (
+                <div
+                  role="tabpanel"
+                  className="grid max-h-56 grid-cols-1 gap-[var(--primitive-space-2)] overflow-y-auto md:grid-cols-2"
+                >
+                  {prerequisiteOptions.map((option) => {
+                    const checked = state.prerequisiteCourseIds.includes(
+                      option.value,
+                    );
+                    return (
+                      <Checkbox
+                        key={option.value}
+                        label={option.label}
+                        checked={checked}
+                        onChange={(event) => {
+                          const next = event.target.checked
+                            ? [...state.prerequisiteCourseIds, option.value]
+                            : state.prerequisiteCourseIds.filter(
+                                (value) => value !== option.value,
+                              );
+                          onChange({ prerequisiteCourseIds: next });
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </FormField>
-        </section>
-      ) : null}
+          )}
+        </FormField>
+      </section>
 
       <section className="flex flex-col gap-[var(--primitive-space-4)]">
         <h3 className="text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
@@ -388,18 +455,15 @@ function CourseFormFields({
           </FormField>
         </div>
 
-        {computedSessions != null ? (
-          <p className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
-            تعداد کل جلسات:{" "}
-            <span className="font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-primary)]">
-              {formatCount(computedSessions)} جلسه
-            </span>
-          </p>
-        ) : null}
-
         {scheduleSummary ? (
           <div className="rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-subtle)] px-[var(--primitive-space-4)] py-[var(--primitive-space-3)] text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
             <p>
+              تعداد کل جلسات:{" "}
+              <span className="font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-primary)]">
+                {formatCount(scheduleSummary.totalSessions)} جلسه
+              </span>
+            </p>
+            <p className="mt-[var(--primitive-space-1)]">
               مدت دوره:{" "}
               <span className="font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-primary)]">
                 حدود {formatCount(scheduleSummary.weeks)} هفته

@@ -287,6 +287,7 @@ export type CourseRead = {
   total_hours: number | null;
   session_duration: number | null;
   sessions_per_week: number | null;
+  prerequisite_course_ids: number[];
   is_active: boolean;
   prerequisite_ids: number[];
   org_id: number;
@@ -303,6 +304,7 @@ export type CourseCreate = {
   total_hours?: number | null;
   session_duration?: number | null;
   sessions_per_week?: number | null;
+  prerequisite_course_ids?: number[];
   is_active?: boolean;
   prerequisite_ids?: number[];
 };
@@ -316,6 +318,7 @@ export type CourseUpdate = {
   total_hours?: number | null;
   session_duration?: number | null;
   sessions_per_week?: number | null;
+  prerequisite_course_ids?: number[] | null;
   is_active?: boolean;
   prerequisite_ids?: number[];
 };
@@ -363,6 +366,66 @@ export type RoadmapItemUpdate = {
   title?: string | null;
   sequence?: number | null;
   course_id?: number | null;
+};
+
+export type RoadmapStepStatus =
+  | "completed"
+  | "waived"
+  | "active"
+  | "pre_enroll"
+  | "locked"
+  | "upcoming";
+
+export type RoadmapStepProgress = {
+  item_id: number;
+  sequence: number;
+  title: string;
+  course_id: number | null;
+  course_title: string | null;
+  status: RoadmapStepStatus;
+  enrollment_id: number | null;
+  waiver_id: number | null;
+};
+
+export type JourneyRoadmapWaiverRead = {
+  id: number;
+  journey_id: number;
+  roadmap_item_id: number;
+  course_id: number | null;
+  reason: string;
+  waived_by: number;
+  org_id: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type JourneyRoadmapWaiverCreate = {
+  roadmap_item_id: number;
+  reason: string;
+};
+
+export type PersonJourneyProgress = {
+  journey_id: number;
+  department_id: number;
+  department_name: string;
+  roadmap_id: number;
+  roadmap_name: string;
+  journey_status: JourneyStatus;
+  current_item_id: number | null;
+  current_item_ids: number[];
+  completed_count: number;
+  waived_count: number;
+  credited_count: number;
+  total_count: number;
+  has_path_gap: boolean;
+  gap_item_ids: number[];
+  steps: RoadmapStepProgress[];
+};
+
+export type PersonRoadmapProgressRead = {
+  person_id: number;
+  journeys: PersonJourneyProgress[];
+  selected_journey_id: number | null;
 };
 
 export type DepartmentCreate = {

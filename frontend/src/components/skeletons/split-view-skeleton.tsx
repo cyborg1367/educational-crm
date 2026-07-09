@@ -44,9 +44,9 @@ function SplitViewSkeleton({
         <PageZone
           name="Secondary"
           className={cn(
-            "min-h-[var(--primitive-space-48)] rounded-[var(--primitive-radius-md)]",
+            "min-h-[var(--primitive-space-48)] overflow-hidden rounded-[var(--primitive-radius-lg)]",
             "border border-[var(--semantic-color-surface-border)]",
-            "bg-[var(--semantic-color-surface-card)]",
+            "bg-[var(--semantic-color-surface-card)] shadow-[var(--primitive-elevation-1)]",
             "md:flex-1",
           )}
         >

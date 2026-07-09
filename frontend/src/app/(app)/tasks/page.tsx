@@ -4,14 +4,13 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { CheckSquare } from "lucide-react";
 
-import { DataTable, RelationshipCard } from "@/components/data-display";
-import type { PaginatedResponse } from "@/components/data-display/types";
-import { StatusAction, StatusBadge } from "@/components/domain";
+import {
+  TaskDetailPane,
+  TaskInboxToolbar,
+  TaskQueueList,
+  type ReferralQueueItem,
+} from "@/components/domain";
 import { EmptyState, ErrorState, useToast } from "@/components/feedback";
-import { FilterBar, type FilterValues } from "@/components/layout";
-import { Avatar } from "@/components/primitives/avatar";
-import { Badge } from "@/components/primitives/badge";
-import { Button } from "@/components/ui/button";
 import { SplitViewSkeleton } from "@/components/skeletons";
 import type { ApiError } from "@/lib/api/error";
 import { toApiError } from "@/lib/api/errors";
@@ -23,53 +22,27 @@ import type {
   DepartmentRead,
   PersonRead,
   TaskRead,
-  TaskStatus,
-  TaskType,
   UserRead,
 } from "@/lib/api/types";
 import { getMe, listUsers } from "@/lib/api/users";
 import { listTasks, updateTask } from "@/lib/api/tasks";
 import { getCurrentRole } from "@/lib/auth/role";
-import {
-  assessmentStatusLabel,
-  isConsultationAssessmentComplete,
-} from "@/lib/consultation/assessment";
+import { isConsultationAssessmentComplete } from "@/lib/consultation/assessment";
 import type { UserRole } from "@/lib/nav/types";
 import { isConsultationIntakeTask } from "@/lib/task/consultation-task";
 import {
-  buildEnrollmentWizardHref,
-  isFollowUpRegistrationTask,
-} from "@/lib/task/enrollment-from-task";
-import { formatDateDisplay } from "@/lib/locale/date";
-import { TASK_TYPE_LABELS, terminologyLabel } from "@/lib/terminology";
+  DEFAULT_TASK_SECONDARY_FILTERS,
+  filterTasksBySearch,
+  getDefaultViewChip,
+  countViewChips,
+  matchesSecondaryFilters,
+  matchesViewChip,
+  type TaskSecondaryFilters,
+  type TaskViewChipId,
+} from "@/lib/task/queue";
+import { todayStorage } from "@/lib/locale/date";
 
 const PAGE_LIMIT = 100;
-
-const emptyPage = <T,>(): PaginatedResponse<T> => ({
-  items: [],
-  total_count: 0,
-  limit: PAGE_LIMIT,
-  offset: 0,
-  has_more: false,
-});
-
-type PendingConsultationRow = ConsultationRead & {
-  person_name: string;
-  department_name: string;
-  assessment_label: string;
-};
-
-function relatedHref(task: TaskRead): string | undefined {
-  const id = task.related_entity_id;
-  if (!id || !task.related_entity_type) return undefined;
-  if (task.related_entity_type === "person") return `/people/${id}`;
-  if (task.related_entity_type === "consultation") {
-    return `/people/${task.person_id}/consultations/${id}`;
-  }
-  if (task.related_entity_type === "enrollment") return `/enrollments/${id}`;
-  if (task.related_entity_type === "invoice") return `/invoices/${id}`;
-  return undefined;
-}
 
 function consultationWizardHref(consultation: ConsultationRead): string {
   const step = isConsultationAssessmentComplete(consultation)
@@ -82,6 +55,16 @@ function tasksScopedToAssignee(role: UserRole): boolean {
   return role === "department_manager" || role === "finance";
 }
 
+function syncSelectedQuery(taskId: number | null) {
+  const url = new URL(window.location.href);
+  if (taskId == null) {
+    url.searchParams.delete("selected");
+  } else {
+    url.searchParams.set("selected", String(taskId));
+  }
+  window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+}
+
 export default function TasksPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -89,7 +72,7 @@ export default function TasksPage() {
   const [role, setRole] = React.useState<UserRole>("admin");
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<ApiError | null>(null);
-  const [tasksPage, setTasksPage] = React.useState<PaginatedResponse<TaskRead>>(emptyPage);
+  const [tasks, setTasks] = React.useState<TaskRead[]>([]);
   const [pendingConsultations, setPendingConsultations] = React.useState<
     ConsultationRead[]
   >([]);
@@ -99,13 +82,22 @@ export default function TasksPage() {
   const [departmentsById, setDepartmentsById] = React.useState<
     Map<number, DepartmentRead>
   >(new Map());
-  const [usersById, setUsersById] = React.useState<Map<number, UserRead>>(new Map());
-  const [filterValues, setFilterValues] = React.useState<FilterValues>({});
-  const [selectedTaskId, setSelectedTaskId] = React.useState<number | null>(null);
+  const [usersById, setUsersById] = React.useState<Map<number, UserRead>>(
+    new Map(),
+  );
+  const [viewChip, setViewChip] = React.useState<TaskViewChipId>("open");
+  const [secondaryFilters, setSecondaryFilters] =
+    React.useState<TaskSecondaryFilters>(DEFAULT_TASK_SECONDARY_FILTERS);
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [viewInitialized, setViewInitialized] = React.useState(false);
+  const [selectedTaskId, setSelectedTaskId] = React.useState<number | null>(
+    null,
+  );
   const [completing, setCompleting] = React.useState(false);
   const [linkedConsultation, setLinkedConsultation] =
     React.useState<ConsultationRead | null>(null);
   const [loadingConsultation, setLoadingConsultation] = React.useState(false);
+  const [today] = React.useState(() => todayStorage());
 
   React.useEffect(() => {
     setRole(getCurrentRole());
@@ -148,7 +140,7 @@ export default function TasksPage() {
         consultations = consultationRes.items;
       }
 
-      setTasksPage(tasksRes);
+      setTasks(tasksRes.items);
       setPendingConsultations(consultations);
       setPeopleById(new Map(peopleRes.items.map((person) => [person.id, person])));
       setDepartmentsById(
@@ -178,72 +170,76 @@ export default function TasksPage() {
   const operationalTasks = React.useMemo(
     () =>
       role === "department_manager"
-        ? tasksPage.items.filter((task) => !isConsultationIntakeTask(task))
-        : tasksPage.items,
-    [tasksPage.items, role],
+        ? tasks.filter((task) => !isConsultationIntakeTask(task))
+        : tasks,
+    [tasks, role],
   );
 
-  const filteredTasks = React.useMemo(() => {
-    const selectedTypes = Array.isArray(filterValues.type)
-      ? (filterValues.type as string[])
-      : [];
-    const status =
-      typeof filterValues.status === "string"
-        ? (filterValues.status as TaskStatus)
-        : undefined;
-    const assignee = typeof filterValues.assignee === "string" ? filterValues.assignee : undefined;
+  React.useEffect(() => {
+    if (loading || viewInitialized) return;
+    const counts = countViewChips(operationalTasks, today);
+    setViewChip(getDefaultViewChip(counts));
+    setViewInitialized(true);
+  }, [loading, operationalTasks, today, viewInitialized]);
 
-    return operationalTasks.filter((task) => {
-      if (selectedTypes.length > 0 && !selectedTypes.includes(task.type)) {
+  const peopleNames = React.useMemo(() => {
+    const map = new Map<number, string>();
+    for (const [id, person] of peopleById) {
+      map.set(id, person.full_name);
+    }
+    return map;
+  }, [peopleById]);
+
+  const filteredTasks = React.useMemo(() => {
+    const base = operationalTasks.filter((task) => {
+      if (!matchesSecondaryFilters(task, secondaryFilters)) {
         return false;
       }
-      if (status && task.status !== status) {
-        return false;
-      }
-      if (assignee === "unassigned" && task.assignee_id !== null) {
-        return false;
-      }
-      if (assignee && assignee !== "unassigned" && String(task.assignee_id ?? "") !== assignee) {
+      if (
+        secondaryFilters.status === "open" &&
+        !matchesViewChip(task, viewChip, today)
+      ) {
         return false;
       }
       return true;
     });
-  }, [operationalTasks, filterValues]);
+    return filterTasksBySearch(base, searchQuery, peopleNames);
+  }, [
+    operationalTasks,
+    secondaryFilters,
+    viewChip,
+    today,
+    searchQuery,
+    peopleNames,
+  ]);
 
-  const pendingRows: PendingConsultationRow[] = React.useMemo(
+  const referrals: ReferralQueueItem[] = React.useMemo(
     () =>
-      pendingConsultations.map((consultation) => ({
-        ...consultation,
-        person_name:
-          peopleById.get(consultation.person_id)?.full_name ??
-          `#${consultation.person_id}`,
-        department_name:
-          departmentsById.get(consultation.department_id)?.name ?? "—",
-        assessment_label: assessmentStatusLabel(consultation),
-      })),
-    [pendingConsultations, peopleById, departmentsById],
+      role === "department_manager"
+        ? pendingConsultations.map((consultation) => ({
+            ...consultation,
+            person_name:
+              peopleById.get(consultation.person_id)?.full_name ??
+              `#${consultation.person_id}`,
+            department_name:
+              departmentsById.get(consultation.department_id)?.name ?? "—",
+          }))
+        : [],
+    [role, pendingConsultations, peopleById, departmentsById],
   );
+
+  const assigneeNames = React.useMemo(() => {
+    const map = new Map<number, string>();
+    for (const [id, user] of usersById) {
+      map.set(id, user.name);
+    }
+    return map;
+  }, [usersById]);
 
   const selectedTask = React.useMemo(
     () => filteredTasks.find((task) => task.id === selectedTaskId) ?? null,
     [filteredTasks, selectedTaskId],
   );
-
-  const selectedTaskIsConsultationIntake =
-    selectedTask != null && isConsultationIntakeTask(selectedTask);
-
-  const selectedTaskPersonName = selectedTask
-    ? (peopleById.get(selectedTask.person_id)?.full_name ??
-      `#${selectedTask.person_id}`)
-    : "";
-
-  const showStartEnrollment =
-    selectedTask != null && isFollowUpRegistrationTask(selectedTask);
-
-  const enrollmentWizardHref =
-    selectedTask && showStartEnrollment
-      ? buildEnrollmentWizardHref(selectedTask, linkedConsultation)
-      : null;
 
   React.useEffect(() => {
     if (
@@ -279,48 +275,34 @@ export default function TasksPage() {
     };
   }, [selectedTask]);
 
-  const facets = React.useMemo(() => {
-    const items = [
-      {
-        id: "type",
-        type: "multi" as const,
-        label: "نوع",
-        options: (Object.keys(TASK_TYPE_LABELS) as TaskType[]).map((type) => ({
-          value: type,
-          label: TASK_TYPE_LABELS[type],
-        })),
-      },
-      {
-        id: "status",
-        type: "select" as const,
-        label: "وضعیت",
-        placeholder: "همه",
-        options: [
-          { value: "open", label: terminologyLabel("open") },
-          { value: "done", label: terminologyLabel("done") },
-          { value: "cancelled", label: terminologyLabel("cancelled") },
-        ],
-      },
-    ];
+  const handleSelectTask = React.useCallback((taskId: number) => {
+    setSelectedTaskId(taskId);
+    syncSelectedQuery(taskId);
+  }, []);
 
-    if (role === "admin") {
-      items.splice(1, 0, {
-        id: "assignee",
-        type: "select" as const,
-        label: "مسئول",
-        placeholder: "همه",
-        options: [
-          { value: "unassigned", label: "بدون مسئول" },
-          ...Array.from(usersById.values()).map((user) => ({
-            value: String(user.id),
-            label: user.name,
-          })),
-        ],
-      });
-    }
+  const handleViewChipChange = React.useCallback((chip: TaskViewChipId) => {
+    setViewChip(chip);
+    setSecondaryFilters((prev) =>
+      prev.status === "open" ? prev : { ...prev, status: "open" },
+    );
+  }, []);
 
-    return items;
-  }, [role, usersById]);
+  const handleSecondaryFiltersChange = React.useCallback(
+    (filters: TaskSecondaryFilters) => {
+      setSecondaryFilters(filters);
+      if (filters.status !== "open") {
+        setViewChip("open");
+      }
+    },
+    [],
+  );
+
+  const handleResetAll = React.useCallback(() => {
+    const counts = countViewChips(operationalTasks, today);
+    setViewChip(getDefaultViewChip(counts));
+    setSecondaryFilters(DEFAULT_TASK_SECONDARY_FILTERS);
+    setSearchQuery("");
+  }, [operationalTasks, today]);
 
   const handleMarkComplete = React.useCallback(async () => {
     if (!selectedTask || selectedTask.status !== "open") return;
@@ -328,10 +310,9 @@ export default function TasksPage() {
     setCompleting(true);
     try {
       const updated = await updateTask(selectedTask.id, { status: "done" });
-      setTasksPage((prev) => ({
-        ...prev,
-        items: prev.items.map((task) => (task.id === updated.id ? updated : task)),
-      }));
+      setTasks((prev) =>
+        prev.map((task) => (task.id === updated.id ? updated : task)),
+      );
       toast({ variant: "success", title: "وظیفه تکمیل شد" });
     } catch (err) {
       toast({
@@ -348,190 +329,61 @@ export default function TasksPage() {
     return <ErrorState error={error} />;
   }
 
-  const referralSection =
-    role === "department_manager" ? (
-      <div className="mb-[var(--primitive-space-sectionGap)] rounded-[var(--primitive-radius-md)] bg-[var(--semantic-color-surface-card)] p-[var(--semantic-space-cardPadding)] shadow-[var(--primitive-elevation-1)]">
-        <h2 className="mb-[var(--primitive-space-3)] text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-secondary)]">
-          ارجاع‌های مشاوره
-        </h2>
-        <DataTable
-          columns={[
-            { key: "person", header: "شخص", cell: (row) => row.person_name },
-            {
-              key: "department",
-              header: "دپارتمان",
-              cell: (row) => row.department_name,
-            },
-            {
-              key: "assessment",
-              header: "ارزیابی",
-              cell: (row) => row.assessment_label,
-            },
-            {
-              key: "created_at",
-              header: "تاریخ",
-              align: "end",
-              cell: (row) => formatDateDisplay(row.created_at.slice(0, 10)),
-            },
-            {
-              key: "action",
-              header: "",
-              align: "end",
-              cell: (row) => (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    router.push(consultationWizardHref(row));
-                  }}
-                >
-                  ادامه مشاوره
-                </Button>
-              ),
-            },
-          ]}
-          data={{
-            ...emptyPage<PendingConsultationRow>(),
-            items: pendingRows,
-            total_count: pendingRows.length,
-          }}
-          loading={loading}
-          onRowClick={(row) => router.push(consultationWizardHref(row))}
-          emptyMessage="ارجاع مشاوره‌ای در انتظار نیست"
-        />
-      </div>
-    ) : null;
-
   return (
     <div className="flex h-full flex-col">
-      {referralSection}
       <div className="min-h-0 flex-1">
         <SplitViewSkeleton
           filterBar={
-            role === "department_manager" ? null : (
-              <FilterBar
-                facets={facets}
-                values={filterValues}
-                onValuesChange={setFilterValues}
-              />
-            )
+            <TaskInboxToolbar
+              tasks={operationalTasks}
+              today={today}
+              viewChip={viewChip}
+              onViewChipChange={handleViewChipChange}
+              secondaryFilters={secondaryFilters}
+              onSecondaryFiltersChange={handleSecondaryFiltersChange}
+              searchQuery={searchQuery}
+              onSearchQueryChange={setSearchQuery}
+              onResetAll={handleResetAll}
+              showAssigneeFilter={role === "admin"}
+              users={Array.from(usersById.values())}
+            />
           }
           table={
-            <div className="flex h-full flex-col">
-              {role === "department_manager" ? (
-                <h2 className="mb-[var(--primitive-space-3)] px-[var(--primitive-space-1)] text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-secondary)]">
-                  سایر وظایف
-                </h2>
-              ) : null}
-              <DataTable
-                columns={[
-                  {
-                    key: "type",
-                    header: "نوع",
-                    cell: (row) => TASK_TYPE_LABELS[row.type],
-                  },
-                  { key: "title", header: "عنوان" },
-                  {
-                    key: "due_date",
-                    header: "موعد",
-                    align: "end",
-                    cell: (row) => formatDateDisplay(row.due_date),
-                  },
-                  {
-                    key: "assignee",
-                    header: "مسئول",
-                    cell: (row) => {
-                      const assignee = row.assignee_id
-                        ? usersById.get(row.assignee_id)
-                        : null;
-                      return assignee ? (
-                        <Avatar name={assignee.name} size="xs" />
-                      ) : (
-                        <span className="text-[var(--semantic-color-text-secondary)]">—</span>
-                      );
-                    },
-                  },
-                  {
-                    key: "status",
-                    header: "وضعیت",
-                    cell: (row) => <StatusBadge domain="task" value={row.status} />,
-                  },
-                ]}
-                data={{
-                  ...tasksPage,
-                  items: filteredTasks,
-                  total_count: filteredTasks.length,
-                  has_more: false,
-                }}
-                loading={loading}
-                onRowClick={(task) => setSelectedTaskId(task.id)}
-                selectedIds={selectedTaskId ? [String(selectedTaskId)] : []}
-                emptyMessage="وظیفه‌ای یافت نشد"
-              />
-            </div>
+            <TaskQueueList
+              tasks={filteredTasks}
+              today={today}
+              selectedTaskId={selectedTaskId}
+              peopleNames={peopleNames}
+              assigneeNames={assigneeNames}
+              onSelectTask={handleSelectTask}
+              loading={loading}
+              referrals={referrals}
+              onOpenReferral={(row) => router.push(consultationWizardHref(row))}
+            />
           }
           emptyState={
             <EmptyState icon={CheckSquare} message="یک وظیفه انتخاب کنید" />
           }
           detail={
             selectedTask ? (
-              <div className="flex h-full flex-col gap-[var(--primitive-space-4)] p-[var(--primitive-space-5)]">
-                <h2 className="text-[length:var(--primitive-font-size-xl)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
-                  {selectedTask.title}
-                </h2>
-                <div className="flex flex-wrap items-center gap-[var(--primitive-space-2)]">
-                  <Badge>{TASK_TYPE_LABELS[selectedTask.type]}</Badge>
-                  <span className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
-                    موعد: {formatDateDisplay(selectedTask.due_date)}
-                  </span>
-                </div>
-                <p className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-primary)]">
-                  {selectedTask.description?.trim() || "—"}
-                </p>
-                <RelationshipCard
-                  label="دانش‌پذیر"
-                  title={selectedTaskPersonName}
-                  href={`/people/${selectedTask.person_id}`}
-                />
-                {selectedTask.related_entity_type &&
-                selectedTask.related_entity_type !== "person" ? (
-                  <RelationshipCard
-                    label="ارتباط"
-                    title={`${selectedTask.related_entity_type} #${selectedTask.related_entity_id ?? "—"}`}
-                    href={relatedHref(selectedTask)}
-                  />
-                ) : null}
-                {selectedTaskIsConsultationIntake ? (
-                  <p className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
-                    ابتدا نتیجه مشاوره را از بخش «ارجاع‌های مشاوره» ثبت کنید.
-                  </p>
-                ) : (
-                  <div className="flex flex-col gap-[var(--primitive-space-3)]">
-                    {showStartEnrollment ? (
-                      <Button
-                        type="button"
-                        variant="primary"
-                        disabled={loadingConsultation}
-                        onClick={() => {
-                          if (enrollmentWizardHref) {
-                            router.push(enrollmentWizardHref);
-                          }
-                        }}
-                      >
-                        شروع ثبت‌نام
-                      </Button>
-                    ) : null}
-                    <StatusAction
-                      entity="task"
-                      status={selectedTask.status}
-                      onAction={() => void handleMarkComplete()}
-                      className={completing ? "pointer-events-none opacity-60" : undefined}
-                    />
-                  </div>
-                )}
-              </div>
+              <TaskDetailPane
+                task={selectedTask}
+                personName={
+                  peopleNames.get(selectedTask.person_id) ??
+                  `#${selectedTask.person_id}`
+                }
+                assigneeName={
+                  selectedTask.assignee_id
+                    ? (assigneeNames.get(selectedTask.assignee_id) ?? null)
+                    : null
+                }
+                linkedConsultation={linkedConsultation}
+                loadingConsultation={loadingConsultation}
+                completing={completing}
+                onMarkComplete={() => void handleMarkComplete()}
+                onNavigate={(href) => router.push(href)}
+                today={today}
+              />
             ) : null
           }
         />

@@ -42,16 +42,23 @@ function StatCard({
   return (
     <div
       className={cn(
-        "rounded-[var(--primitive-radius-md)] bg-[var(--semantic-color-surface-card)] p-[var(--semantic-space-cardPadding)]",
+        "relative overflow-hidden rounded-[var(--primitive-radius-lg)]",
+        "border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)]",
+        "p-[var(--semantic-space-cardPadding)]",
         "shadow-[var(--primitive-elevation-1)]",
+        "transition-shadow duration-[var(--primitive-motion-duration-base)] hover:shadow-[var(--primitive-elevation-2)]",
         className,
       )}
     >
+      <div
+        className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-l from-[var(--primitive-color-brand-500)] to-[var(--primitive-color-brand-300)]"
+        aria-hidden
+      />
       <p className="text-[length:var(--primitive-font-size-sm)] leading-[var(--primitive-font-lineHeight-sm)] text-[var(--semantic-color-text-secondary)]">
         {label}
       </p>
-      <div className="mt-[var(--primitive-space-2)] flex flex-wrap items-end gap-[var(--primitive-space-2)]">
-        <p className="text-[length:var(--primitive-font-size-2xl)] font-[var(--primitive-font-weight-semibold)] leading-[var(--primitive-font-lineHeight-2xl)] text-[var(--semantic-color-text-primary)]">
+      <div className="mt-[var(--primitive-space-3)] flex flex-wrap items-end gap-[var(--primitive-space-2)]">
+        <p className="text-[length:var(--primitive-font-size-2xl)] font-[var(--primitive-font-weight-semibold)] leading-[var(--primitive-font-lineHeight-2xl)] tracking-tight text-[var(--semantic-color-text-primary)]">
           {displayValue}
         </p>
         {trend ? (

@@ -40,19 +40,26 @@ function NavLink({
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex min-h-[var(--primitive-space-10)] items-center gap-[var(--primitive-space-3)]",
+        "relative flex min-h-[var(--primitive-space-10)] items-center gap-[var(--primitive-space-3)]",
         "rounded-[var(--primitive-radius-md)] px-[var(--primitive-space-3)]",
         "text-[length:var(--primitive-font-size-sm)] leading-[var(--primitive-font-lineHeight-sm)]",
-        "transition-colors",
+        "transition-all duration-[var(--primitive-motion-duration-fast)]",
         active
-          ? "bg-[var(--primitive-color-brand-50)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-action-primary)]"
-          : "text-[var(--semantic-color-text-primary)] hover:bg-[var(--primitive-color-neutral-100)] active:bg-[var(--primitive-color-neutral-200)]",
+          ? [
+              "bg-[var(--primitive-color-brand-500)]/12 font-[var(--primitive-font-weight-medium)] text-[var(--primitive-color-brand-400)]",
+              "before:absolute before:inset-y-1.5 before:w-0.5 before:rounded-full before:bg-[var(--primitive-color-brand-500)]",
+              "before:start-0",
+            ]
+          : "text-[var(--primitive-color-neutral-400)] hover:bg-white/5 hover:text-[var(--primitive-color-neutral-200)]",
         focusVisibleStyles,
       )}
     >
       {Icon ? (
         <Icon
-          className="size-[var(--primitive-space-5)] shrink-0"
+          className={cn(
+            "size-[var(--primitive-space-5)] shrink-0",
+            active ? "text-[var(--primitive-color-brand-400)]" : "opacity-70",
+          )}
           aria-hidden
         />
       ) : null}
@@ -75,7 +82,7 @@ function SidebarNav({
       {navTree.map((group) => (
         <div key={group.id}>
           {group.label ? (
-            <p className="mb-[var(--primitive-space-2)] px-[var(--primitive-space-3)] text-[length:var(--primitive-font-size-xs)] font-[var(--primitive-font-weight-medium)] uppercase tracking-wide text-[var(--semantic-color-text-secondary)]">
+            <p className="mb-[var(--primitive-space-2)] px-[var(--primitive-space-3)] text-[length:var(--primitive-font-size-xs)] font-[var(--primitive-font-weight-medium)] tracking-wide text-[var(--primitive-color-neutral-600)]">
               {group.label}
             </p>
           ) : null}

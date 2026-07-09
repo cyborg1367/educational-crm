@@ -24,7 +24,7 @@ function Breadcrumb({ crumbs, className }: BreadcrumbProps) {
   }
 
   return (
-    <nav aria-label="مسیر ناوبری" className={className}>
+    <nav aria-label="مسیر ناوبری" className={cn("text-[length:var(--primitive-font-size-sm)]", className)}>
       <ol className="flex flex-wrap items-center gap-[var(--primitive-space-2)]">
         {crumbs.map((crumb, index) => {
           const isLast = index === crumbs.length - 1;

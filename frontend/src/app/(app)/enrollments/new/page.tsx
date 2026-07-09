@@ -21,11 +21,13 @@ import {
   getPerson,
   listClasses,
 } from "@/lib/api/finance";
+import { getPersonRoadmapProgress } from "@/lib/api/people";
 import { updateTask } from "@/lib/api/tasks";
 import type {
   CourseClassRead,
   CourseRead,
   PersonRead,
+  PersonRoadmapProgressRead,
 } from "@/lib/api/types";
 import { canManageEnrollments } from "@/lib/auth/role";
 import {
@@ -38,6 +40,7 @@ import {
   formatDateDisplay,
   formatToman,
 } from "@/lib/locale";
+import { wouldEnrollmentCreatePathGap } from "@/lib/roadmap/graph";
 
 const WIZARD_STEPS = [
   { id: "class", label: "انتخاب کلاس" },
@@ -98,7 +101,10 @@ function NewEnrollmentWizard() {
   );
 
   const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [pathGapConfirmOpen, setPathGapConfirmOpen] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
+  const [roadmapProgress, setRoadmapProgress] =
+    React.useState<PersonRoadmapProgressRead | null>(null);
 
   const selectedClass = React.useMemo(
     () => classes.find((cls) => String(cls.id) === selectedClassId) ?? null,
@@ -124,10 +130,12 @@ function NewEnrollmentWizard() {
     setLoading(true);
     setError(null);
     try {
-      const [personData, classesRes] = await Promise.all([
+      const [personData, classesRes, progressRes] = await Promise.all([
         getPerson(personId),
         listClasses({ limit: 500 }),
+        getPersonRoadmapProgress(personId).catch(() => null),
       ]);
+      setRoadmapProgress(progressRes);
       let openClasses = classesRes.items.filter(
         (cls) => cls.status === "planned" || cls.status === "active",
       );
@@ -181,9 +189,21 @@ function NewEnrollmentWizard() {
     };
   });
 
+  const createsPathGap =
+    selectedCourse != null &&
+    wouldEnrollmentCreatePathGap(roadmapProgress, selectedCourse.id);
+
   const discountValid = discount >= 0 && discount <= priceSnapshot;
   const step1Valid = Boolean(selectedClassId);
   const step2Valid = priceSnapshot > 0 && discountValid;
+
+  const openFinalConfirm = () => {
+    if (createsPathGap) {
+      setPathGapConfirmOpen(true);
+      return;
+    }
+    setConfirmOpen(true);
+  };
 
   const handleNext = () => {
     if (step === 1) {
@@ -192,7 +212,7 @@ function NewEnrollmentWizard() {
       return;
     }
     if (step === 2) {
-      setConfirmOpen(true);
+      openFinalConfirm();
       return;
     }
     setStep((current) => current + 1);
@@ -369,6 +389,27 @@ function NewEnrollmentWizard() {
           />
         ) : null}
       </WizardSkeleton>
+
+      <ConfirmDialog
+        tier={3}
+        open={pathGapConfirmOpen}
+        onOpenChange={setPathGapConfirmOpen}
+        title="ثبت‌نام وسط مسیر"
+        body="این دوره داخل مسیر است ولی مراحل قبل هنوز تکمیل یا معاف نشده‌اند."
+        consequences={[
+          "بعد از ثبت‌نام، در تب «نقشه راه» هشدار شکاف مسیر نمایش داده می‌شود",
+          "برای تمیز شدن منطقی مسیر باید مراحل قبل را معاف‌سازی کنید یا enrollment واقعی ثبت کنید",
+          "ادامه ثبت‌نام الان بلاک نمی‌شود",
+        ]}
+        confirmLabel="ادامه ثبت‌نام"
+        cancelLabel="انصراف"
+        confirmVariant="primary"
+        onConfirm={() => {
+          setPathGapConfirmOpen(false);
+          setConfirmOpen(true);
+        }}
+        onCancel={() => setPathGapConfirmOpen(false)}
+      />
 
       <ConfirmDialog
         tier={2}

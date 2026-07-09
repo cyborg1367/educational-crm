@@ -53,7 +53,7 @@ import { InvoicePrintActions } from "@/components/invoice/invoice-print-actions"
 import type { InvoiceData } from "@/lib/pdf/types";
 import { canManageFinance } from "@/lib/auth/role";
 import { refundableBalance } from "@/lib/finance/preflight";
-import { formatDateDisplay, formatToman } from "@/lib/locale";
+import { formatDateDisplay, formatPhoneDisplay, formatToman } from "@/lib/locale";
 
 const INVOICE_LOCK_REASON = "مبلغ فاکتور پس از صدور قابل تغییر نیست";
 
@@ -322,7 +322,7 @@ export default function InvoiceDetailPage() {
                 />
 
                 <section>
-                  <h2 className="mb-[var(--primitive-space-3)] text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-primary)]">
+                  <h2 className="mb-[var(--primitive-space-4)] text-[length:var(--primitive-font-size-base)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
                     اقساط
                   </h2>
                   <FinancialTable
@@ -377,7 +377,7 @@ export default function InvoiceDetailPage() {
                 </section>
 
                 <section>
-                  <h2 className="mb-[var(--primitive-space-3)] text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-primary)]">
+                  <h2 className="mb-[var(--primitive-space-4)] text-[length:var(--primitive-font-size-base)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
                     پرداخت‌ها
                   </h2>
                   <DataTable
@@ -434,7 +434,7 @@ export default function InvoiceDetailPage() {
                 </section>
 
                 <section>
-                  <h2 className="mb-[var(--primitive-space-3)] text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-primary)]">
+                  <h2 className="mb-[var(--primitive-space-4)] text-[length:var(--primitive-font-size-base)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
                     بازپرداخت‌ها
                   </h2>
                   <DataTable
@@ -477,7 +477,9 @@ export default function InvoiceDetailPage() {
             <RelationshipCard
               label="شخص"
               title={person.full_name}
-              subtitle={person.phone ?? undefined}
+              subtitle={
+                person.phone ? formatPhoneDisplay(person.phone) : undefined
+              }
               href={`/people/${person.id}`}
             />
           </div>

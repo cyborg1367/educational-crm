@@ -18,14 +18,16 @@ function CascadeConsequenceList({
   return (
     <div
       className={cn(
-        "rounded-[var(--primitive-radius-md)]",
-        "border border-[var(--semantic-color-status-danger-strong)]",
+        "rounded-[var(--primitive-radius-lg)]",
+        "border border-[var(--semantic-color-status-danger)]/20",
         "bg-[var(--semantic-color-surface-danger-subtle)]",
-        "p-[var(--semantic-space-cardPadding)]",
-        "shadow-[var(--semantic-confirmationTier-tier3-elevation)]",
+        "px-[var(--primitive-space-4)] py-[var(--primitive-space-3)]",
         className,
       )}
     >
+      <p className="mb-[var(--primitive-space-2)] text-[length:var(--primitive-font-size-xs)] font-[var(--primitive-font-weight-semibold)] tracking-wide text-[var(--semantic-color-status-danger-strong)]">
+        پیامدها
+      </p>
       <ul
         className={cn(
           "list-disc space-y-[var(--primitive-space-2)]",
