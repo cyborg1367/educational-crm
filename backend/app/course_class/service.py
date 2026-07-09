@@ -111,7 +111,35 @@ def update_class(
     return course_class
 
 
-def delete_class(db: Session, org_id: int, class_id: int) -> None:
+def delete_class(
+    db: Session, org_id: int, class_id: int, *, actor: User | None = None
+) -> None:
+    from sqlalchemy import func
+
+    from app.enrollment.model import Enrollment
+
     course_class = get_class(db, org_id, class_id)
+
+    active_enrollments = db.scalar(
+        select(func.count(Enrollment.id)).where(
+            Enrollment.class_id == class_id,
+            Enrollment.status.in_(["enrolled", "active"]),
+        )
+    )
+    if active_enrollments and active_enrollments > 0:
+        raise ValidationError(
+            "Cannot delete class with active enrollments. Please drop all active enrollments first.",
+            field="class_id",
+        )
+
     db.delete(course_class)
     db.commit()
+
+    if actor is not None:
+        workflow_service.log_activity(
+            db,
+            org_id,
+            action="class_deleted",
+            actor_id=actor.id,
+            payload={"class_id": class_id, "class_name": course_class.name},
+        )
