@@ -12,6 +12,7 @@ export { Timeline, type TimelineProps } from "./timeline";
 export { mergeTimelineEntries, type TimelineEntry } from "@/lib/timeline/merge";
 export { CalendarAgenda, type CalendarAgendaProps } from "./calendar-agenda";
 export {
+  mapClassSessions,
   mapClassStartDates,
   mapInstallmentDueDates,
   mapTaskDueDates,

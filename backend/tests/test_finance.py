@@ -546,3 +546,60 @@ def test_refund_twice(
     refreshed = finance_service.get_installment(db_session, org_id, installment.id)
     assert refreshed.paid_amount == 1_000_000
     assert refreshed.status == InstallmentStatus.partially_paid
+
+
+def test_list_org_installments_date_window(
+    db_session: Session,
+    org_id: int,
+    person: Person,
+    course: Course,
+    admin_user: User,
+    request: pytest.FixtureRequest,
+) -> None:
+    """Org-wide installment listing filters by due date across invoices."""
+    course_class = request.getfixturevalue("class")
+    course.current_price = 6_000_000
+    db_session.commit()
+
+    enrollment = _create_enrollment(db_session, org_id, person, course_class)
+    finance_service.issue_invoice(
+        db_session,
+        org_id,
+        InvoiceCreate(
+            enrollment_id=enrollment.id,
+            installments=[
+                InstallmentPlanItem(
+                    sequence=1, amount=2_000_000, due_date=date(2026, 1, 10)
+                ),
+                InstallmentPlanItem(
+                    sequence=2, amount=2_000_000, due_date=date(2026, 2, 10)
+                ),
+                InstallmentPlanItem(
+                    sequence=3, amount=2_000_000, due_date=date(2026, 3, 10)
+                ),
+            ],
+        ),
+    )
+
+    all_items, all_count = finance_service.list_org_installments(
+        db_session, org_id
+    )
+    assert all_count == 3
+    # Ordered by due date.
+    assert [item.sequence for item in all_items] == [1, 2, 3]
+
+    window_items, window_count = finance_service.list_org_installments(
+        db_session,
+        org_id,
+        due_from=date(2026, 2, 1),
+        due_to=date(2026, 2, 28),
+    )
+    assert window_count == 1
+    assert window_items[0].sequence == 2
+
+    # Scoped to the org — a different org sees nothing.
+    other_items, other_count = finance_service.list_org_installments(
+        db_session, org_id + 1
+    )
+    assert other_count == 0
+    assert other_items == []

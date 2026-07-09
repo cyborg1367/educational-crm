@@ -1,6 +1,7 @@
+from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
@@ -41,6 +42,41 @@ def list_invoices(
     items, total_count = finance_service.list_invoices(
         db,
         current_user.org_id,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
+    return PaginatedResponse.from_page(
+        items,
+        total_count,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
+
+
+# NOTE: must be registered before "/{invoice_id}" so the literal segment wins.
+@router.get("/installments", response_model=PaginatedResponse[InstallmentRead])
+def list_all_installments(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    pagination: Annotated[PaginationParams, Depends()],
+    due_from: Annotated[
+        date | None, Query(description="Only installments due on/after this date.")
+    ] = None,
+    due_to: Annotated[
+        date | None, Query(description="Only installments due on/before this date.")
+    ] = None,
+) -> PaginatedResponse[InstallmentRead]:
+    """List installments across all invoices.
+
+    Returns a paginated, org-scoped list of installments, optionally bounded
+    by due date. Designed for calendar/reporting views that need a date
+    window in a single request.
+    """
+    items, total_count = finance_service.list_org_installments(
+        db,
+        current_user.org_id,
+        due_from=due_from,
+        due_to=due_to,
         limit=pagination.limit,
         offset=pagination.offset,
     )

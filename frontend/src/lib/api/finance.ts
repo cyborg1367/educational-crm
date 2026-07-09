@@ -149,6 +149,26 @@ export function listInstallments(
   );
 }
 
+export function listAllInstallments(
+  params: {
+    due_from?: string;
+    due_to?: string;
+    limit?: number;
+    offset?: number;
+  } = {},
+): Promise<PaginatedResponse<InstallmentRead>> {
+  const limit = params.limit ?? DEFAULT_LIMIT;
+  const offset = params.offset ?? 0;
+  return fetchJson(
+    `/invoices/installments${buildQuery({
+      limit,
+      offset,
+      due_from: params.due_from,
+      due_to: params.due_to,
+    })}`,
+  );
+}
+
 export function listPayments(
   params: { limit?: number; offset?: number } = {},
 ): Promise<PaginatedResponse<PaymentRead>> {

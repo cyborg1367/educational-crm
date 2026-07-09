@@ -98,6 +98,28 @@ def list_installments(
     return paginate_query(db, stmt, limit=limit, offset=offset)
 
 
+def list_org_installments(
+    db: Session,
+    org_id: int,
+    *,
+    due_from: date | None = None,
+    due_to: date | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[Installment], int]:
+    """List installments across all invoices in the org, optionally bounded
+    by due date. Lets consumers (e.g. the calendar) fetch a date window in a
+    single request instead of iterating invoices."""
+    stmt = scoped(select(Installment), Installment, org_id).order_by(
+        Installment.due_date, Installment.invoice_id, Installment.sequence
+    )
+    if due_from is not None:
+        stmt = stmt.where(Installment.due_date >= due_from)
+    if due_to is not None:
+        stmt = stmt.where(Installment.due_date <= due_to)
+    return paginate_query(db, stmt, limit=limit, offset=offset)
+
+
 def get_installments_for_invoice(
     db: Session, org_id: int, invoice_id: int
 ) -> list[Installment]:
