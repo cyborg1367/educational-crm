@@ -124,3 +124,26 @@ def update_class(
         )
 
     return course_class
+
+
+@router.delete("/{class_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_class(
+    class_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[
+        User,
+        Depends(
+            require_role(
+                UserRole.admin,
+                UserRole.admission,
+                UserRole.department_manager,
+            )
+        ),
+    ],
+) -> None:
+    """Delete a class.
+
+    Permanently removes a class instance from the organization.
+    Returns 404 if the class is not found.
+    """
+    class_service.delete_class(db, current_user.org_id, class_id)

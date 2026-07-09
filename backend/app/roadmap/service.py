@@ -134,6 +134,19 @@ def sync_department_roadmap(
     return roadmap
 
 
+def sync_roadmap(db: Session, org_id: int, roadmap_id: int) -> Roadmap:
+    """Rebuild a roadmap's steps from its department's active courses.
+
+    Roadmaps are auto-managed; this re-runs the same sync that fires when a
+    course is created or updated so the user can refresh the path on demand.
+    """
+    roadmap = get_roadmap(db, org_id, roadmap_id)
+    sync_department_roadmap(db, org_id, roadmap.department_id)
+    db.commit()
+    db.refresh(roadmap)
+    return roadmap
+
+
 def create_roadmap(db: Session, org_id: int, data: RoadmapCreate) -> Roadmap:
     _raise_auto_managed()
 

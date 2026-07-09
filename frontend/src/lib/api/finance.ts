@@ -108,6 +108,10 @@ export function updateClass(
   return fetchJson<CourseClassRead>(`/classes/${id}`, { method: "PATCH", body });
 }
 
+export function deleteClass(id: number): Promise<void> {
+  return fetchJson<void>(`/classes/${id}`, { method: "DELETE" });
+}
+
 export function getCourse(id: number): Promise<CourseRead> {
   return fetchJson<CourseRead>(`/courses/${id}`);
 }

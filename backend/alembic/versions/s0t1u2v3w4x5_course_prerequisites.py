@@ -19,6 +19,15 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if "course_prerequisites" in inspector.get_table_names():
+        # Table already exists (e.g. created by the older simple branch
+        # s9t0u1v2w3x4). v3w4x5y6z7a8 (merge_course_prerequisites_heads)
+        # converts it to this rich, org-scoped schema, so skip the CREATE
+        # here to avoid a DuplicateTable error.
+        return
+
     op.create_table(
         "course_prerequisites",
         sa.Column("id", sa.Integer(), nullable=False),

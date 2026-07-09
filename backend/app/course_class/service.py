@@ -109,3 +109,9 @@ def update_class(
     db.commit()
     db.refresh(course_class)
     return course_class
+
+
+def delete_class(db: Session, org_id: int, class_id: int) -> None:
+    course_class = get_class(db, org_id, class_id)
+    db.delete(course_class)
+    db.commit()

@@ -113,11 +113,24 @@ def create_course(db: Session, org_id: int, data: CourseCreate) -> Course:
     db.add(course)
     db.flush()
 
-    _set_prerequisites(db, org_id, course, data.prerequisite_ids)
+    _set_prerequisites(db, org_id, course, _prerequisite_ids(data))
     roadmap_service.sync_department_roadmap(db, org_id, data.department_id)
     db.commit()
     db.refresh(course)
     return course
+
+
+def _prerequisite_ids(data: CourseCreate | CourseUpdate) -> list[int]:
+    """Resolve the requested prerequisite course ids.
+
+    The frontend submits ``prerequisite_course_ids``; older clients may use
+    ``prerequisite_ids``. Prefer whichever is provided.
+    """
+    course_ids = getattr(data, "prerequisite_course_ids", None)
+    if course_ids:
+        return course_ids
+    legacy_ids = getattr(data, "prerequisite_ids", None)
+    return legacy_ids or []
 
 
 def update_course(
@@ -126,7 +139,13 @@ def update_course(
     course = get_course(db, org_id, course_id)
     old_department_id = course.department_id
     updates = data.model_dump(exclude_unset=True)
+    prerequisite_course_ids = updates.pop("prerequisite_course_ids", None)
     prerequisite_ids = updates.pop("prerequisite_ids", None)
+    resolved_prerequisite_ids: list[int] | None = None
+    if prerequisite_course_ids is not None:
+        resolved_prerequisite_ids = prerequisite_course_ids
+    elif prerequisite_ids is not None:
+        resolved_prerequisite_ids = prerequisite_ids
 
     if "department_id" in updates:
         _validate_department(db, org_id, updates["department_id"])
@@ -138,8 +157,8 @@ def update_course(
     session_duration = course.session_duration
     _apply_duration_sessions(course, total_hours, session_duration)
 
-    if prerequisite_ids is not None:
-        _set_prerequisites(db, org_id, course, prerequisite_ids)
+    if resolved_prerequisite_ids is not None:
+        _set_prerequisites(db, org_id, course, resolved_prerequisite_ids)
 
     roadmap_service.sync_department_roadmap(db, org_id, course.department_id)
     if old_department_id != course.department_id:

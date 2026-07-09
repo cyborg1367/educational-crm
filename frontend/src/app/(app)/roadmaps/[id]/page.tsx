@@ -137,6 +137,16 @@ function RoadmapDetailContent() {
     }
   }, [roadmapId]);
 
+  const refreshItems = React.useCallback(async () => {
+    const [roadmapRes, itemsRes] = await Promise.all([
+      getRoadmap(roadmapId),
+      listRoadmapItems(roadmapId, { limit: PAGE_LIMIT, offset: 0 }),
+    ]);
+    setRoadmap(roadmapRes);
+    setEditName(roadmapRes.name);
+    setItemsPage(itemsRes);
+  }, [roadmapId]);
+
   React.useEffect(() => {
     void loadData();
   }, [loadData]);
@@ -197,7 +207,7 @@ function RoadmapDetailContent() {
         description: "مراحل از دوره‌های فعال دپارتمان بازسازی شد.",
       });
       clearNewQuery();
-      await loadData();
+      await refreshItems();
     } catch (err) {
       toast({
         variant: "error",

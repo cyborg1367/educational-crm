@@ -68,6 +68,7 @@ class CourseRead(BaseModel):
                     )
                 },
                 "prerequisite_ids": [prereq.id for prereq in prereqs],
+                "prerequisite_course_ids": [prereq.id for prereq in prereqs],
             }
         return data
 

@@ -151,6 +151,37 @@ def get_roadmap_item(
 
 
 @router.post(
+    "/{roadmap_id}/sync",
+    response_model=PaginatedResponse[RoadmapItemRead],
+)
+def sync_roadmap_items(
+    roadmap_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    pagination: Annotated[PaginationParams, Depends()],
+) -> PaginatedResponse[RoadmapItemRead]:
+    """Sync a roadmap from its department's active courses and prerequisites.
+
+    Rebuilds the roadmap steps on demand. Roadmaps are auto-managed, so this
+    mirrors the sync that runs when a course changes.
+    """
+    roadmap_service.sync_roadmap(db, current_user.org_id, roadmap_id)
+    items, total_count = roadmap_service.list_roadmap_items(
+        db,
+        current_user.org_id,
+        roadmap_id,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
+    return PaginatedResponse.from_page(
+        items,
+        total_count,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
+
+
+@router.post(
     "/{roadmap_id}/items",
     response_model=RoadmapItemRead,
     status_code=status.HTTP_201_CREATED,
