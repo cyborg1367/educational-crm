@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.pagination import paginate_query
 from app.communication.model import Communication
 from app.communication.schemas import CommunicationCreate
 from app.person import service as person_service
@@ -8,14 +9,19 @@ from app.tenancy.scoping import scoped
 
 
 def list_communications(
-    db: Session, org_id: int, *, person_id: int | None = None
-) -> list[Communication]:
+    db: Session,
+    org_id: int,
+    *,
+    person_id: int | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[Communication], int]:
     stmt = scoped(select(Communication), Communication, org_id).order_by(
         Communication.created_at.desc()
     )
     if person_id is not None:
         stmt = stmt.where(Communication.person_id == person_id)
-    return list(db.scalars(stmt).all())
+    return paginate_query(db, stmt, limit=limit, offset=offset)
 
 
 def log_communication(

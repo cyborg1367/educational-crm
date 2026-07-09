@@ -1,28 +1,30 @@
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.errors import ConflictError, NotFoundError
+from app.core.pagination import paginate_query
 from app.department import service as department_service
 from app.journey.model import Journey
 from app.journey.schemas import JourneyCreate, JourneyUpdate
 from app.person import service as person_service
+from app.roadmap import service as roadmap_service
 from app.tenancy.scoping import scoped
 from app.user import service as user_service
 
 
-def list_journeys(db: Session, org_id: int) -> list[Journey]:
+def list_journeys(
+    db: Session, org_id: int, *, limit: int = 50, offset: int = 0
+) -> tuple[list[Journey], int]:
     stmt = scoped(select(Journey), Journey, org_id).order_by(Journey.id)
-    return list(db.scalars(stmt).all())
+    return paginate_query(db, stmt, limit=limit, offset=offset)
 
 
 def get_journey(db: Session, org_id: int, journey_id: int) -> Journey:
     stmt = scoped(select(Journey), Journey, org_id).where(Journey.id == journey_id)
     journey = db.scalars(stmt).first()
     if journey is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Journey not found"
-        )
+        raise NotFoundError("Journey not found")
     return journey
 
 
@@ -38,15 +40,26 @@ def _validate_person_and_department(
     department_service.get_department(db, org_id, department_id)
 
 
+def _department_roadmap_id(
+    db: Session, org_id: int, department_id: int
+) -> int:
+    roadmap = roadmap_service.ensure_department_roadmap(db, org_id, department_id)
+    return roadmap.id
+
+
 def create_journey(db: Session, org_id: int, data: JourneyCreate) -> Journey:
     _validate_person_and_department(db, org_id, data.person_id, data.department_id)
     _validate_owner(db, org_id, data.owner_id)
+
+    roadmap_id = data.roadmap_id
+    if roadmap_id is None:
+        roadmap_id = _department_roadmap_id(db, org_id, data.department_id)
 
     journey = Journey(
         person_id=data.person_id,
         department_id=data.department_id,
         owner_id=data.owner_id,
-        roadmap_id=data.roadmap_id,
+        roadmap_id=roadmap_id,
         status=data.status,
         org_id=org_id,
     )
@@ -55,9 +68,8 @@ def create_journey(db: Session, org_id: int, data: JourneyCreate) -> Journey:
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Journey already exists for this person and department",
+        raise ConflictError(
+            "Journey already exists for this person and department"
         ) from None
     db.refresh(journey)
     return journey
@@ -91,11 +103,18 @@ def get_or_create_journey(
     )
     journey = db.scalars(stmt).first()
     if journey is not None:
+        if journey.roadmap_id is None:
+            journey.roadmap_id = _department_roadmap_id(
+                db, org_id, department_id
+            )
+            db.commit()
+            db.refresh(journey)
         return journey
 
     journey = Journey(
         person_id=person_id,
         department_id=department_id,
+        roadmap_id=_department_roadmap_id(db, org_id, department_id),
         org_id=org_id,
     )
     db.add(journey)

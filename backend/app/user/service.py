@@ -1,33 +1,33 @@
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.security import hash_password
+from app.core.errors import ConflictError, NotFoundError
+from app.core.pagination import paginate_query
 from app.tenancy.scoping import scoped
 from app.user.model import User
 from app.user.schemas import UserCreate, UserUpdate
 
 
-def list_users(db: Session, org_id: int) -> list[User]:
+def list_users(
+    db: Session, org_id: int, *, limit: int = 50, offset: int = 0
+) -> tuple[list[User], int]:
     stmt = scoped(select(User), User, org_id).order_by(User.name)
-    return list(db.scalars(stmt).all())
+    return paginate_query(db, stmt, limit=limit, offset=offset)
 
 
 def get_user(db: Session, org_id: int, user_id: int) -> User:
     stmt = scoped(select(User), User, org_id).where(User.id == user_id)
     user = db.scalars(stmt).first()
     if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise NotFoundError("User not found")
     return user
 
 
 def create_user(db: Session, org_id: int, data: UserCreate) -> User:
     existing = db.scalars(select(User).where(User.email == data.email)).first()
     if existing is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Email already registered",
-        )
+        raise ConflictError("Email already registered")
 
     user = User(
         name=data.name,
@@ -51,10 +51,7 @@ def update_user(db: Session, org_id: int, user_id: int, data: UserUpdate) -> Use
     if "email" in updates and updates["email"] != user.email:
         existing = db.scalars(select(User).where(User.email == updates["email"])).first()
         if existing is not None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Email already registered",
-            )
+            raise ConflictError("Email already registered")
 
     if "password" in updates:
         user.password_hash = hash_password(updates.pop("password"))

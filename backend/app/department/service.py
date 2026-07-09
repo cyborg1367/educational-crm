@@ -1,16 +1,20 @@
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.errors import NotFoundError
+from app.core.pagination import paginate_query
 from app.department.model import Department
 from app.department.schemas import DepartmentCreate, DepartmentUpdate
+from app.roadmap import service as roadmap_service
 from app.tenancy.scoping import scoped
 from app.user import service as user_service
 
 
-def list_departments(db: Session, org_id: int) -> list[Department]:
+def list_departments(
+    db: Session, org_id: int, *, limit: int = 50, offset: int = 0
+) -> tuple[list[Department], int]:
     stmt = scoped(select(Department), Department, org_id).order_by(Department.name)
-    return list(db.scalars(stmt).all())
+    return paginate_query(db, stmt, limit=limit, offset=offset)
 
 
 def get_department(db: Session, org_id: int, department_id: int) -> Department:
@@ -19,9 +23,7 @@ def get_department(db: Session, org_id: int, department_id: int) -> Department:
     )
     department = db.scalars(stmt).first()
     if department is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Department not found"
-        )
+        raise NotFoundError("Department not found")
     return department
 
 
@@ -44,6 +46,8 @@ def create_department(
     db.add(department)
     db.commit()
     db.refresh(department)
+    roadmap_service.sync_department_roadmap(db, org_id, department.id)
+    db.commit()
     return department
 
 
@@ -61,4 +65,6 @@ def update_department(
 
     db.commit()
     db.refresh(department)
+    roadmap_service.sync_department_roadmap(db, org_id, department_id)
+    db.commit()
     return department

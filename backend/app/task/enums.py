@@ -9,3 +9,9 @@ class TaskType(str, Enum):
     installment_overdue = "installment_overdue"
     referral = "referral"
     custom = "custom"
+
+
+class TaskStatus(str, Enum):
+    open = "open"
+    done = "done"
+    cancelled = "cancelled"

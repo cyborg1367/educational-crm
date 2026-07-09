@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
@@ -12,17 +12,51 @@ from app.consultation.schemas import (
     ConsultationUpdate,
 )
 from app.core.db import get_db
+from app.core.openapi import PROTECTED_RESPONSES
+from app.core.pagination import PaginatedResponse, PaginationParams
 from app.user.model import User
+from app.workflow import service as workflow_service
+from app.workflow.schemas import ConsultationOutcomeUpdate
 
-router = APIRouter()
+router = APIRouter(responses=PROTECTED_RESPONSES)
 
 
-@router.get("", response_model=list[ConsultationRead])
+@router.get("", response_model=PaginatedResponse[ConsultationRead])
 def list_consultations(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-) -> list[Consultation]:
-    return consultation_service.list_consultations(db, current_user.org_id)
+    pagination: Annotated[PaginationParams, Depends()],
+    consultant_id: Annotated[
+        int | None, Query(description="Filter by consultant user ID.")
+    ] = None,
+    department_id: Annotated[
+        int | None, Query(description="Filter by department ID.")
+    ] = None,
+    pending: Annotated[
+        bool | None,
+        Query(description="When true, only consultations without an outcome."),
+    ] = None,
+) -> PaginatedResponse[ConsultationRead]:
+    """List consultations.
+
+    Returns a paginated list of consultation records in the organization,
+    optionally filtered by consultant, department, or pending outcome.
+    """
+    items, total_count = consultation_service.list_consultations(
+        db,
+        current_user.org_id,
+        consultant_id=consultant_id,
+        department_id=department_id,
+        pending=pending,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
+    return PaginatedResponse.from_page(
+        items,
+        total_count,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
 
 
 @router.get("/{consultation_id}", response_model=ConsultationRead)
@@ -31,6 +65,11 @@ def get_consultation(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Consultation:
+    """Get a consultation by ID.
+
+    Fetches a single consultation record from the organization.
+    Returns 404 if the consultation is not found in the org.
+    """
     return consultation_service.get_consultation(
         db, current_user.org_id, consultation_id
     )
@@ -42,7 +81,15 @@ def create_consultation(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Consultation:
-    return consultation_service.create_consultation(db, current_user.org_id, body)
+    """Create a new consultation.
+
+    Records an initial or follow-up consultation with a prospect.
+    Returns 404 if referenced person, department, consultant, or course is not found.
+    Returns 422 if request validation fails.
+    """
+    return consultation_service.create_consultation(
+        db, current_user.org_id, body, actor_id=current_user.id
+    )
 
 
 @router.patch("/{consultation_id}", response_model=ConsultationRead)
@@ -52,6 +99,38 @@ def update_consultation(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Consultation:
+    """Update a consultation.
+
+    Applies partial updates to consultation notes and metadata.
+    Returns 404 if the consultation or referenced entities are not found.
+    Returns 422 if request validation fails.
+    """
     return consultation_service.update_consultation(
-        db, current_user.org_id, consultation_id, body
+        db, current_user.org_id, consultation_id, body, actor=current_user
+    )
+
+
+@router.patch("/{consultation_id}/outcome", response_model=ConsultationRead)
+def set_consultation_outcome(
+    consultation_id: int,
+    body: ConsultationOutcomeUpdate,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> Consultation:
+    """Set consultation outcome and trigger workflow.
+
+    Records the consultation outcome and runs automated routing (enrollment,
+    follow-up tasks, referrals, etc.).
+    Returns 404 if the consultation or referenced entities are not found.
+    Returns 422 if the outcome requires missing data (e.g. class_id, refer_to_department_id).
+    """
+    return workflow_service.on_consultation_outcome(
+        db,
+        current_user.org_id,
+        consultation_id,
+        body.outcome,
+        class_id=body.class_id,
+        notes=body.notes,
+        actor_id=current_user.id,
+        actor=current_user,
     )

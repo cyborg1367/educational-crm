@@ -16,6 +16,6 @@ cd backend
 uv venv && source .venv/bin/activate
 uv sync
 cp .env.example .env   # edit SECRET_KEY
-uv run alembic upgrade head
+docker compose run --rm api uv run alembic upgrade head
 uv run uvicorn app.main:app --reload
 ```

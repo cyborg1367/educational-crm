@@ -1,0 +1,221 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+
+@font-face {
+  font-family: "Vazirmatn";
+  src:
+    url("/fonts/Vazirmatn-Variable.woff2") format("woff2 supports variations"),
+    url("/fonts/Vazirmatn-Variable.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: var(--primitive-radius-sm);
+  --radius-md: var(--primitive-radius-md);
+  --radius-lg: var(--primitive-radius-lg);
+  --font-sans: "Vazirmatn", Tahoma, sans-serif;
+}
+
+html,
+body {
+  font-family: "Vazirmatn", Tahoma, sans-serif;
+  letter-spacing: 0;
+  word-spacing: normal;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-size: var(--primitive-font-size-base);
+  line-height: var(--primitive-font-lineHeight-base);
+}
+
+/* Directional icons mirror with reading direction — 04-design-system.md §4 */
+html[dir="rtl"] .icon-mirror-rtl {
+  transform: scaleX(-1);
+}
+
+/* ConfirmDialog — fade+scale per 04-design-system.md §6 (same motion for tier 2 and 3). */
+@keyframes confirm-dialog-fade-scale-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes confirm-dialog-fade-scale-out {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+}
+
+.confirm-dialog-content[data-state="open"] {
+  animation: confirm-dialog-fade-scale-in var(--primitive-motion-duration-base)
+    var(--primitive-motion-easing-standard);
+}
+
+.confirm-dialog-content[data-state="closed"] {
+  animation: confirm-dialog-fade-scale-out var(--primitive-motion-duration-base)
+    var(--primitive-motion-easing-standard);
+}
+
+/* Panel drawer — slide from inline-end per 04-design-system.md §6 */
+@keyframes panel-drawer-slide-in-rtl {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes panel-drawer-slide-out-rtl {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes panel-drawer-slide-in-ltr {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes panel-drawer-slide-out-ltr {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+html[dir="rtl"] .panel-drawer-content[data-state="open"] {
+  animation: panel-drawer-slide-in-rtl var(--primitive-motion-duration-base)
+    var(--primitive-motion-easing-standard);
+}
+
+html[dir="rtl"] .panel-drawer-content[data-state="closed"] {
+  animation: panel-drawer-slide-out-rtl var(--primitive-motion-duration-base)
+    var(--primitive-motion-easing-standard);
+}
+
+html[dir="ltr"] .panel-drawer-content[data-state="open"] {
+  animation: panel-drawer-slide-in-ltr var(--primitive-motion-duration-base)
+    var(--primitive-motion-easing-standard);
+}
+
+html[dir="ltr"] .panel-drawer-content[data-state="closed"] {
+  animation: panel-drawer-slide-out-ltr var(--primitive-motion-duration-base)
+    var(--primitive-motion-easing-standard);
+}
+
+/* Shell nav drawer — slides from inline-start (sidebar position). */
+@keyframes panel-drawer-start-slide-in-rtl {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes panel-drawer-start-slide-out-rtl {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes panel-drawer-start-slide-in-ltr {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes panel-drawer-start-slide-out-ltr {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+html[dir="rtl"] .panel-drawer-content-start[data-state="open"] {
+  animation: panel-drawer-start-slide-in-rtl var(--primitive-motion-duration-base)
+    var(--primitive-motion-easing-standard);
+}
+
+html[dir="rtl"] .panel-drawer-content-start[data-state="closed"] {
+  animation: panel-drawer-start-slide-out-rtl var(--primitive-motion-duration-base)
+    var(--primitive-motion-easing-standard);
+}
+
+html[dir="ltr"] .panel-drawer-content-start[data-state="open"] {
+  animation: panel-drawer-start-slide-in-ltr var(--primitive-motion-duration-base)
+    var(--primitive-motion-easing-standard);
+}
+
+html[dir="ltr"] .panel-drawer-content-start[data-state="closed"] {
+  animation: panel-drawer-start-slide-out-ltr var(--primitive-motion-duration-base)
+    var(--primitive-motion-easing-standard);
+}
+
+/* Toast — slide from edge per 04-design-system.md §6 */
+@keyframes toast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--primitive-space-4));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast-item {
+  animation: toast-slide-in var(--primitive-motion-duration-base)
+    var(--primitive-motion-easing-standard);
+}
