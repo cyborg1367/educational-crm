@@ -3,21 +3,18 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
-  CalendarClock,
   CalendarDays,
-  CalendarRange,
   GraduationCap,
-  LayoutGrid,
   Pencil,
-  Table2,
   Trash2,
   Users,
 } from "lucide-react";
 
-import { DataTable } from "@/components/data-display";
+import { CardListState, DataTable } from "@/components/data-display";
 import type { PaginatedResponse } from "@/components/data-display/types";
 import { StatusBadge } from "@/components/domain";
 import { ClassFormDialog } from "@/components/domain/class-form-dialog";
+import { ConfirmDialog } from "@/components/domain/confirm-dialog";
 import {
   classFormStateFromRead,
   classFormStateToCreateBody,
@@ -28,7 +25,12 @@ import {
 } from "@/components/domain/class-form-fields";
 import { ErrorState, useToast } from "@/components/feedback";
 import { ListPageSkeleton } from "@/components/skeletons";
-import { FilterBar, type FilterValues } from "@/components/layout";
+import {
+  FilterBar,
+  ViewModeToggle,
+  useListViewMode,
+  type FilterValues,
+} from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { fieldErrorFromApi, toApiError } from "@/lib/api/errors";
 import type { ApiError, ApiFieldError } from "@/lib/api/error";
@@ -66,7 +68,6 @@ type ClassRow = CourseClassRead & {
 };
 
 type DialogMode = "create" | "edit";
-type ClassesListViewMode = "cards" | "table";
 
 /** Shared brand chrome for all class cards — mirrors the course card language. */
 const BRAND_CARD = {
@@ -135,7 +136,9 @@ export default function ClassesListPage() {
   );
   const [formError, setFormError] = React.useState<ApiError | null>(null);
   const [fieldError, setFieldError] = React.useState<ApiFieldError | null>(null);
-  const [viewMode, setViewMode] = React.useState<ClassesListViewMode>("cards");
+  const [viewMode, setViewMode] = useListViewMode(CLASSES_VIEW_STORAGE_KEY);
+  const [deleteTarget, setDeleteTarget] = React.useState<ClassRow | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
   const [contextMenu, setContextMenu] = React.useState<{
     x: number;
     y: number;
@@ -143,21 +146,28 @@ export default function ClassesListPage() {
   } | null>(null);
 
   React.useEffect(() => {
-    const stored = window.localStorage.getItem(CLASSES_VIEW_STORAGE_KEY);
-    if (stored === "cards" || stored === "table") {
-      setViewMode(stored);
-    }
-  }, []);
-
-  React.useEffect(() => {
     const handleClickOutside = () => setContextMenu(null);
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setContextMenu(null);
+      }
+    };
     document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("click", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
   }, []);
 
-  const handleViewModeChange = (mode: ClassesListViewMode) => {
-    setViewMode(mode);
-    window.localStorage.setItem(CLASSES_VIEW_STORAGE_KEY, mode);
+  const openContextMenu = (event: React.MouseEvent, row: ClassRow) => {
+    event.preventDefault();
+    // Clamp so the menu never overflows the viewport edge.
+    setContextMenu({
+      x: Math.min(event.clientX, window.innerWidth - 180),
+      y: Math.min(event.clientY, window.innerHeight - 110),
+      row,
+    });
   };
 
   const statusFilter =
@@ -369,14 +379,27 @@ export default function ClassesListPage() {
     }
   };
 
-  const handleDelete = async (classId: number) => {
+  const requestDelete = (row: ClassRow) => {
+    setContextMenu(null);
+    setDeleteTarget(row);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await deleteClass(classId);
+      await deleteClass(deleteTarget.id);
       toast({ variant: "success", title: "کلاس حذف شد" });
-      setContextMenu(null);
+      setDeleteTarget(null);
       void loadData();
     } catch (err) {
-      toast({ variant: "error", title: toApiError(err, "خطا در حذف کلاس").detail });
+      toast({
+        variant: "error",
+        title: "خطا در حذف کلاس",
+        description: toApiError(err, "حذف کلاس ناموفق بود").detail,
+      });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -420,43 +443,7 @@ export default function ClassesListPage() {
               }}
             />
             <div className="flex flex-wrap items-center justify-end">
-              <div
-                className={cn(
-                  "inline-flex rounded-[var(--primitive-radius-full)] border border-[var(--semantic-color-surface-border)]",
-                  "bg-[var(--semantic-color-surface-card)] p-0.5 shadow-[var(--primitive-elevation-1)]",
-                )}
-                role="group"
-                aria-label="نوع نمایش"
-              >
-                {(
-                  [
-                    { mode: "cards" as const, icon: LayoutGrid, label: "کارت" },
-                    { mode: "table" as const, icon: Table2, label: "جدول" },
-                  ] as const
-                ).map(({ mode, icon: Icon, label }) => {
-                  const active = viewMode === mode;
-                  return (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => handleViewModeChange(mode)}
-                      aria-pressed={active}
-                      className={cn(
-                        "inline-flex items-center gap-[var(--primitive-space-1)] rounded-[var(--primitive-radius-full)]",
-                        "px-[var(--primitive-space-3)] py-[var(--primitive-space-2)]",
-                        "text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)]",
-                        "transition-colors duration-150",
-                        active
-                          ? "bg-[var(--semantic-color-action-primary)] text-[var(--semantic-color-text-inverse)]"
-                          : "text-[var(--semantic-color-text-secondary)] hover:text-[var(--semantic-color-text-primary)]",
-                      )}
-                    >
-                      <Icon className="size-3.5" aria-hidden />
-                      <span>{label}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              <ViewModeToggle value={viewMode} onChange={setViewMode} />
             </div>
           </div>
         }
@@ -487,17 +474,36 @@ export default function ClassesListPage() {
                       header: "",
                       align: "end" as const,
                       cell: (row: ClassRow) => (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            openEditDialog(row);
-                          }}
-                        >
-                          ویرایش
-                        </Button>
+                        <div className="flex items-center justify-end gap-[var(--primitive-space-1)]">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="size-8 p-0"
+                            title="ویرایش"
+                            aria-label={`ویرایش ${row.name}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openEditDialog(row);
+                            }}
+                          >
+                            <Pencil className="size-3.5" aria-hidden />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="size-8 p-0 text-[var(--semantic-color-status-danger)] hover:text-[var(--semantic-color-status-danger-strong)]"
+                            title="حذف"
+                            aria-label={`حذف ${row.name}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              requestDelete(row);
+                            }}
+                          >
+                            <Trash2 className="size-3.5" aria-hidden />
+                          </Button>
+                        </div>
                       ),
                     },
                   ]
@@ -512,16 +518,23 @@ export default function ClassesListPage() {
         }
         cardList={
           <div className="grid grid-cols-1 gap-[var(--primitive-space-4)] md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {loading ? (
-              <p className="col-span-full text-center text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
-                در حال بارگذاری…
-              </p>
-            ) : rows.length === 0 ? (
-              <p className="col-span-full text-center text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
-                کلاسی یافت نشد
-              </p>
-            ) : (
-              rows.map((row) => {
+            <CardListState
+              loading={loading}
+              empty={rows.length === 0}
+              emptyIcon={GraduationCap}
+              emptyMessage={
+                statusFilter
+                  ? "کلاسی با این فیلتر یافت نشد."
+                  : "هنوز کلاسی تعریف نشده است."
+              }
+              emptyAction={
+                canManage && !createBlockedReason && !statusFilter
+                  ? { label: "افزودن کلاس", onClick: openCreateDialog }
+                  : undefined
+              }
+              skeletonCount={8}
+            >
+              {rows.map((row) => {
                 const weekdays = row.weekdays ?? [];
                 const goToDetail = () => router.push(`/classes/${row.id}`);
 
@@ -529,19 +542,14 @@ export default function ClassesListPage() {
                   <article
                     key={row.id}
                     className={cn(
-                      "relative overflow-hidden rounded-[var(--primitive-radius-lg)]",
+                      "relative flex flex-col overflow-hidden rounded-[var(--primitive-radius-lg)]",
                       "border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)]/95",
                       "shadow-[var(--primitive-elevation-1)] transition-all duration-[var(--primitive-motion-duration-base)]",
                       "hover:-translate-y-0.5 hover:shadow-[var(--primitive-elevation-2)]",
                     )}
                     onContextMenu={(event) => {
-                      event.preventDefault();
                       if (canManage) {
-                        setContextMenu({
-                          x: event.clientX,
-                          y: event.clientY,
-                          row,
-                        });
+                        openContextMenu(event, row);
                       }
                     }}
                   >
@@ -561,7 +569,7 @@ export default function ClassesListPage() {
                           goToDetail();
                         }
                       }}
-                      className="flex h-full w-full cursor-pointer flex-col p-[var(--semantic-space-cardPadding)] text-right outline-none focus-visible:ring-2 focus-visible:ring-[var(--primitive-color-brand-400)]"
+                      className="flex flex-1 cursor-pointer flex-col p-[var(--semantic-space-cardPadding)] pb-0 text-right outline-none focus-visible:ring-2 focus-visible:ring-[var(--primitive-color-brand-400)]"
                     >
                       <div className="rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)]/70 bg-[color-mix(in_srgb,var(--semantic-color-surface-subtle)_75%,white)] px-[var(--primitive-space-3)] py-[var(--primitive-space-3)]">
                         <div className="flex items-start justify-between gap-[var(--primitive-space-3)]">
@@ -602,95 +610,71 @@ export default function ClassesListPage() {
                       </div>
 
                       {weekdays.length > 0 ? (
-                        <div className="mt-[var(--primitive-space-3)] flex items-center justify-between gap-[var(--primitive-space-2)]">
-                          {canManage && (
-                            <div className="flex items-center gap-1 shrink-0">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="ghost"
-                                className="size-8 p-0 hover:bg-[var(--semantic-color-surface-subtle)]"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  openEditDialog(row);
-                                }}
-                                title="ویرایش"
-                              >
-                                <Pencil className="size-3.5" aria-hidden />
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="ghost"
-                                className="size-8 p-0 hover:bg-[var(--semantic-color-surface-subtle)] text-[var(--semantic-color-text-destructive)]"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  handleDelete(row.id);
-                                }}
-                                title="حذف"
-                              >
-                                <Trash2 className="size-3.5" aria-hidden />
-                              </Button>
-                            </div>
-                          )}
-                          <div className="flex flex-wrap gap-[var(--primitive-space-2)]">
-                            {weekdays.map((day) => (
-                              <span
-                                key={day}
-                                className={cn(
-                                  "rounded-[var(--primitive-radius-full)] border px-[var(--primitive-space-2)] py-0.5 text-[length:var(--primitive-font-size-xs)]",
-                                  BRAND_CARD.weekdayChipClassName,
-                                )}
-                              >
-                                {weekdayLabel(day)}
-                              </span>
-                            ))}
-                          </div>
+                        <div className="mt-[var(--primitive-space-3)] flex flex-wrap gap-[var(--primitive-space-2)]">
+                          {weekdays.map((day) => (
+                            <span
+                              key={day}
+                              className={cn(
+                                "rounded-[var(--primitive-radius-full)] border px-[var(--primitive-space-2)] py-0.5 text-[length:var(--primitive-font-size-xs)]",
+                                BRAND_CARD.weekdayChipClassName,
+                              )}
+                            >
+                              {weekdayLabel(day)}
+                            </span>
+                          ))}
                         </div>
-                      ) : canManage ? (
-                        <div className="mt-[var(--primitive-space-3)] flex justify-start">
-                          <div className="flex items-center gap-1 shrink-0">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              className="size-8 p-0 hover:bg-[var(--semantic-color-surface-subtle)]"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                openEditDialog(row);
-                              }}
-                              title="ویرایش"
-                            >
-                              <Pencil className="size-3.5" aria-hidden />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              className="size-8 p-0 hover:bg-[var(--semantic-color-surface-subtle)] text-[var(--semantic-color-text-destructive)]"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleDelete(row.id);
-                              }}
-                              title="حذف"
-                            >
-                              <Trash2 className="size-3.5" aria-hidden />
-                            </Button>
-                          </div>
+                      ) : null}
+                    </div>
+
+                    <div
+                      className={cn(
+                        "mx-[var(--semantic-space-cardPadding)] mt-[var(--primitive-space-3)] flex items-center justify-between",
+                        "border-t border-[var(--semantic-color-surface-border)]/70 py-[var(--primitive-space-2)]",
+                        "mb-[var(--primitive-space-2)]",
+                      )}
+                    >
+                      <span className="text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]">
+                        {formatDateDisplay(row.start_date)}
+                      </span>
+                      {canManage ? (
+                        <div className="flex items-center gap-[var(--primitive-space-1)]">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="size-8 p-0 hover:bg-[var(--semantic-color-surface-subtle)]"
+                            onClick={() => openEditDialog(row)}
+                            title="ویرایش"
+                            aria-label={`ویرایش ${row.name}`}
+                          >
+                            <Pencil className="size-3.5" aria-hidden />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="size-8 p-0 text-[var(--semantic-color-status-danger)] hover:bg-[var(--semantic-color-surface-subtle)] hover:text-[var(--semantic-color-status-danger-strong)]"
+                            onClick={() => requestDelete(row)}
+                            title="حذف"
+                            aria-label={`حذف ${row.name}`}
+                          >
+                            <Trash2 className="size-3.5" aria-hidden />
+                          </Button>
                         </div>
                       ) : null}
                     </div>
                   </article>
                 );
-              })
-            )}
+              })}
+            </CardListState>
           </div>
         }
       />
 
       {contextMenu && contextMenu.row && (
         <div
-          className="fixed z-50 min-w-[150px] rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] shadow-[var(--primitive-elevation-3)] py-1"
+          role="menu"
+          className="fixed z-50 min-w-[160px] rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] shadow-[var(--primitive-elevation-3)] py-1"
           style={{
             left: contextMenu.x,
             top: contextMenu.y,
@@ -699,6 +683,7 @@ export default function ClassesListPage() {
         >
           <button
             type="button"
+            role="menuitem"
             className="flex w-full items-center gap-2 px-3 py-2 text-right text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-primary)] hover:bg-[var(--semantic-color-surface-subtle)]"
             onClick={() => {
               openEditDialog(contextMenu.row!);
@@ -710,9 +695,10 @@ export default function ClassesListPage() {
           </button>
           <button
             type="button"
-            className="flex w-full items-center gap-2 px-3 py-2 text-right text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-destructive)] hover:bg-[var(--semantic-color-surface-subtle)]"
+            role="menuitem"
+            className="flex w-full items-center gap-2 px-3 py-2 text-right text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-status-danger)] hover:bg-[var(--semantic-color-surface-subtle)]"
             onClick={() => {
-              handleDelete(contextMenu.row!.id);
+              requestDelete(contextMenu.row!);
             }}
           >
             <Trash2 className="size-3.5" aria-hidden />
@@ -720,6 +706,27 @@ export default function ClassesListPage() {
           </button>
         </div>
       )}
+
+      <ConfirmDialog
+        tier={2}
+        open={deleteTarget != null}
+        onOpenChange={(open) => {
+          if (!open && !deleting) {
+            setDeleteTarget(null);
+          }
+        }}
+        title="حذف کلاس"
+        body={
+          deleteTarget
+            ? `کلاس «${deleteTarget.name}» برای همیشه حذف می‌شود. اگر ثبت‌نام فعالی داشته باشد، حذف انجام نخواهد شد.`
+            : ""
+        }
+        confirmLabel="حذف کلاس"
+        confirmVariant="destructive"
+        confirmLoading={deleting}
+        onConfirm={() => void handleDeleteConfirm()}
+        onCancel={() => setDeleteTarget(null)}
+      />
 
       <ClassFormDialog
         open={dialogOpen}

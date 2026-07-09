@@ -2,8 +2,13 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { ReceiptText } from "lucide-react";
 
-import { DataTable, EntitySummaryCard } from "@/components/data-display";
+import {
+  CardListState,
+  DataTable,
+  EntitySummaryCard,
+} from "@/components/data-display";
 import type { PaginatedResponse } from "@/components/data-display/types";
 import { StatusBadge } from "@/components/domain";
 import { ErrorState } from "@/components/feedback";
@@ -206,16 +211,28 @@ export default function InvoicesListPage() {
       }
       cardList={
         <div className="flex flex-col gap-[var(--primitive-space-3)]">
-          {filteredItems.map((invoice) => (
-            <EntitySummaryCard
-              key={invoice.id}
-              title={enrollmentLabel(invoice.enrollment_id)}
-              subtitle={formatToman(invoice.total_amount)}
-              badges={<StatusBadge domain="invoice" value={invoice.status} />}
-              meta={formatDateTimeDisplay(invoice.created_at, "YYYY/MM/DD")}
-              onClick={() => router.push(`/invoices/${invoice.id}`)}
-            />
-          ))}
+          <CardListState
+            loading={loading}
+            empty={filteredItems.length === 0}
+            emptyIcon={ReceiptText}
+            emptyMessage={
+              statusFilter
+                ? "فاکتوری با این فیلتر یافت نشد."
+                : "هنوز فاکتوری صادر نشده است."
+            }
+            skeletonCount={4}
+          >
+            {filteredItems.map((invoice) => (
+              <EntitySummaryCard
+                key={invoice.id}
+                title={enrollmentLabel(invoice.enrollment_id)}
+                subtitle={formatToman(invoice.total_amount)}
+                badges={<StatusBadge domain="invoice" value={invoice.status} />}
+                meta={formatDateTimeDisplay(invoice.created_at, "YYYY/MM/DD")}
+                onClick={() => router.push(`/invoices/${invoice.id}`)}
+              />
+            ))}
+          </CardListState>
         </div>
       }
     />

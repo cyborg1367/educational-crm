@@ -3,15 +3,14 @@
 import * as React from "react";
 import {
   ArrowUpLeft,
+  BookOpen,
   CalendarClock,
   CalendarDays,
   Coins,
-  LayoutGrid,
   Timer,
-  Table2,
 } from "lucide-react";
 
-import { DataTable } from "@/components/data-display";
+import { CardListState, DataTable } from "@/components/data-display";
 import type { PaginatedResponse } from "@/components/data-display/types";
 import {
   courseFormStateFromRead,
@@ -24,7 +23,12 @@ import {
 import { CourseFormDialog } from "@/components/domain/course-form-dialog";
 import { ErrorState, useToast } from "@/components/feedback";
 import { Checkbox } from "@/components/form/selection-control";
-import { FilterBar, type FilterValues } from "@/components/layout";
+import {
+  FilterBar,
+  ViewModeToggle,
+  useListViewMode,
+  type FilterValues,
+} from "@/components/layout";
 import { Badge } from "@/components/primitives/badge";
 import { ListPageSkeleton } from "@/components/skeletons";
 import { Button } from "@/components/ui/button";
@@ -56,7 +60,6 @@ const emptyPage = <T,>(): PaginatedResponse<T> => ({
 });
 
 type DialogMode = "create" | "edit";
-type CoursesListViewMode = "cards" | "table";
 type DepartmentVisual = {
   imageSrc: string;
   imageAlt: string;
@@ -159,19 +162,7 @@ export default function CoursesListPage() {
   );
   const [formError, setFormError] = React.useState<ApiError | null>(null);
   const [fieldError, setFieldError] = React.useState<ApiFieldError | null>(null);
-  const [viewMode, setViewMode] = React.useState<CoursesListViewMode>("cards");
-
-  React.useEffect(() => {
-    const stored = window.localStorage.getItem(COURSES_VIEW_STORAGE_KEY);
-    if (stored === "cards" || stored === "table") {
-      setViewMode(stored);
-    }
-  }, []);
-
-  const handleViewModeChange = (mode: CoursesListViewMode) => {
-    setViewMode(mode);
-    window.localStorage.setItem(COURSES_VIEW_STORAGE_KEY, mode);
-  };
+  const [viewMode, setViewMode] = useListViewMode(COURSES_VIEW_STORAGE_KEY);
 
   const departmentFilter =
     typeof filterValues.department === "string"
@@ -349,43 +340,7 @@ export default function CoursesListPage() {
                   setOffset(0);
                 }}
               />
-              <div
-                className={cn(
-                  "inline-flex rounded-[var(--primitive-radius-full)] border border-[var(--semantic-color-surface-border)]",
-                  "bg-[var(--semantic-color-surface-card)] p-0.5 shadow-[var(--primitive-elevation-1)]",
-                )}
-                role="group"
-                aria-label="نوع نمایش"
-              >
-                {(
-                  [
-                    { mode: "cards" as const, icon: LayoutGrid, label: "کارت" },
-                    { mode: "table" as const, icon: Table2, label: "جدول" },
-                  ] as const
-                ).map(({ mode, icon: Icon, label }) => {
-                  const active = viewMode === mode;
-                  return (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => handleViewModeChange(mode)}
-                      aria-pressed={active}
-                      className={cn(
-                        "inline-flex items-center gap-[var(--primitive-space-1)] rounded-[var(--primitive-radius-full)]",
-                        "px-[var(--primitive-space-3)] py-[var(--primitive-space-2)]",
-                        "text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)]",
-                        "transition-colors duration-150",
-                        active
-                          ? "bg-[var(--semantic-color-action-primary)] text-[var(--semantic-color-text-inverse)]"
-                          : "text-[var(--semantic-color-text-secondary)] hover:text-[var(--semantic-color-text-primary)]",
-                      )}
-                    >
-                      <Icon className="size-3.5" aria-hidden />
-                      <span>{label}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              <ViewModeToggle value={viewMode} onChange={setViewMode} />
             </div>
           </div>
         }
@@ -442,16 +397,23 @@ export default function CoursesListPage() {
         }
         cardList={
           <div className="grid grid-cols-1 gap-[var(--primitive-space-4)] md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {loading ? (
-              <p className="col-span-full text-center text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
-                در حال بارگذاری…
-              </p>
-            ) : rows.length === 0 ? (
-              <p className="col-span-full text-center text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
-                دوره‌ای یافت نشد
-              </p>
-            ) : (
-              rows.map((row) => {
+            <CardListState
+              loading={loading}
+              empty={rows.length === 0}
+              emptyIcon={BookOpen}
+              emptyMessage={
+                departmentFilter || activeOnly
+                  ? "دوره‌ای با این فیلتر یافت نشد."
+                  : "هنوز دوره‌ای تعریف نشده است."
+              }
+              emptyAction={
+                activeDepartments.length > 0 && !departmentFilter && !activeOnly
+                  ? { label: "افزودن دوره", onClick: openCreateDialog }
+                  : undefined
+              }
+              skeletonCount={8}
+            >
+              {rows.map((row) => {
                 const prerequisiteNames = row.prerequisite_course_ids
                   .map((id) => courseTitleById.get(id) ?? `دوره #${formatCount(id)}`);
                 const deptVisual = getDepartmentVisual(row.department_name);
@@ -598,8 +560,8 @@ export default function CoursesListPage() {
                     </button>
                   </article>
                 );
-              })
-            )}
+              })}
+            </CardListState>
           </div>
         }
       />

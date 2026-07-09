@@ -2,14 +2,24 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { ClipboardList } from "lucide-react";
 
-import { DataTable, EntitySummaryCard } from "@/components/data-display";
+import {
+  CardListState,
+  DataTable,
+  EntitySummaryCard,
+} from "@/components/data-display";
 import type { PaginatedResponse } from "@/components/data-display/types";
 import { StatusBadge } from "@/components/domain";
 import { AppDrawer, ErrorState } from "@/components/feedback";
 import { Select } from "@/components/form/select";
 import { FormField } from "@/components/form/form-field";
-import { FilterBar, type FilterValues } from "@/components/layout";
+import {
+  FilterBar,
+  ViewModeToggle,
+  useListViewMode,
+  type FilterValues,
+} from "@/components/layout";
 import { ListPageSkeleton } from "@/components/skeletons";
 import { Button } from "@/components/ui/button";
 import { toApiError } from "@/lib/api/errors";
@@ -27,6 +37,7 @@ import { formatToman } from "@/lib/locale";
 import { statusDisplayLabel } from "@/lib/terminology";
 
 const PAGE_LIMIT = 50;
+const ENROLLMENTS_VIEW_STORAGE_KEY = "enrollments-list-view";
 
 const ENROLLMENT_STATUS_OPTIONS: { value: EnrollmentStatus; label: string }[] =
   (["pre_enroll", "active", "completed", "dropped"] as const).map((value) => ({
@@ -57,6 +68,10 @@ export default function EnrollmentsListPage() {
 
   const [personPickerOpen, setPersonPickerOpen] = React.useState(false);
   const [selectedPersonId, setSelectedPersonId] = React.useState("");
+  const [viewMode, setViewMode] = useListViewMode(
+    ENROLLMENTS_VIEW_STORAGE_KEY,
+    "table",
+  );
 
   const statusFilter =
     typeof filterValues.status === "string" ? filterValues.status : undefined;
@@ -162,15 +177,21 @@ export default function EnrollmentsListPage() {
           ) : null
         }
         filterBar={
-          <FilterBar
-            facets={facets}
-            values={filterValues}
-            onValuesChange={(values) => {
-              setFilterValues(values);
-              setOffset(0);
-            }}
-          />
+          <div className="flex flex-col gap-[var(--primitive-space-4)]">
+            <FilterBar
+              facets={facets}
+              values={filterValues}
+              onValuesChange={(values) => {
+                setFilterValues(values);
+                setOffset(0);
+              }}
+            />
+            <div className="flex flex-wrap items-center justify-end">
+              <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            </div>
+          </div>
         }
+        primaryView={viewMode === "table" ? "table" : "cards"}
         table={
           <DataTable
             columns={[
@@ -206,16 +227,30 @@ export default function EnrollmentsListPage() {
           />
         }
         cardList={
-          <div className="flex flex-col gap-[var(--primitive-space-3)]">
-            {enrollmentsPage.items.map((row) => (
-              <EntitySummaryCard
-                key={row.id}
-                title={personNameById.get(row.person_id) ?? "—"}
-                subtitle={classNameById.get(row.class_id) ?? "—"}
-                meta={formatToman(row.final_amount)}
-                onClick={() => router.push(`/enrollments/${row.id}`)}
-              />
-            ))}
+          <div className="grid grid-cols-1 gap-[var(--primitive-space-3)] md:grid-cols-2 xl:grid-cols-3">
+            <CardListState
+              loading={loading}
+              empty={enrollmentsPage.items.length === 0}
+              emptyIcon={ClipboardList}
+              emptyMessage={
+                statusFilter || classFilter
+                  ? "ثبت‌نامی با این فیلتر یافت نشد."
+                  : "هنوز ثبت‌نامی انجام نشده است."
+              }
+              skeletonCount={6}
+            >
+              {enrollmentsPage.items.map((row) => (
+                <EntitySummaryCard
+                  key={row.id}
+                  variant="enrollment"
+                  title={personNameById.get(row.person_id) ?? "—"}
+                  subtitle={classNameById.get(row.class_id) ?? "—"}
+                  badges={<StatusBadge domain="enrollment" value={row.status} />}
+                  meta={formatToman(row.final_amount)}
+                  onClick={() => router.push(`/enrollments/${row.id}`)}
+                />
+              ))}
+            </CardListState>
           </div>
         }
       />
