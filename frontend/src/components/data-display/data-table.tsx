@@ -199,13 +199,13 @@ function DataTable<T>({
     <div className={cn("w-full", className)}>
       <div
         className={cn(
-          "overflow-x-auto rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)]",
-          "bg-[var(--semantic-color-surface-card)]",
+          "overflow-x-auto rounded-[var(--primitive-radius-lg)] border border-[var(--semantic-color-surface-border)]",
+          "bg-[var(--semantic-color-surface-card)] shadow-[var(--primitive-elevation-1)]",
         )}
       >
         <table className="w-full min-w-full border-collapse text-start">
           <thead>
-            <tr className="border-b border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-subtle)]">
+            <tr className="border-b border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-subtle)]/70">
               {rowSelectable ? (
                 <th
                   scope="col"
@@ -316,10 +316,11 @@ function DataTable<T>({
                     key={rowId}
                     onClick={isClickable ? () => onRowClick?.(row) : undefined}
                     className={cn(
-                      "border-b border-[var(--semantic-color-surface-border)] last:border-b-0 transition-colors",
-                      "hover:bg-[var(--primitive-color-neutral-50)]",
+                      "border-b border-[var(--semantic-color-surface-border)]/80 last:border-b-0",
+                      "transition-colors duration-[var(--primitive-motion-duration-fast)]",
+                      "hover:bg-[var(--primitive-color-brand-50)]/40",
                       isClickable && "cursor-pointer",
-                      isSelected && "bg-[var(--primitive-color-brand-50)]",
+                      isSelected && "bg-[var(--primitive-color-brand-50)]/70",
                     )}
                   >
                     {rowSelectable ? (

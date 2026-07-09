@@ -4,7 +4,7 @@ import * as React from "react";
 
 import type { InstallmentRead } from "@/lib/api/types";
 import { formatDateDisplay } from "@/lib/locale/date";
-import { formatToman, toPersianDigits } from "@/lib/locale/number";
+import { formatPhoneDisplay, formatToman, toPersianDigits } from "@/lib/locale/number";
 import { installmentDescription } from "@/lib/pdf/installment-labels";
 import type { InvoiceData } from "@/lib/pdf/types";
 import { weekdayLabel } from "@/lib/terminology";
@@ -181,7 +181,7 @@ const InvoiceDocument = React.forwardRef<HTMLDivElement, InvoiceDocumentProps>(
               {person.full_name}
             </div>
             <div style={{ fontSize: 10, color: "#444", marginBottom: 4 }}>
-              📞 {person.phone ? toPersianDigits(person.phone) : "—"}
+              📞 {formatPhoneDisplay(person.phone)}
             </div>
             <div style={{ fontSize: 10, color: "#444" }}>
               🎓 {toPersianDigits(padCode("STU", person.id))}

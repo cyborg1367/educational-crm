@@ -10,7 +10,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useDialogPortalContainer } from "@/components/ui/dialog-portal-context";
 import {
   formatDateDisplay,
   toStorageDate,
@@ -77,7 +76,6 @@ function DatePicker({
   const [viewMonth, setViewMonth] = React.useState<JalaliMonth>(() =>
     value ? storageToJalaliMonth(value) : currentMonth,
   );
-  const portalContainer = useDialogPortalContainer();
 
   const yearOptions = React.useMemo(
     () =>
@@ -164,8 +162,12 @@ function DatePicker({
       </div>
 
       <PopoverContent
-        container={portalContainer}
-        className="w-[min(20rem,calc(100vw-2*var(--semantic-space-pageMargin)))] p-[var(--primitive-space-3)]"
+        align="center"
+        side="bottom"
+        sideOffset={6}
+        collisionPadding={16}
+        avoidCollisions
+        className="w-[min(18rem,calc(100vw-2rem))] p-[var(--primitive-space-3)]"
       >
         <div className="mb-[var(--primitive-space-3)] grid grid-cols-2 gap-[var(--primitive-space-2)]">
           <Select

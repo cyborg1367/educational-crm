@@ -295,7 +295,9 @@ function FilterBar({
   return (
     <div
       className={cn(
-        "flex flex-col gap-[var(--primitive-space-4)] rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] p-[var(--primitive-space-4)]",
+        "flex flex-col gap-[var(--primitive-space-4)] rounded-[var(--primitive-radius-lg)]",
+        "border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)]",
+        "p-[var(--primitive-space-5)] shadow-[var(--primitive-elevation-1)]",
         className,
       )}
     >

@@ -36,6 +36,7 @@ import type {
 } from "@/lib/api/types";
 import { canConductConsultation } from "@/lib/auth/role";
 import { formatDateDisplay, formatDateTimeDisplay } from "@/lib/locale/date";
+import { formatPhoneDisplay } from "@/lib/locale/number";
 import {
   CONSULTATION_OUTCOME_LABELS,
   levelLabel,
@@ -406,7 +407,10 @@ export default function ConsultationOutcomeWizardPage() {
           <div className="flex flex-col gap-[var(--primitive-space-sectionGap)]">
             <dl className="rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] px-[var(--primitive-space-4)]">
               <KeyValueRow label="نام" value={person.full_name} />
-              <KeyValueRow label="تلفن" value={person.phone} />
+              <KeyValueRow
+                label="تلفن"
+                value={person.phone ? formatPhoneDisplay(person.phone) : null}
+              />
               <KeyValueRow
                 label="وضعیت"
                 value={statusDisplayLabel("person", person.status)}

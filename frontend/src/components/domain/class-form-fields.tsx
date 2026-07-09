@@ -15,14 +15,18 @@ import type {
   CourseClassRead,
   CourseClassUpdate,
   CourseRead,
+  DepartmentRead,
   UserRead,
 } from "@/lib/api/types";
+import { sortDepartmentsByInstituteCatalog } from "@/lib/department/institute-departments";
 import {
   addDaysToStorageDate,
+  formatCount,
   formatDateDisplay,
   type StorageDate,
 } from "@/lib/locale";
 import { CLASS_STATUS_OPTIONS, WEEKDAY_OPTIONS } from "@/lib/terminology";
+import { cn } from "@/lib/utils";
 
 export type ClassFormState = {
   courseId: string;
@@ -176,6 +180,7 @@ export type ClassFormFieldsProps = {
   state: ClassFormState;
   onChange: (patch: Partial<ClassFormState>) => void;
   courses: CourseRead[];
+  departments: DepartmentRead[];
   teachers: UserRead[];
   selectedCourse: CourseRead | null;
   fieldError?: ApiFieldError | null;
@@ -186,14 +191,66 @@ function ClassFormFields({
   state,
   onChange,
   courses,
+  departments,
   teachers,
   selectedCourse,
   fieldError = null,
 }: ClassFormFieldsProps) {
-  const courseOptions = courses.map((course) => ({
-    value: String(course.id),
-    label: course.title,
-  }));
+  const departmentById = React.useMemo(
+    () => new Map(departments.map((department) => [department.id, department])),
+    [departments],
+  );
+
+  const departmentTabs = React.useMemo(() => {
+    const departmentIds = new Set(courses.map((course) => course.department_id));
+    if (selectedCourse) {
+      departmentIds.add(selectedCourse.department_id);
+    }
+    return sortDepartmentsByInstituteCatalog(
+      [...departmentIds]
+        .map((id) => departmentById.get(id))
+        .filter((department): department is DepartmentRead => department != null),
+    ).map((department) => ({
+      id: String(department.id),
+      label: department.name,
+      count: courses.filter((course) => course.department_id === department.id)
+        .length,
+    }));
+  }, [courses, departmentById, selectedCourse]);
+
+  const [departmentTab, setDepartmentTab] = React.useState(() => {
+    if (selectedCourse) {
+      return String(selectedCourse.department_id);
+    }
+    return departmentTabs[0]?.id ?? "";
+  });
+
+  React.useEffect(() => {
+    if (selectedCourse) {
+      const selectedTab = String(selectedCourse.department_id);
+      if (departmentTabs.some((tab) => tab.id === selectedTab)) {
+        setDepartmentTab(selectedTab);
+        return;
+      }
+    }
+    if (
+      departmentTab &&
+      departmentTabs.some((tab) => tab.id === departmentTab)
+    ) {
+      return;
+    }
+    setDepartmentTab(departmentTabs[0]?.id ?? "");
+  }, [selectedCourse, departmentTabs, departmentTab]);
+
+  const courseOptions = React.useMemo(() => {
+    const activeDepartmentId = Number(departmentTab);
+    return courses
+      .filter((course) => course.department_id === activeDepartmentId)
+      .map((course) => ({
+        value: String(course.id),
+        label: course.title,
+      }));
+  }, [courses, departmentTab]);
 
   const teacherOptions = teachers.map((teacher) => ({
     value: String(teacher.id),
@@ -229,19 +286,77 @@ function ClassFormFields({
           required
           error={fieldError?.field === "course_id" ? fieldError : null}
         >
-          <Select
-            searchable
-            options={courseOptions}
-            value={state.courseId}
-            onChange={(value) =>
-              onChange({
-                courseId: value,
-                endDateManual: false,
-                endDate: null,
-              })
-            }
-            placeholder="انتخاب دوره"
-          />
+          {courses.length === 0 ? (
+            <p className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
+              هنوز دوره فعالی برای انتخاب وجود ندارد.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-[var(--primitive-space-3)]">
+              {departmentTabs.length > 1 ? (
+                <div
+                  role="tablist"
+                  aria-label="فیلتر دوره بر اساس دپارتمان"
+                  className="flex gap-[var(--primitive-space-1)] overflow-x-auto border-b border-[var(--semantic-color-surface-border)]"
+                >
+                  {departmentTabs.map((tab) => {
+                    const selected = tab.id === departmentTab;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={selected}
+                        onClick={() => setDepartmentTab(tab.id)}
+                        className={cn(
+                          "relative shrink-0 px-[var(--primitive-space-3)] py-[var(--primitive-space-2)]",
+                          "text-[length:var(--primitive-font-size-sm)] transition-colors",
+                          selected
+                            ? "font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-action-primary)] after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-[var(--semantic-color-action-primary)]"
+                            : "text-[var(--semantic-color-text-secondary)] hover:text-[var(--semantic-color-text-primary)]",
+                        )}
+                      >
+                        {tab.label}
+                        <span className="ms-[var(--primitive-space-1)] text-[length:var(--primitive-font-size-xs)] opacity-70">
+                          ({formatCount(tab.count)})
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+
+              {courseOptions.length === 0 ? (
+                <p className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
+                  در این دپارتمان دوره فعالی نیست.
+                </p>
+              ) : (
+                <Select
+                  searchable
+                  options={courseOptions}
+                  value={
+                    courseOptions.some((option) => option.value === state.courseId)
+                      ? state.courseId
+                      : ""
+                  }
+                  onChange={(value) =>
+                    onChange({
+                      courseId: value,
+                      endDateManual: false,
+                      endDate: null,
+                    })
+                  }
+                  placeholder="انتخاب دوره"
+                />
+              )}
+
+              {selectedCourse &&
+              String(selectedCourse.department_id) !== departmentTab ? (
+                <p className="text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]">
+                  دوره انتخاب‌شده: {selectedCourse.title}
+                </p>
+              ) : null}
+            </div>
+          )}
         </FormField>
 
         {selectedCourse ? (

@@ -53,11 +53,12 @@ function RelationshipCard({
   );
 
   const sharedClassName = cn(
-    "block rounded-[var(--primitive-radius-sm)] border border-[var(--semantic-color-surface-border)]",
-    "bg-[var(--semantic-color-surface-subtle)] p-[var(--primitive-space-3)] transition-colors",
+    "block rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)]",
+    "bg-[var(--semantic-color-surface-card)] p-[var(--primitive-space-4)]",
+    "shadow-[var(--primitive-elevation-1)] transition-all duration-[var(--primitive-motion-duration-fast)]",
     (href || onClick) && [
-      "cursor-pointer hover:bg-[var(--primitive-color-neutral-100)]",
-      "active:bg-[var(--primitive-color-neutral-200)]",
+      "cursor-pointer hover:border-[var(--primitive-color-brand-200)] hover:shadow-[var(--primitive-elevation-2)]",
+      "active:bg-[var(--primitive-color-brand-50)]/30",
       focusVisibleStyles,
     ],
     className,

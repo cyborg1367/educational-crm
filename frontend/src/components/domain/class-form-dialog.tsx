@@ -8,7 +8,7 @@ import {
   type ClassFormState,
 } from "@/components/domain/class-form-fields";
 import type { ApiError, ApiFieldError } from "@/lib/api/error";
-import type { CourseRead, UserRead } from "@/lib/api/types";
+import type { CourseRead, DepartmentRead, UserRead } from "@/lib/api/types";
 
 export type ClassFormDialogProps = {
   open: boolean;
@@ -19,6 +19,7 @@ export type ClassFormDialogProps = {
   state: ClassFormState;
   onChange: (patch: Partial<ClassFormState>) => void;
   courses: CourseRead[];
+  departments: DepartmentRead[];
   teachers: UserRead[];
   selectedCourse: CourseRead | null;
   onSubmit: () => void;
@@ -37,6 +38,7 @@ function ClassFormDialog({
   state,
   onChange,
   courses,
+  departments,
   teachers,
   selectedCourse,
   onSubmit,
@@ -61,6 +63,7 @@ function ClassFormDialog({
         state={state}
         onChange={onChange}
         courses={courses}
+        departments={departments}
         teachers={teachers}
         selectedCourse={selectedCourse}
         fieldError={fieldError}

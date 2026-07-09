@@ -17,6 +17,11 @@ export {
   type SavedView,
 } from "@/components/layout/filter-bar";
 export {
+  PeopleListToolbar,
+  type PeopleListToolbarProps,
+  type PeopleListViewMode,
+} from "@/components/layout/people-list-toolbar";
+export {
   SidebarNav,
   isNavItemActive,
   type SidebarNavProps,

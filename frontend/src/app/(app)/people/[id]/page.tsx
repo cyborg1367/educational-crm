@@ -3,11 +3,7 @@
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 
-import {
-  DataTable,
-  RelationshipCard,
-  Timeline,
-} from "@/components/data-display";
+import { DataTable, RelationshipCard, Timeline } from "@/components/data-display";
 import type { PaginatedResponse } from "@/components/data-display/types";
 import {
   AISummaryPanel,
@@ -21,13 +17,16 @@ import {
   personFormStateToUpdateBody,
   type PersonFormState,
 } from "@/components/domain/person-form-fields";
+import { PersonProfileCard } from "@/components/domain/person-profile-card";
 import { PersonFormDialog } from "@/components/domain/person-form-dialog";
+import {
+  getPersonRoadmapSidebarSummary,
+  PersonRoadmapProgress,
+} from "@/components/domain/person-roadmap-progress";
 import { ErrorState, useToast } from "@/components/feedback";
 import { FormDialog } from "@/components/domain/form-dialog";
 import { ReferralFormFields } from "@/components/domain/referral-form-fields";
 import { Breadcrumb } from "@/components/layout";
-import { RoadmapGraph } from "@/components/roadmap";
-import { Badge } from "@/components/primitives/badge";
 import { T1DetailSkeleton } from "@/components/skeletons";
 import { BlockSkeleton } from "@/components/feedback/skeleton";
 import { Button } from "@/components/ui/button";
@@ -35,10 +34,11 @@ import { fieldErrorFromApi, toApiError } from "@/lib/api/errors";
 import type { ApiError, ApiFieldError } from "@/lib/api/error";
 import { createActivity } from "@/lib/api/activities";
 import { createConsultation, listConsultations } from "@/lib/api/consultations";
-import { getDepartment, getDepartmentRoadmap, listDepartments } from "@/lib/api/departments";
+import { getDepartment, listDepartments } from "@/lib/api/departments";
 import {
   deletePerson,
   getPerson,
+  getPersonRoadmapProgress,
   listClasses,
   listEnrollments,
   listJourneys,
@@ -63,11 +63,11 @@ import {
 import type {
   ConsultationRead,
   CourseClassRead,
-  CourseRead,
   DepartmentRead,
   EnrollmentRead,
   JourneyRead,
   PersonRead,
+  PersonRoadmapProgressRead,
   TaskRead,
   UserRead,
 } from "@/lib/api/types";
@@ -77,9 +77,6 @@ import {
   isStaleLead,
 } from "@/lib/person/stale-lead";
 import {
-  genderLabel,
-  interestLabel,
-  sourceLabel,
   taskTypeLabel,
   terminologyLabel,
 } from "@/lib/terminology";
@@ -94,11 +91,11 @@ const emptyPage = <T,>(): PaginatedResponse<T> => ({
 
 function KeyValueRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[minmax(6rem,8rem)_1fr] gap-[var(--primitive-space-3)] border-b border-[var(--semantic-color-surface-border)] py-[var(--primitive-space-3)] last:border-b-0">
+    <div className="grid grid-cols-[minmax(6rem,8rem)_1fr] gap-[var(--primitive-space-4)] border-b border-[var(--semantic-color-surface-border)]/80 py-[var(--primitive-space-4)] last:border-b-0">
       <dt className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
         {label}
       </dt>
-      <dd className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-primary)]">
+      <dd className="text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-primary)]">
         {value ?? "—"}
       </dd>
     </div>
@@ -125,13 +122,12 @@ export default function PersonDetailPage() {
   const [tasks, setTasks] = React.useState<TaskRead[]>([]);
   const [departments, setDepartments] = React.useState<DepartmentRead[]>([]);
   const [classes, setClasses] = React.useState<CourseClassRead[]>([]);
-  const [journeyRoadmapCourses, setJourneyRoadmapCourses] = React.useState<
-    CourseRead[]
-  >([]);
   const [consultations, setConsultations] = React.useState<ConsultationRead[]>(
     [],
   );
   const [usersMap, setUsersMap] = React.useState<Record<number, string>>({});
+  const [roadmapProgress, setRoadmapProgress] =
+    React.useState<PersonRoadmapProgressRead | null>(null);
   const [me, setMe] = React.useState<UserRead | null>(null);
   const [tabLoading, setTabLoading] = React.useState(false);
 
@@ -171,14 +167,6 @@ export default function PersonDetailPage() {
     const map = new Map<number, string>();
     for (const cls of classes) {
       map.set(cls.id, cls.name);
-    }
-    return map;
-  }, [classes]);
-
-  const courseIdByClassId = React.useMemo(() => {
-    const map = new Map<number, number>();
-    for (const cls of classes) {
-      map.set(cls.id, cls.course_id);
     }
     return map;
   }, [classes]);
@@ -225,34 +213,18 @@ export default function PersonDetailPage() {
     )[0];
   }, [personJourneys]);
 
-  const activeJourney = React.useMemo(
-    () => personJourneys.find((journey) => journey.status === "active") ?? null,
-    [personJourneys],
-  );
-
-  const completedCourseIds = React.useMemo(
-    () =>
-      personEnrollments
-        .filter((enrollment) => enrollment.status === "completed")
-        .map((enrollment) => courseIdByClassId.get(enrollment.class_id))
-        .filter((courseId): courseId is number => courseId != null),
-    [personEnrollments, courseIdByClassId],
-  );
-
-  const enrolledCourseIds = React.useMemo(
-    () =>
-      personEnrollments
-        .filter(
-          (enrollment) =>
-            enrollment.status === "active" ||
-            enrollment.status === "pre_enroll",
-        )
-        .map((enrollment) => courseIdByClassId.get(enrollment.class_id))
-        .filter((courseId): courseId is number => courseId != null),
-    [personEnrollments, courseIdByClassId],
-  );
-
   const latestEnrollment = personEnrollments[0] ?? null;
+  const roadmapSidebarSummary = React.useMemo(
+    () => getPersonRoadmapSidebarSummary(roadmapProgress),
+    [roadmapProgress],
+  );
+
+  const handleRoadmapProgressLoaded = React.useCallback(
+    (progress: PersonRoadmapProgressRead | null) => {
+      setRoadmapProgress(progress);
+    },
+    [],
+  );
 
   const loadPerson = React.useCallback(async () => {
     if (!Number.isFinite(personId)) {
@@ -299,7 +271,7 @@ export default function PersonDetailPage() {
     if (!person) return;
     setTabLoading(true);
     try {
-      const [journeyRes, enrollmentRes, taskRes, deptRes, classRes, consultRes] =
+      const [journeyRes, enrollmentRes, taskRes, deptRes, classRes, consultRes, progressRes] =
         await Promise.all([
           listJourneys({ limit: 500 }),
           listEnrollments({ limit: 500 }),
@@ -307,6 +279,7 @@ export default function PersonDetailPage() {
           listDepartments({ limit: 100 }),
           listClasses({ limit: 500 }),
           listConsultations({ limit: 500 }),
+          getPersonRoadmapProgress(person.id).catch(() => null),
         ]);
       setJourneys(journeyRes.items);
       setEnrollments(enrollmentRes.items);
@@ -314,34 +287,13 @@ export default function PersonDetailPage() {
       setDepartments(deptRes.items);
       setClasses(classRes.items);
       setConsultations(consultRes.items);
+      setRoadmapProgress(progressRes);
     } catch {
       // Tab-level errors handled per tab via empty states
     } finally {
       setTabLoading(false);
     }
   }, [person]);
-
-  React.useEffect(() => {
-    if (!activeJourney) {
-      setJourneyRoadmapCourses([]);
-      return;
-    }
-    let cancelled = false;
-    void getDepartmentRoadmap(activeJourney.department_id)
-      .then((res) => {
-        if (!cancelled) {
-          setJourneyRoadmapCourses(res.courses);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setJourneyRoadmapCourses([]);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeJourney]);
 
   const refreshConsultations = React.useCallback(async () => {
     try {
@@ -568,55 +520,19 @@ export default function PersonDetailPage() {
             label: "اطلاعات کلی",
             content: (
               <div className="flex flex-col gap-[var(--semantic-space-sectionGap)]">
-                <dl className="rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] px-[var(--primitive-space-4)]">
-                  <KeyValueRow label="تلفن" value={person.phone} />
-                  <KeyValueRow label="ایمیل" value={person.email} />
-                  <KeyValueRow
-                    label="تاریخ تولد"
-                    value={
-                      person.birth_date
-                        ? formatDateDisplay(person.birth_date)
-                        : "ثبت نشده"
-                    }
-                  />
-                  <KeyValueRow
-                    label="جنسیت"
-                    value={
-                      person.gender ? genderLabel(person.gender) : "ثبت نشده"
-                    }
-                  />
-                  <KeyValueRow
-                    label="علاقه‌مندی‌ها"
-                    value={
-                      person.interests && person.interests.length > 0 ? (
-                        <span className="flex flex-wrap gap-[var(--primitive-space-2)]">
-                          {person.interests.map((interest) => (
-                            <Badge key={interest} variant="brand">
-                              {interestLabel(interest)}
-                            </Badge>
-                          ))}
-                        </span>
-                      ) : (
-                        "ثبت نشده"
-                      )
-                    }
-                  />
-                  <KeyValueRow
-                    label="توضیحات علاقه‌مندی"
-                    value={person.interests_note ?? "—"}
-                  />
-                  <KeyValueRow
-                    label="منبع آشنایی"
-                    value={
-                      person.source ? sourceLabel(person.source) : "ثبت نشده"
-                    }
-                  />
-                  <KeyValueRow label="یادداشت" value={person.notes ?? "—"} />
-                </dl>
+                <PersonProfileCard
+                  person={person}
+                  stale={stale}
+                  lastActivityLabel={
+                    lastActivityAt
+                      ? formatDateTimeDisplay(lastActivityAt, "YYYY/MM/DD")
+                      : null
+                  }
+                />
 
                 <div className="flex flex-col gap-[var(--primitive-space-3)]">
                   <div className="flex flex-wrap items-center justify-between gap-[var(--primitive-space-3)]">
-                    <h2 className="text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-primary)]">
+                    <h2 className="text-[length:var(--primitive-font-size-base)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
                       مشاوره‌ها
                     </h2>
                     {canRefer ? (
@@ -641,7 +557,7 @@ export default function PersonDetailPage() {
                       {personConsultations.map((consultation) => (
                         <div
                           key={consultation.id}
-                          className="rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] px-[var(--primitive-space-4)] py-[var(--primitive-space-3)]"
+                          className="rounded-[var(--primitive-radius-lg)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] px-[var(--primitive-space-5)] py-[var(--primitive-space-4)] shadow-[var(--primitive-elevation-1)] transition-shadow duration-[var(--primitive-motion-duration-fast)] hover:shadow-[var(--primitive-elevation-2)]"
                         >
                           <dl className="flex flex-col gap-[var(--primitive-space-2)]">
                             <KeyValueRow
@@ -809,28 +725,17 @@ export default function PersonDetailPage() {
                 onRowClick={(row) => router.push(`/enrollments/${row.id}`)}
                 emptyMessage="ثبت‌نامی یافت نشد"
               />
-                {activeJourney && journeyRoadmapCourses.length > 0 ? (
-                  <div className="flex flex-col gap-[var(--primitive-space-3)]">
-                    <h3 className="text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
-                      مسیر آموزشی در{" "}
-                      {departmentNameById.get(activeJourney.department_id) ?? "—"}
-                    </h3>
-                    <div
-                      style={{
-                        height: 300,
-                        border: "1px solid #EBEBEB",
-                        borderRadius: 12,
-                      }}
-                    >
-                      <RoadmapGraph
-                        courses={journeyRoadmapCourses}
-                        completedCourseIds={completedCourseIds}
-                        enrolledCourseIds={enrolledCourseIds}
-                      />
-                    </div>
-                  </div>
-                ) : null}
               </div>
+            ),
+          },
+          {
+            id: "roadmap",
+            label: "نقشه راه",
+            content: (
+              <PersonRoadmapProgress
+                personId={person.id}
+                onProgressLoaded={handleRoadmapProgressLoaded}
+              />
             ),
           },
           {
@@ -911,6 +816,18 @@ export default function PersonDetailPage() {
                 title="ثبت‌نامی یافت نشد"
               />
             )}
+            {roadmapSidebarSummary ? (
+              <RelationshipCard
+                label="موقعیت در مسیر"
+                title={roadmapSidebarSummary.title}
+                subtitle={roadmapSidebarSummary.subtitle}
+              />
+            ) : (
+              <RelationshipCard
+                label="موقعیت در مسیر"
+                title="نقشه راهی ثبت نشده"
+              />
+            )}
           </div>
         }
       />
@@ -937,9 +854,9 @@ export default function PersonDetailPage() {
         tier={2}
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
-        title="حذف شخص"
-        body={`آیا از حذف «${person.full_name}» مطمئن هستید؟ این عمل برای توسعه است و تمام timeline و داده‌های وابسته را هم پاک می‌کند.`}
-        confirmLabel="حذف"
+        title="حذف دانش‌پذیر"
+        body={`«${person.full_name}» برای همیشه حذف می‌شود؛ تایم‌لاین و داده‌های وابسته هم پاک می‌شوند.`}
+        confirmLabel="بله، حذف شود"
         cancelLabel="انصراف"
         confirmVariant="destructive"
         confirmLoading={deleting}

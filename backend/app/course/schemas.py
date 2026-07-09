@@ -30,6 +30,10 @@ class CourseRead(BaseModel):
         description="Sessions per week, if known.",
         examples=[2],
     )
+    prerequisite_course_ids: list[int] = Field(
+        default_factory=list,
+        description="Course ids that must be completed before this course.",
+    )
     is_active: bool = Field(description="Whether the course is offered.")
     prerequisite_ids: list[int] = Field(
         default_factory=list,
@@ -106,6 +110,10 @@ class CourseCreate(BaseModel):
         description="Sessions per week. Must be > 0 when set.",
         examples=[2],
     )
+    prerequisite_course_ids: list[int] = Field(
+        default_factory=list,
+        description="Course ids that are prerequisites.",
+    )
     is_active: bool = Field(default=True, description="Whether the course is offered.")
     prerequisite_ids: list[int] = Field(
         default_factory=list,
@@ -150,6 +158,10 @@ class CourseUpdate(BaseModel):
         default=None,
         ge=1,
         description="Updated sessions per week. Must be > 0 when set.",
+    )
+    prerequisite_course_ids: list[int] | None = Field(
+        default=None,
+        description="Updated prerequisite course ids.",
     )
     is_active: bool | None = Field(default=None, description="Updated active flag.")
     prerequisite_ids: list[int] | None = Field(

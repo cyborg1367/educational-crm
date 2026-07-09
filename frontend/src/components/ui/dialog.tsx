@@ -11,6 +11,32 @@ const DialogTrigger = DialogPrimitive.Trigger;
 const DialogPortal = DialogPrimitive.Portal;
 const DialogClose = DialogPrimitive.Close;
 
+const dialogCloseButtonClassName = cn(
+  "inline-flex size-9 shrink-0 items-center justify-center",
+  "rounded-[var(--primitive-radius-full)] bg-[var(--primitive-color-neutral-800)] text-white",
+  "transition-colors duration-[var(--primitive-motion-duration-fast)] ease-[var(--primitive-motion-easing-standard)]",
+  "hover:bg-[var(--primitive-color-neutral-900)]",
+  "active:bg-[var(--primitive-color-neutral-950)]",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--semantic-color-action-focusRing)] focus-visible:ring-offset-2",
+  "disabled:pointer-events-none disabled:opacity-50",
+);
+
+function DialogCloseButton({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Close>) {
+  return (
+    <DialogPrimitive.Close
+      className={cn(dialogCloseButtonClassName, className)}
+      title="بستن"
+      {...props}
+    >
+      <X className="size-4 stroke-[2.5]" aria-hidden />
+      <span className="sr-only">بستن</span>
+    </DialogPrimitive.Close>
+  );
+}
+
 const DialogOverlay = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
@@ -18,7 +44,9 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-[var(--primitive-zIndex-modal)] bg-black/40",
+      "fixed inset-0 z-[var(--primitive-zIndex-modal)] bg-[var(--primitive-color-neutral-900)]/50 backdrop-blur-[2px]",
+      "data-[state=open]:animate-[dialog-overlay-fade-in_var(--primitive-motion-duration-base)_var(--primitive-motion-easing-standard)]",
+      "data-[state=closed]:animate-[dialog-overlay-fade-out_var(--primitive-motion-duration-base)_var(--primitive-motion-easing-standard)]",
       className,
     )}
     {...props}
@@ -28,23 +56,25 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 const DialogContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+    hideClose?: boolean;
+  }
+>(({ className, children, hideClose = false, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed inset-inline-start-1/2 top-1/2 z-[var(--primitive-zIndex-modal)] grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border border-border bg-card p-6 shadow-[var(--primitive-elevation-3)] duration-[var(--primitive-motion-duration-base)] sm:rounded-[var(--primitive-radius-lg)]",
+        // Use inset + margin auto for centering so open/close animations never fight transform.
+        "fixed inset-0 z-[var(--primitive-zIndex-modal)] m-auto grid h-fit w-full max-w-lg gap-4 overflow-hidden border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] p-0 shadow-[var(--primitive-elevation-3)] duration-[var(--primitive-motion-duration-base)] sm:rounded-[var(--primitive-radius-xl)]",
         className,
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute inset-inline-end-4 top-4 rounded-[var(--primitive-radius-sm)] opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none">
-        <X className="h-4 w-4" />
-        <span className="sr-only">بستن</span>
-      </DialogPrimitive.Close>
+      {hideClose ? null : (
+        <DialogCloseButton className="absolute inset-inline-end-5 top-5 z-10" />
+      )}
     </DialogPrimitive.Content>
   </DialogPortal>
 ));
@@ -113,6 +143,7 @@ export {
   DialogOverlay,
   DialogTrigger,
   DialogClose,
+  DialogCloseButton,
   DialogContent,
   DialogHeader,
   DialogFooter,

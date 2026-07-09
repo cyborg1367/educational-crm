@@ -6,6 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.activity.router import router as activities_router
+from app.attendance.progress_router import router as progress_router
 from app.attendance.router import router as attendances_router
 from app.auth.router import router as auth_router
 from app.communication.router import router as communications_router
@@ -75,6 +76,7 @@ app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(organizations_router, prefix="/organizations", tags=["Organizations"])
 app.include_router(users_router, prefix="/users", tags=["Users"])
 app.include_router(people_router, prefix="/people", tags=["People"])
+app.include_router(progress_router, prefix="/people", tags=["Roadmap Progress"])
 app.include_router(departments_router, prefix="/departments", tags=["Departments"])
 app.include_router(courses_router, prefix="/courses", tags=["Courses"])
 app.include_router(classes_router, prefix="/classes", tags=["Classes"])

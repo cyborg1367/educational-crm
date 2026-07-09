@@ -75,7 +75,7 @@ def _validate_discount(discount_snapshot: int, price_snapshot: int) -> None:
 
 
 def create_enrollment(
-    db: Session, org_id: int, data: EnrollmentCreate
+    db: Session, org_id: int, data: EnrollmentCreate, *, actor_id: int | None = None
 ) -> Enrollment:
     course_id = _validate_fks(
         db,
@@ -89,11 +89,31 @@ def create_enrollment(
     price_snapshot = course.current_price
     _validate_discount(data.discount_snapshot, price_snapshot)
 
+    # Ensure linked journey (or department journey) gets a roadmap when possible.
+    journey_id = data.journey_id
+    if journey_id is None:
+        journey = journey_service.get_or_create_journey(
+            db, org_id, data.person_id, course.department_id
+        )
+        journey_id = journey.id
+    else:
+        journey = journey_service.get_journey(db, org_id, journey_id)
+        journey_service.ensure_journey_roadmap(db, org_id, journey)
+
+    # Soft path-gap check (does not block enrollment).
+    from app.attendance import progress as progress_service
+
+    journey_id_for_gap, gap_item_ids = (
+        progress_service.find_prior_uncertified_steps_for_course(
+            db, org_id, data.person_id, course_id
+        )
+    )
+
     enrollment = Enrollment(
         person_id=data.person_id,
         class_id=data.class_id,
         consultation_id=data.consultation_id,
-        journey_id=data.journey_id,
+        journey_id=journey_id,
         status=data.status,
         price_snapshot=price_snapshot,
         discount_snapshot=data.discount_snapshot,
@@ -110,6 +130,25 @@ def create_enrollment(
             "Person already has a live enrollment for this class"
         ) from None
     db.refresh(enrollment)
+
+    if gap_item_ids:
+        activity_service.log_activity(
+            db,
+            org_id,
+            data.person_id,
+            action="enrollment_path_gap_warning",
+            payload={
+                "enrollment_id": enrollment.id,
+                "course_id": course_id,
+                "journey_id": journey_id_for_gap or journey_id,
+                "gap_item_ids": gap_item_ids,
+                "message": (
+                    "ثبت‌نام وسط مسیر ثبت شد؛ مراحل قبل هنوز تکمیل یا معاف نشده‌اند."
+                ),
+            },
+            actor_id=actor_id,
+        )
+
     return enrollment
 
 

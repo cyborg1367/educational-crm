@@ -54,7 +54,7 @@ import { InvoicePrintActions } from "@/components/invoice/invoice-print-actions"
 import type { InvoiceData } from "@/lib/pdf/types";
 import { canManageEnrollments, canManageFinance } from "@/lib/auth/role";
 import { computeDropPreflight } from "@/lib/finance/preflight";
-import { formatDateDisplay, formatToman } from "@/lib/locale";
+import { formatDateDisplay, formatPhoneDisplay, formatToman } from "@/lib/locale";
 
 const MONEY_LOCK_REASON =
   "مبلغ در زمان ثبت‌نام ثبت شده و قابل تغییر نیست";
@@ -507,7 +507,11 @@ export default function EnrollmentDetailPage() {
             <RelationshipCard
               label="شخص"
               title={person.full_name}
-              subtitle={person.phone ?? person.email ?? undefined}
+              subtitle={
+                person.phone
+                  ? formatPhoneDisplay(person.phone)
+                  : person.email ?? undefined
+              }
               href={`/people/${person.id}`}
             />
             <RelationshipCard

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.activity import service as activity_service
 from app.activity.model import Activity
 from app.attendance.model import Attendance
+from app.attendance.waiver_model import JourneyRoadmapWaiver
 from app.communication.model import Communication
 from app.consultation.model import Consultation
 from app.core.errors import ConflictError, NotFoundError
@@ -219,12 +220,29 @@ def delete_person(db: Session, org_id: int, person_id: int) -> None:
             Consultation.person_id == person_id,
         )
     )
-    db.execute(
-        delete(Journey).where(
-            Journey.org_id == org_id,
-            Journey.person_id == person_id,
-        )
+
+    journey_ids = list(
+        db.scalars(
+            select(Journey.id).where(
+                Journey.org_id == org_id,
+                Journey.person_id == person_id,
+            )
+        ).all()
     )
+    if journey_ids:
+        db.execute(
+            delete(JourneyRoadmapWaiver).where(
+                JourneyRoadmapWaiver.org_id == org_id,
+                JourneyRoadmapWaiver.journey_id.in_(journey_ids),
+            )
+        )
+        db.execute(
+            delete(Journey).where(
+                Journey.org_id == org_id,
+                Journey.id.in_(journey_ids),
+            )
+        )
+
     db.execute(
         delete(Task).where(
             Task.org_id == org_id,

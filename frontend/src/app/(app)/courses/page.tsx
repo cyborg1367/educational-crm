@@ -1,11 +1,19 @@
 "use client";
 
 import * as React from "react";
+import {
+  ArrowUpLeft,
+  CalendarClock,
+  CalendarDays,
+  Coins,
+  LayoutGrid,
+  Timer,
+  Table2,
+} from "lucide-react";
 
-import { DataTable, EntitySummaryCard } from "@/components/data-display";
+import { DataTable } from "@/components/data-display";
 import type { PaginatedResponse } from "@/components/data-display/types";
 import {
-  CourseFormFields,
   courseFormStateFromRead,
   courseFormStateToCreateBody,
   courseFormStateToUpdateBody,
@@ -13,7 +21,7 @@ import {
   isCourseFormValid,
   type CourseFormState,
 } from "@/components/domain/course-form-fields";
-import { FormDialog } from "@/components/domain/form-dialog";
+import { CourseFormDialog } from "@/components/domain/course-form-dialog";
 import { ErrorState, useToast } from "@/components/feedback";
 import { Checkbox } from "@/components/form/selection-control";
 import { FilterBar, type FilterValues } from "@/components/layout";
@@ -25,10 +33,19 @@ import { listDepartments } from "@/lib/api/departments";
 import type { ApiError, ApiFieldError } from "@/lib/api/error";
 import { fieldErrorFromApi, toApiError } from "@/lib/api/errors";
 import type { CourseRead, DepartmentRead } from "@/lib/api/types";
-import { formatCount, formatToman } from "@/lib/locale";
+import { formatCount, formatNumber, formatToman } from "@/lib/locale";
 import { cn } from "@/lib/utils";
 
 const PAGE_LIMIT = 50;
+const COURSES_VIEW_STORAGE_KEY = "courses-list-view";
+
+const DEPARTMENT_IMAGES = {
+  ai: "/images/departments/dept-ai.png",
+  it: "/images/departments/dept-it.png",
+  finance: "/images/departments/dept-finance.png",
+  langKids: "/images/departments/dept-lang-kids.png",
+  langAdult: "/images/departments/dept-lang-adult.png",
+} as const;
 
 const emptyPage = <T,>(): PaginatedResponse<T> => ({
   items: [],
@@ -39,6 +56,24 @@ const emptyPage = <T,>(): PaginatedResponse<T> => ({
 });
 
 type DialogMode = "create" | "edit";
+type CoursesListViewMode = "cards" | "table";
+type DepartmentVisual = {
+  imageSrc: string;
+  imageAlt: string;
+};
+
+/** Shared brand chrome for all course cards: orange + charcoal, royal blue only as accent. */
+const BRAND_CARD = {
+  headerLineClassName:
+    "bg-gradient-to-l from-[var(--primitive-color-brand-500)] via-[var(--primitive-color-brand-400)] to-[#2563EB]",
+  prerequisiteBoxClassName:
+    "border-[var(--primitive-color-brand-200)]/80 bg-[var(--primitive-color-brand-50)]/70",
+  prerequisiteChipClassName:
+    "border-[var(--primitive-color-brand-200)] bg-[var(--semantic-color-surface-card)] text-[var(--primitive-color-brand-700)]",
+  prerequisiteLabelClassName: "text-[var(--primitive-color-brand-700)]",
+  priceBarClassName:
+    "border-[var(--primitive-color-brand-200)]/70 bg-[var(--primitive-color-brand-50)]/60",
+} as const;
 
 function ActiveBadge({ isActive }: { isActive: boolean }) {
   return (
@@ -55,6 +90,51 @@ function ActiveBadge({ isActive }: { isActive: boolean }) {
 }
 
 type CourseRow = CourseRead & { department_name: string };
+
+function CourseMiniMetric({
+  icon: Icon,
+  value,
+  label,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  value: string;
+  label: string;
+}) {
+  return (
+    <div className="rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)]/75 bg-[var(--semantic-color-surface-subtle)]/80 px-[var(--primitive-space-2)] py-[var(--primitive-space-2)]">
+      <div className="flex items-center gap-[var(--primitive-space-2)]">
+        <Icon className="size-3.5 text-[var(--semantic-color-text-secondary)]" />
+        <p className="text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
+          {value}
+        </p>
+      </div>
+      <p className="mt-1 text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function getDepartmentVisual(departmentName: string): DepartmentVisual {
+  if (departmentName.includes("هوش مصنوعی")) {
+    return { imageSrc: DEPARTMENT_IMAGES.ai, imageAlt: departmentName };
+  }
+  if (departmentName.includes("فناوری") || departmentName.includes("اطلاعات")) {
+    return { imageSrc: DEPARTMENT_IMAGES.it, imageAlt: departmentName };
+  }
+  if (departmentName.includes("مالی")) {
+    return { imageSrc: DEPARTMENT_IMAGES.finance, imageAlt: departmentName };
+  }
+  if (departmentName.includes("زبان")) {
+    return {
+      imageSrc: departmentName.includes("کودکان")
+        ? DEPARTMENT_IMAGES.langKids
+        : DEPARTMENT_IMAGES.langAdult,
+      imageAlt: departmentName,
+    };
+  }
+  return { imageSrc: DEPARTMENT_IMAGES.it, imageAlt: departmentName };
+}
 
 export default function CoursesListPage() {
   const { toast } = useToast();
@@ -79,6 +159,19 @@ export default function CoursesListPage() {
   );
   const [formError, setFormError] = React.useState<ApiError | null>(null);
   const [fieldError, setFieldError] = React.useState<ApiFieldError | null>(null);
+  const [viewMode, setViewMode] = React.useState<CoursesListViewMode>("cards");
+
+  React.useEffect(() => {
+    const stored = window.localStorage.getItem(COURSES_VIEW_STORAGE_KEY);
+    if (stored === "cards" || stored === "table") {
+      setViewMode(stored);
+    }
+  }, []);
+
+  const handleViewModeChange = (mode: CoursesListViewMode) => {
+    setViewMode(mode);
+    window.localStorage.setItem(COURSES_VIEW_STORAGE_KEY, mode);
+  };
 
   const departmentFilter =
     typeof filterValues.department === "string"
@@ -113,6 +206,10 @@ export default function CoursesListPage() {
   const departmentById = React.useMemo(
     () => new Map(departments.map((dept) => [dept.id, dept.name])),
     [departments],
+  );
+  const courseTitleById = React.useMemo(
+    () => new Map(coursesPage.items.map((course) => [course.id, course.title])),
+    [coursesPage.items],
   );
 
   const rows: CourseRow[] = React.useMemo(() => {
@@ -243,16 +340,56 @@ export default function CoursesListPage() {
                 setOffset(0);
               }}
             />
-            <Checkbox
-              label="فقط فعال"
-              checked={activeOnly}
-              onChange={(event) => {
-                setActiveOnly(event.target.checked);
-                setOffset(0);
-              }}
-            />
+            <div className="flex flex-wrap items-center justify-between gap-[var(--primitive-space-3)]">
+              <Checkbox
+                label="فقط فعال"
+                checked={activeOnly}
+                onChange={(event) => {
+                  setActiveOnly(event.target.checked);
+                  setOffset(0);
+                }}
+              />
+              <div
+                className={cn(
+                  "inline-flex rounded-[var(--primitive-radius-full)] border border-[var(--semantic-color-surface-border)]",
+                  "bg-[var(--semantic-color-surface-card)] p-0.5 shadow-[var(--primitive-elevation-1)]",
+                )}
+                role="group"
+                aria-label="نوع نمایش"
+              >
+                {(
+                  [
+                    { mode: "cards" as const, icon: LayoutGrid, label: "کارت" },
+                    { mode: "table" as const, icon: Table2, label: "جدول" },
+                  ] as const
+                ).map(({ mode, icon: Icon, label }) => {
+                  const active = viewMode === mode;
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => handleViewModeChange(mode)}
+                      aria-pressed={active}
+                      className={cn(
+                        "inline-flex items-center gap-[var(--primitive-space-1)] rounded-[var(--primitive-radius-full)]",
+                        "px-[var(--primitive-space-3)] py-[var(--primitive-space-2)]",
+                        "text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)]",
+                        "transition-colors duration-150",
+                        active
+                          ? "bg-[var(--semantic-color-action-primary)] text-[var(--semantic-color-text-inverse)]"
+                          : "text-[var(--semantic-color-text-secondary)] hover:text-[var(--semantic-color-text-primary)]",
+                      )}
+                    >
+                      <Icon className="size-3.5" aria-hidden />
+                      <span>{label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         }
+        primaryView={viewMode === "table" ? "table" : "cards"}
         table={
           <DataTable
             columns={[
@@ -304,32 +441,170 @@ export default function CoursesListPage() {
           />
         }
         cardList={
-          <div className="flex flex-col gap-[var(--primitive-space-3)]">
+          <div className="grid grid-cols-1 gap-[var(--primitive-space-4)] md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {loading ? (
-              <p className="text-center text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
+              <p className="col-span-full text-center text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
                 در حال بارگذاری…
               </p>
             ) : rows.length === 0 ? (
-              <p className="text-center text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
+              <p className="col-span-full text-center text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
                 دوره‌ای یافت نشد
               </p>
             ) : (
-              rows.map((row) => (
-                <EntitySummaryCard
-                  key={row.id}
-                  title={row.title}
-                  subtitle={row.department_name}
-                  meta={formatToman(row.current_price)}
-                  badges={<ActiveBadge isActive={row.is_active} />}
-                  onClick={() => openEditDialog(row)}
-                />
-              ))
+              rows.map((row) => {
+                const prerequisiteNames = row.prerequisite_course_ids
+                  .map((id) => courseTitleById.get(id) ?? `دوره #${formatCount(id)}`);
+                const deptVisual = getDepartmentVisual(row.department_name);
+
+                return (
+                  <article
+                    key={row.id}
+                    className={cn(
+                      "relative overflow-hidden rounded-[var(--primitive-radius-lg)]",
+                      "border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)]/95",
+                      "shadow-[var(--primitive-elevation-1)] transition-all duration-[var(--primitive-motion-duration-base)]",
+                      "hover:-translate-y-0.5 hover:shadow-[var(--primitive-elevation-2)]",
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "absolute inset-x-0 top-0 h-0.5",
+                        BRAND_CARD.headerLineClassName,
+                      )}
+                      aria-hidden
+                    />
+                    <button
+                      type="button"
+                      onClick={() => openEditDialog(row)}
+                      className="flex h-full w-full flex-col p-[var(--semantic-space-cardPadding)] text-right"
+                    >
+                      <div className="rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)]/70 bg-[color-mix(in_srgb,var(--semantic-color-surface-subtle)_75%,white)] px-[var(--primitive-space-3)] py-[var(--primitive-space-3)]">
+                        <div className="flex items-start justify-between gap-[var(--primitive-space-3)]">
+                          <div className="flex min-w-0 items-center gap-[var(--primitive-space-3)]">
+                            <span className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-[var(--primitive-radius-lg)] bg-[var(--semantic-color-surface-card)] shadow-[var(--primitive-elevation-1)] ring-1 ring-[var(--semantic-color-surface-border)]">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={deptVisual.imageSrc}
+                                alt={deptVisual.imageAlt}
+                                width={64}
+                                height={64}
+                                className="size-full object-contain p-1"
+                                loading="lazy"
+                                decoding="async"
+                              />
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-[length:var(--primitive-font-size-base)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
+                                {row.title}
+                              </p>
+                              <p className="mt-1 truncate text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
+                                {row.department_name}
+                              </p>
+                            </div>
+                          </div>
+                          <ActiveBadge isActive={row.is_active} />
+                        </div>
+                      </div>
+
+                      <div
+                        className={cn(
+                          "mt-[var(--primitive-space-3)] flex items-center justify-between gap-[var(--primitive-space-3)] rounded-[var(--primitive-radius-md)] border px-[var(--primitive-space-3)] py-[var(--primitive-space-2)]",
+                          BRAND_CARD.priceBarClassName,
+                        )}
+                      >
+                        <div className="inline-flex items-center gap-[var(--primitive-space-2)] text-[var(--primitive-color-brand-700)]">
+                          <Coins className="size-4" aria-hidden />
+                          <span className="text-[length:var(--primitive-font-size-xs)] font-[var(--primitive-font-weight-medium)]">
+                            شهریه
+                          </span>
+                        </div>
+                        <p className="text-[length:var(--primitive-font-size-lg)] font-[var(--primitive-font-weight-semibold)] text-[var(--primitive-color-brand-700)]">
+                          {formatToman(row.current_price)}
+                        </p>
+                      </div>
+
+                      <div className="mt-[var(--primitive-space-3)] grid grid-cols-2 gap-[var(--primitive-space-2)]">
+                        <CourseMiniMetric
+                          icon={CalendarDays}
+                          value={
+                            row.duration_sessions != null
+                              ? formatCount(row.duration_sessions)
+                              : "—"
+                          }
+                          label="جلسه"
+                        />
+                        <CourseMiniMetric
+                          icon={CalendarClock}
+                          value={
+                            row.sessions_per_week != null
+                              ? formatCount(row.sessions_per_week)
+                              : "—"
+                          }
+                          label="در هفته"
+                        />
+                        <CourseMiniMetric
+                          icon={Timer}
+                          value={
+                            row.total_hours != null ? formatCount(row.total_hours) : "—"
+                          }
+                          label="ساعت کل"
+                        />
+                        <CourseMiniMetric
+                          icon={Timer}
+                          value={
+                            row.session_duration != null
+                              ? formatNumber(row.session_duration)
+                              : "—"
+                          }
+                          label="هر جلسه"
+                        />
+                      </div>
+
+                      <div
+                        className={cn(
+                          "mt-[var(--primitive-space-3)] rounded-[var(--primitive-radius-md)] border px-[var(--primitive-space-3)] py-[var(--primitive-space-2)]",
+                          BRAND_CARD.prerequisiteBoxClassName,
+                        )}
+                      >
+                        <p
+                          className={cn(
+                            "mb-[var(--primitive-space-1)] inline-flex items-center gap-[var(--primitive-space-1)] text-[length:var(--primitive-font-size-xs)] font-[var(--primitive-font-weight-medium)]",
+                            BRAND_CARD.prerequisiteLabelClassName,
+                          )}
+                        >
+                          <ArrowUpLeft className="size-3.5" aria-hidden />
+                          پیش‌نیاز مسیر
+                        </p>
+                        {prerequisiteNames.length > 0 ? (
+                          <div className="flex flex-wrap gap-[var(--primitive-space-2)]">
+                            {prerequisiteNames.map((name) => (
+                              <span
+                                key={name}
+                                className={cn(
+                                  "rounded-[var(--primitive-radius-full)] border bg-[var(--semantic-color-surface-card)] px-[var(--primitive-space-2)] py-0.5 text-[length:var(--primitive-font-size-xs)]",
+                                  BRAND_CARD.prerequisiteChipClassName,
+                                )}
+                              >
+                                {name}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
+                            این دوره شروع مسیر است و پیش‌نیاز ندارد.
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  </article>
+                );
+              })
             )}
           </div>
         }
       />
 
-      <FormDialog
+      <CourseFormDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         title={dialogMode === "create" ? "افزودن دوره" : "ویرایش دوره"}
@@ -337,18 +612,16 @@ export default function CoursesListPage() {
         onSubmit={() => void handleSubmit()}
         submitLoading={submitting}
         submitDisabled={!isCourseFormValid(formState)}
+        departments={departments}
+        courses={coursesPage.items}
+        currentCourseId={editingCourseId}
+        state={formState}
+        onChange={(patch) =>
+          setFormState((prev) => ({ ...prev, ...patch }))
+        }
+        fieldError={fieldError}
         formError={formError}
-      >
-        <CourseFormFields
-          state={formState}
-          onChange={(patch) =>
-            setFormState((prev) => ({ ...prev, ...patch }))
-          }
-          departments={departments}
-          editingCourseId={editingCourseId}
-          fieldError={fieldError}
-        />
-      </FormDialog>
+      />
     </>
   );
 }

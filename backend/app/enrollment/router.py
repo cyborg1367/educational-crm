@@ -82,7 +82,9 @@ def create_enrollment(
     Returns 409 if the person already has a live enrollment for this class.
     Returns 422 if discount exceeds price or validation fails.
     """
-    enrollment = enrollment_service.create_enrollment(db, current_user.org_id, body)
+    enrollment = enrollment_service.create_enrollment(
+        db, current_user.org_id, body, actor_id=current_user.id
+    )
     workflow_service.on_enrollment_created(
         db,
         current_user.org_id,

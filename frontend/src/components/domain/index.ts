@@ -24,3 +24,26 @@ export {
   PermissionBanner,
   type PermissionBannerProps,
 } from "./permission-banner";
+export {
+  TaskInboxToolbar,
+  type TaskInboxToolbarProps,
+} from "./task-inbox-toolbar";
+export {
+  TaskViewChips,
+  TaskPriorityChips,
+  type TaskViewChipsProps,
+  type TaskPriorityChipsProps,
+} from "./task-priority-chips";
+export {
+  TaskQueueList,
+  type TaskQueueListProps,
+  type ReferralQueueItem,
+} from "./task-queue-list";
+export {
+  TaskQueueRow,
+  type TaskQueueRowProps,
+} from "./task-queue-row";
+export {
+  TaskDetailPane,
+  type TaskDetailPaneProps,
+} from "./task-detail-pane";

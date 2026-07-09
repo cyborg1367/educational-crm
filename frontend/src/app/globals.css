@@ -34,6 +34,7 @@
   --radius-sm: var(--primitive-radius-sm);
   --radius-md: var(--primitive-radius-md);
   --radius-lg: var(--primitive-radius-lg);
+  --radius-xl: var(--primitive-radius-xl);
   --font-sans: "Vazirmatn", Tahoma, sans-serif;
 }
 
@@ -42,6 +43,7 @@ body {
   font-family: "Vazirmatn", Tahoma, sans-serif;
   letter-spacing: 0;
   word-spacing: normal;
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -49,6 +51,8 @@ body {
   color: var(--foreground);
   font-size: var(--primitive-font-size-base);
   line-height: var(--primitive-font-lineHeight-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Directional icons mirror with reading direction — 04-design-system.md §4 */
@@ -56,37 +60,72 @@ html[dir="rtl"] .icon-mirror-rtl {
   transform: scaleX(-1);
 }
 
-/* ConfirmDialog — fade+scale per 04-design-system.md §6 (same motion for tier 2 and 3). */
-@keyframes confirm-dialog-fade-scale-in {
+@keyframes dialog-overlay-fade-in {
   from {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.96);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
   }
 }
 
-@keyframes confirm-dialog-fade-scale-out {
+@keyframes dialog-overlay-fade-out {
   from {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
   }
   to {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.96);
   }
 }
 
-.confirm-dialog-content[data-state="open"] {
-  animation: confirm-dialog-fade-scale-in var(--primitive-motion-duration-base)
+/* Confirm/Form dialogs — fade only. Centering is inset+margin (no transform),
+   so open/close never jumps when the animation ends. */
+@keyframes dialog-content-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dialog-content-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.confirm-dialog-content[data-state="open"],
+.form-dialog-content[data-state="open"] {
+  animation: dialog-content-fade-in var(--primitive-motion-duration-base)
     var(--primitive-motion-easing-standard);
 }
 
-.confirm-dialog-content[data-state="closed"] {
-  animation: confirm-dialog-fade-scale-out var(--primitive-motion-duration-base)
+.confirm-dialog-content[data-state="closed"],
+.form-dialog-content[data-state="closed"] {
+  animation: dialog-content-fade-out var(--primitive-motion-duration-base)
     var(--primitive-motion-easing-standard);
+}
+
+.form-dialog-body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--primitive-color-neutral-300) transparent;
+}
+
+.form-dialog-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.form-dialog-body::-webkit-scrollbar-thumb {
+  border-radius: var(--primitive-radius-full);
+  background: var(--primitive-color-neutral-300);
+}
+
+.form-dialog-body::-webkit-scrollbar-thumb:hover {
+  background: var(--primitive-color-neutral-400);
 }
 
 /* Panel drawer — slide from inline-end per 04-design-system.md §6 */

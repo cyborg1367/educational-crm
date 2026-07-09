@@ -57,6 +57,40 @@ export function deletePerson(id: number): Promise<void> {
   return fetchJson<void>(`/people/${id}`, { method: "DELETE" });
 }
 
+export function getPersonRoadmapProgress(
+  personId: number,
+  params: { journeyId?: number } = {},
+): Promise<import("@/lib/api/types").PersonRoadmapProgressRead> {
+  const search = new URLSearchParams();
+  if (params.journeyId != null) {
+    search.set("journey_id", String(params.journeyId));
+  }
+  const qs = search.toString();
+  return fetchJson(`/people/${personId}/progress${qs ? `?${qs}` : ""}`);
+}
+
+export function createPersonJourneyWaiver(
+  personId: number,
+  journeyId: number,
+  body: import("@/lib/api/types").JourneyRoadmapWaiverCreate,
+): Promise<import("@/lib/api/types").JourneyRoadmapWaiverRead> {
+  return fetchJson(`/people/${personId}/journeys/${journeyId}/waivers`, {
+    method: "POST",
+    body,
+  });
+}
+
+export function deletePersonJourneyWaiver(
+  personId: number,
+  journeyId: number,
+  waiverId: number,
+): Promise<void> {
+  return fetchJson(
+    `/people/${personId}/journeys/${journeyId}/waivers/${waiverId}`,
+    { method: "DELETE" },
+  );
+}
+
 export function listJourneys(
   params: { limit?: number; offset?: number } = {},
 ): Promise<PaginatedResponse<import("@/lib/api/types").JourneyRead>> {

@@ -1,14 +1,17 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ChevronLeft } from "lucide-react";
 
-import { DataTable, EntitySummaryCard } from "@/components/data-display";
+import { DataTable } from "@/components/data-display";
 import type { PaginatedResponse } from "@/components/data-display/types";
 import {
   StaleLeadIndicator,
   StatusBadge,
 } from "@/components/domain";
+import { PersonCardGrid } from "@/components/domain/person-card";
 import {
   emptyPersonFormState,
   personFormStateToCreateBody,
@@ -16,35 +19,29 @@ import {
 } from "@/components/domain/person-form-fields";
 import { PersonFormDialog } from "@/components/domain/person-form-dialog";
 import { ErrorState, useToast } from "@/components/feedback";
-import { FilterBar, type FilterValues } from "@/components/layout";
+import { focusVisibleStyles } from "@/components/form/control-styles";
+import { PeopleListToolbar, type PeopleListViewMode } from "@/components/layout";
 import { ListPageSkeleton } from "@/components/skeletons";
 import { Avatar } from "@/components/primitives/avatar";
-import { Button } from "@/components/ui/button";
 import { fieldErrorFromApi, toApiError } from "@/lib/api/errors";
 import type { ApiError, ApiFieldError } from "@/lib/api/error";
 import {
   createPerson,
   listActivities,
   listCommunications,
-  listDepartments,
-  listJourneys,
   listPeople,
 } from "@/lib/api/people";
-import type {
-  DepartmentRead,
-  JourneyRead,
-  PersonRead,
-  PersonStatus,
-} from "@/lib/api/types";
+import type { PersonRead, PersonStatus } from "@/lib/api/types";
 import { formatDateTimeDisplay } from "@/lib/locale";
-import { normalizeDigitsInput } from "@/lib/locale/number";
+import { formatPhoneDisplay, normalizeDigitsInput } from "@/lib/locale/number";
 import {
   buildLastActivityMap,
   isStaleLead,
 } from "@/lib/person/stale-lead";
-import { PERSON_STATUS_OPTIONS } from "@/lib/terminology";
+import { cn } from "@/lib/utils";
 
 const PAGE_LIMIT = 50;
+const PEOPLE_VIEW_STORAGE_KEY = "people-list-view";
 
 const emptyPage = <T,>(): PaginatedResponse<T> => ({
   items: [],
@@ -59,10 +56,13 @@ export default function PeopleListPage() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  const [filterValues, setFilterValues] = React.useState<FilterValues>(() => {
+  const [filterValues, setFilterValues] = React.useState<{
+    status?: PersonStatus;
+    search?: string;
+  }>(() => {
     const status = searchParams.get("status");
     if (status) {
-      return { status };
+      return { status: status as PersonStatus };
     }
     return {};
   });
@@ -71,8 +71,6 @@ export default function PeopleListPage() {
   const [error, setError] = React.useState<ApiError | null>(null);
   const [peoplePage, setPeoplePage] =
     React.useState<PaginatedResponse<PersonRead>>(emptyPage);
-  const [departments, setDepartments] = React.useState<DepartmentRead[]>([]);
-  const [journeys, setJourneys] = React.useState<JourneyRead[]>([]);
   const [lastActivityByPerson, setLastActivityByPerson] = React.useState<
     Map<number, string>
   >(new Map());
@@ -84,38 +82,38 @@ export default function PeopleListPage() {
   );
   const [formError, setFormError] = React.useState<ApiError | null>(null);
   const [fieldError, setFieldError] = React.useState<ApiFieldError | null>(null);
+  const [viewMode, setViewMode] = React.useState<PeopleListViewMode>("cards");
 
-  const statusFilter =
-    typeof filterValues.status === "string" ? filterValues.status : undefined;
-  const departmentFilter =
-    typeof filterValues.department === "string"
-      ? filterValues.department
-      : undefined;
-  const searchQuery =
-    typeof filterValues.search === "string"
-      ? filterValues.search.trim()
-      : "";
+  React.useEffect(() => {
+    const stored = window.localStorage.getItem(PEOPLE_VIEW_STORAGE_KEY);
+    if (stored === "cards" || stored === "table") {
+      setViewMode(stored);
+    }
+  }, []);
+
+  const handleViewModeChange = (mode: PeopleListViewMode) => {
+    setViewMode(mode);
+    window.localStorage.setItem(PEOPLE_VIEW_STORAGE_KEY, mode);
+  };
+
+  const statusFilter = filterValues.status;
+  const searchQuery = filterValues.search?.trim() ?? "";
 
   const loadData = React.useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [people, deptRes, journeyRes, activities, communications] =
-        await Promise.all([
-          listPeople({
-            limit: PAGE_LIMIT,
-            offset,
-            status: statusFilter as PersonStatus | undefined,
-          }),
-          listDepartments({ limit: 100 }),
-          listJourneys({ limit: 500 }),
-          listActivities({ limit: 500 }),
-          listCommunications({ limit: 500 }),
-        ]);
+      const [people, activities, communications] = await Promise.all([
+        listPeople({
+          limit: PAGE_LIMIT,
+          offset,
+          status: statusFilter,
+        }),
+        listActivities({ limit: 500 }),
+        listCommunications({ limit: 500 }),
+      ]);
 
       setPeoplePage(people);
-      setDepartments(deptRes.items);
-      setJourneys(journeyRes.items);
       setLastActivityByPerson(
         buildLastActivityMap(activities.items, communications.items),
       );
@@ -130,85 +128,29 @@ export default function PeopleListPage() {
     void loadData();
   }, [loadData]);
 
-  const departmentByPerson = React.useMemo(() => {
-    const map = new Map<number, Set<number>>();
-    for (const journey of journeys) {
-      const existing = map.get(journey.person_id) ?? new Set();
-      existing.add(journey.department_id);
-      map.set(journey.person_id, existing);
-    }
-    return map;
-  }, [journeys]);
-
   const filteredItems = React.useMemo(() => {
     const normalizedSearch = searchQuery
       ? normalizeDigitsInput(searchQuery).toLowerCase()
       : "";
 
+    if (!normalizedSearch) {
+      return peoplePage.items;
+    }
+
     return peoplePage.items.filter((person) => {
-      if (departmentFilter) {
-        const deptId = Number(departmentFilter);
-        const personDepts = departmentByPerson.get(person.id);
-        if (!personDepts?.has(deptId)) {
-          return false;
-        }
-      }
-      if (normalizedSearch) {
-        const nameMatch = person.full_name
-          .toLowerCase()
-          .includes(normalizedSearch);
-        const phoneMatch = person.phone
-          ? normalizeDigitsInput(person.phone).includes(normalizedSearch)
-          : false;
-        if (!nameMatch && !phoneMatch) {
-          return false;
-        }
-      }
-      return true;
+      const nameMatch = person.full_name
+        .toLowerCase()
+        .includes(normalizedSearch);
+      const phoneMatch = person.phone
+        ? normalizeDigitsInput(person.phone).includes(normalizedSearch)
+        : false;
+      return nameMatch || phoneMatch;
     });
-  }, [
-    peoplePage.items,
-    departmentFilter,
-    departmentByPerson,
-    searchQuery,
-  ]);
+  }, [peoplePage.items, searchQuery]);
 
-  const tableData: PaginatedResponse<PersonRead> =
-    departmentFilter || searchQuery
-      ? { ...peoplePage, items: filteredItems }
-      : peoplePage;
-
-  const facets = React.useMemo(
-    () => [
-      {
-        id: "search",
-        type: "search" as const,
-        label: "جستجو",
-        placeholder: "جستجو بر اساس نام یا تلفن",
-      },
-      {
-        id: "status",
-        type: "select" as const,
-        label: "وضعیت",
-        placeholder: "همه",
-        options: PERSON_STATUS_OPTIONS.map((opt) => ({
-          value: opt.value,
-          label: opt.label,
-        })),
-      },
-      {
-        id: "department",
-        type: "select" as const,
-        label: "دپارتمان",
-        placeholder: "همه",
-        options: departments.map((dept) => ({
-          value: String(dept.id),
-          label: dept.name,
-        })),
-      },
-    ],
-    [departments],
-  );
+  const tableData: PaginatedResponse<PersonRead> = searchQuery
+    ? { ...peoplePage, items: filteredItems, total_count: filteredItems.length }
+    : peoplePage;
 
   const resetForm = () => {
     setFormState(emptyPersonFormState());
@@ -249,29 +191,27 @@ export default function PeopleListPage() {
     <>
       <ListPageSkeleton
         title="افراد"
-        headerAction={
-          <Button
-            type="button"
-            variant="primary"
-            size="md"
-            onClick={() => {
+        filterBar={
+          <PeopleListToolbar
+            searchQuery={searchQuery}
+            onSearchChange={(search) => {
+              setFilterValues((prev) => ({ ...prev, search }));
+              setOffset(0);
+            }}
+            statusFilter={statusFilter}
+            onStatusChange={(status) => {
+              setFilterValues((prev) => ({ ...prev, status }));
+              setOffset(0);
+            }}
+            viewMode={viewMode}
+            onViewModeChange={handleViewModeChange}
+            onAddPerson={() => {
               resetForm();
               setDrawerOpen(true);
             }}
-          >
-            افزودن شخص
-          </Button>
-        }
-        filterBar={
-          <FilterBar
-            facets={facets}
-            values={filterValues}
-            onValuesChange={(values) => {
-              setFilterValues(values);
-              setOffset(0);
-            }}
           />
         }
+        primaryView={viewMode === "table" ? "table" : "cards"}
         table={
           <DataTable
             columns={[
@@ -279,18 +219,32 @@ export default function PeopleListPage() {
                 key: "full_name",
                 header: "نام",
                 cell: (row) => (
-                  <span className="inline-flex items-center gap-[var(--primitive-space-2)]">
-                    {row.full_name}
-                    {isStaleLead(
-                      row.status,
-                      lastActivityByPerson.get(row.id),
-                    ) ? (
-                      <StaleLeadIndicator />
-                    ) : null}
-                  </span>
+                  <div className="flex items-center gap-[var(--primitive-space-3)]">
+                    <Avatar name={row.full_name} size="sm" />
+                    <div className="min-w-0">
+                      <p className="inline-flex items-center gap-[var(--primitive-space-2)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-primary)]">
+                        <span className="truncate">{row.full_name}</span>
+                        {isStaleLead(
+                          row.status,
+                          lastActivityByPerson.get(row.id),
+                        ) ? (
+                          <StaleLeadIndicator />
+                        ) : null}
+                      </p>
+                      <p className="truncate text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]">
+                        {row.email ??
+                          (row.phone ? formatPhoneDisplay(row.phone) : "—")}
+                      </p>
+                    </div>
+                  </div>
                 ),
               },
-              { key: "phone", header: "تلفن" },
+              {
+                key: "phone",
+                header: "شماره تماس",
+                cell: (row) =>
+                  row.phone ? formatPhoneDisplay(row.phone) : "—",
+              },
               {
                 key: "status",
                 header: "وضعیت",
@@ -299,10 +253,41 @@ export default function PeopleListPage() {
                 ),
               },
               {
-                key: "created_at",
-                header: "تاریخ ثبت",
+                key: "last_activity",
+                header: "آخرین فعالیت",
                 align: "end",
-                cell: (row) => formatDateTimeDisplay(row.created_at, "YYYY/MM/DD"),
+                cell: (row) => {
+                  const lastActivity = lastActivityByPerson.get(row.id);
+                  return lastActivity
+                    ? formatDateTimeDisplay(lastActivity, "YYYY/MM/DD")
+                    : "—";
+                },
+              },
+              {
+                key: "action",
+                header: "",
+                align: "end",
+                cell: (row) => (
+                  <Link
+                    href={`/people/${row.id}`}
+                    onClick={(event) => event.stopPropagation()}
+                    className={cn(
+                      "inline-flex items-center gap-[var(--primitive-space-1)] rounded-[var(--primitive-radius-full)]",
+                      "border border-[var(--primitive-color-brand-200)] bg-[var(--primitive-color-brand-50)]",
+                      "px-[var(--primitive-space-3)] py-[var(--primitive-space-1)]",
+                      "text-[length:var(--primitive-font-size-xs)] font-[var(--primitive-font-weight-semibold)]",
+                      "text-[var(--primitive-color-brand-700)]",
+                      "transition-colors hover:border-[var(--primitive-color-brand-300)] hover:bg-[var(--primitive-color-brand-100)]",
+                      focusVisibleStyles,
+                    )}
+                  >
+                    مشاهده
+                    <ChevronLeft
+                      className="icon-mirror-rtl size-[var(--primitive-space-3)]"
+                      aria-hidden
+                    />
+                  </Link>
+                ),
               },
             ]}
             data={tableData}
@@ -313,56 +298,29 @@ export default function PeopleListPage() {
           />
         }
         cardList={
-          <div className="flex flex-col gap-[var(--primitive-space-3)]">
-            {loading ? (
-              <p className="text-center text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
-                در حال بارگذاری…
-              </p>
-            ) : filteredItems.length === 0 ? (
-              <p className="text-center text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
-                موردی یافت نشد
-              </p>
-            ) : (
-              filteredItems.map((person) => (
-                <EntitySummaryCard
-                  key={person.id}
-                  variant="person"
-                  href={`/people/${person.id}`}
-                  leading={
-                    <Avatar
-                      name={person.full_name}
-                      size="md"
-                    />
-                  }
-                  title={person.full_name}
-                  subtitle={person.phone ?? "—"}
-                  badges={
-                    <>
-                      <StatusBadge domain="person" value={person.status} />
-                      {isStaleLead(
-                        person.status,
-                        lastActivityByPerson.get(person.id),
-                      ) ? (
-                        <StaleLeadIndicator />
-                      ) : null}
-                    </>
-                  }
-                  meta={formatDateTimeDisplay(person.created_at, "YYYY/MM/DD")}
-                />
-              ))
-            )}
-          </div>
+          <PersonCardGrid
+            people={filteredItems}
+            data={tableData}
+            loading={loading}
+            lastActivityByPerson={lastActivityByPerson}
+            formatLastActivity={(value) =>
+              formatDateTimeDisplay(value, "YYYY/MM/DD")
+            }
+            isStaleLead={isStaleLead}
+            onPageChange={setOffset}
+            emptyMessage="موردی یافت نشد"
+          />
         }
       />
 
       <PersonFormDialog
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
-        title="افزودن شخص"
+        title="فرد جدید"
         state={formState}
         onChange={(patch) => setFormState((prev) => ({ ...prev, ...patch }))}
         onSubmit={handleCreate}
-        submitLabel="ثبت"
+        submitLabel="ثبت فرد"
         submitLoading={submitting}
         submitDisabled={
           !formState.fullName.trim() || !formState.phone.trim()

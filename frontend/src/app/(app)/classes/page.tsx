@@ -22,9 +22,16 @@ import { Button } from "@/components/ui/button";
 import { fieldErrorFromApi, toApiError } from "@/lib/api/errors";
 import type { ApiError, ApiFieldError } from "@/lib/api/error";
 import { listCourses } from "@/lib/api/courses";
+import { listDepartments } from "@/lib/api/departments";
 import { createClass, getCourse, listClasses, updateClass } from "@/lib/api/finance";
 import { getMe, listUsers } from "@/lib/api/users";
-import type { CourseClassRead, CourseRead, ClassStatus, UserRead } from "@/lib/api/types";
+import type {
+  CourseClassRead,
+  CourseRead,
+  ClassStatus,
+  DepartmentRead,
+  UserRead,
+} from "@/lib/api/types";
 import { canManageClasses, getCurrentRole } from "@/lib/auth/role";
 import { formatDateDisplay } from "@/lib/locale";
 import type { UserRole } from "@/lib/nav/types";
@@ -62,6 +69,7 @@ export default function ClassesListPage() {
   const [classesPage, setClassesPage] =
     React.useState<PaginatedResponse<CourseClassRead>>(emptyPage);
   const [courses, setCourses] = React.useState<CourseRead[]>([]);
+  const [departments, setDepartments] = React.useState<DepartmentRead[]>([]);
   const [usersById, setUsersById] = React.useState<Map<number, UserRead>>(
     new Map(),
   );
@@ -95,7 +103,7 @@ export default function ClassesListPage() {
       const me = await getMe();
       setDepartmentId(me.department_id);
 
-      const [classRes, usersRes, coursesRes] = await Promise.all([
+      const [classRes, usersRes, coursesRes, departmentsRes] = await Promise.all([
         listClasses({
           limit: PAGE_LIMIT,
           offset,
@@ -109,10 +117,12 @@ export default function ClassesListPage() {
           has_more: false,
         })),
         listCourses({ limit: 500, is_active: true }),
+        listDepartments({ limit: 100 }),
       ]);
       setClassesPage(classRes);
       setUsersById(new Map(usersRes.items.map((user) => [user.id, user])));
       setCourses(coursesRes.items);
+      setDepartments(departmentsRes.items);
     } catch (err) {
       setError(toApiError(err, "خطا در بارگذاری کلاس‌ها"));
     } finally {
@@ -408,6 +418,7 @@ export default function ClassesListPage() {
         state={formState}
         onChange={(patch) => setFormState((prev) => ({ ...prev, ...patch }))}
         courses={availableCourses}
+        departments={departments}
         teachers={teachers}
         selectedCourse={selectedCourse}
         onSubmit={() => void handleSubmit()}

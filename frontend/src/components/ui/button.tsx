@@ -23,8 +23,9 @@ const buttonVariants = cva(
       variant: {
         primary: [
           "bg-[var(--semantic-color-action-primary)] text-[var(--semantic-color-text-inverse)]",
+          "shadow-[0_1px_2px_rgba(232,119,34,0.2)]",
           "hover:bg-[var(--semantic-color-action-primaryHover)]",
-          "active:bg-[var(--primitive-color-brand-800)]",
+          "active:bg-[var(--primitive-color-brand-700)]",
         ].join(" "),
         secondary: [
           "bg-[var(--semantic-color-surface-subtle)] text-[var(--semantic-color-text-primary)]",

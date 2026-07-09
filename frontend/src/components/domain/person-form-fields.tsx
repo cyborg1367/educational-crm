@@ -1,15 +1,17 @@
 "use client";
 
 import * as React from "react";
+import { Check, NotebookPen, Sparkles, UserRound } from "lucide-react";
 
+import { INTEREST_ICONS } from "@/components/icons/interest-icons";
+
+import { focusVisibleStyles } from "@/components/form/control-styles";
 import { FormField } from "@/components/form/form-field";
 import { DatePicker } from "@/components/form/date-picker";
 import { Select } from "@/components/form/select";
-import { SelectionControl } from "@/components/form/selection-control";
 import { currentJalaliMonth } from "@/lib/locale";
 import { TextInput } from "@/components/form/text-input";
 import { Textarea } from "@/components/form/textarea";
-import { Divider } from "@/components/primitives/divider";
 import type { ApiFieldError } from "@/lib/api/error";
 import type {
   PersonCreate,
@@ -24,7 +26,9 @@ import {
   INTERESTS_OPTIONS,
   PERSON_STATUS_OPTIONS,
   SOURCE_OPTIONS,
+  interestLabel,
 } from "@/lib/terminology";
+import { cn } from "@/lib/utils";
 
 const OPTIONAL_PLACEHOLDER = "انتخاب کنید";
 
@@ -104,29 +108,216 @@ export type PersonFormFieldsProps = {
   onChange: (patch: Partial<PersonFormState>) => void;
   fieldError?: ApiFieldError | null;
   showStatus?: boolean;
+  focusOnOpen?: boolean;
 };
+
+type FormSectionProps = {
+  title: string;
+  description?: string;
+  icon?: React.ReactNode;
+  badge?: React.ReactNode;
+  headerExtra?: React.ReactNode;
+  children: React.ReactNode;
+};
+
+function FormSection({
+  title,
+  description,
+  icon,
+  badge,
+  headerExtra,
+  children,
+}: FormSectionProps) {
+  return (
+    <section
+      className={cn(
+        "rounded-[var(--primitive-radius-lg)] border border-[var(--semantic-color-surface-border)]",
+        "bg-[var(--semantic-color-surface-card)] p-[var(--primitive-space-5)]",
+        "shadow-[var(--primitive-elevation-1)]",
+        "transition-shadow duration-[var(--primitive-motion-duration-fast)]",
+        "hover:shadow-[var(--primitive-elevation-2)]",
+      )}
+    >
+      <header className="mb-[var(--primitive-space-4)] border-b border-[var(--semantic-color-surface-border)]/70 pb-[var(--primitive-space-3)]">
+        <div className="flex items-start justify-between gap-[var(--primitive-space-3)]">
+          <div className="flex min-w-0 items-center gap-[var(--primitive-space-3)]">
+            {icon ? (
+              <div
+                className={cn(
+                  "flex size-8 shrink-0 items-center justify-center rounded-[var(--primitive-radius-md)]",
+                  "bg-[var(--primitive-color-brand-50)] text-[var(--primitive-color-brand-600)]",
+                )}
+              >
+                {icon}
+              </div>
+            ) : null}
+            <div className="min-w-0">
+              <h3 className="text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
+                {title}
+              </h3>
+              {description ? (
+                <p className="mt-0.5 text-[length:var(--primitive-font-size-xs)] leading-[var(--primitive-font-lineHeight-sm)] text-[var(--semantic-color-text-secondary)]">
+                  {description}
+                </p>
+              ) : null}
+            </div>
+          </div>
+          {badge ? <div className="shrink-0">{badge}</div> : null}
+        </div>
+        {headerExtra ? (
+          <div className="mt-[var(--primitive-space-3)]">{headerExtra}</div>
+        ) : null}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+type InterestTileProps = {
+  value: PersonInterest;
+  label: string;
+  selected: boolean;
+  onToggle: () => void;
+};
+
+function InterestTile({ value, label, selected, onToggle }: InterestTileProps) {
+  const Icon = INTEREST_ICONS[value];
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={selected}
+      className={cn(
+        "relative flex flex-col items-center gap-[var(--primitive-space-2)]",
+        "rounded-[var(--primitive-radius-lg)] border p-[var(--primitive-space-4)] text-center",
+        "transition-[border-color,background-color,box-shadow] duration-150 ease-out",
+        focusVisibleStyles,
+        selected
+          ? "border-[var(--primitive-color-brand-500)] bg-[var(--primitive-color-brand-50)] shadow-[0_1px_6px_rgba(232,119,34,0.12)]"
+          : "border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] hover:border-[var(--primitive-color-neutral-300)] hover:bg-[var(--semantic-color-surface-subtle)]",
+      )}
+    >
+      {selected ? (
+        <span
+          className={cn(
+            "absolute inset-inline-end-[var(--primitive-space-2)] top-[var(--primitive-space-2)]",
+            "flex size-[1.125rem] items-center justify-center rounded-[var(--primitive-radius-full)]",
+            "bg-[var(--primitive-color-brand-500)] text-white",
+          )}
+          aria-hidden
+        >
+          <Check className="size-2.5 stroke-[3]" />
+        </span>
+      ) : null}
+
+      <span
+        className={cn(
+          "flex size-10 items-center justify-center rounded-[var(--primitive-radius-md)] p-[5px]",
+          "transition-colors duration-150 ease-out",
+          selected
+            ? "text-[var(--primitive-color-brand-700)]"
+            : "text-[var(--semantic-color-text-secondary)]",
+        )}
+        aria-hidden
+      >
+        <Icon className="size-full" />
+      </span>
+
+      <span
+        className={cn(
+          "text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)] leading-[var(--primitive-font-lineHeight-sm)]",
+          selected
+            ? "text-[var(--primitive-color-brand-800)]"
+            : "text-[var(--semantic-color-text-primary)]",
+        )}
+      >
+        {label}
+      </span>
+    </button>
+  );
+}
+
+function SelectionBadge({
+  selected,
+  total,
+}: {
+  selected: number;
+  total: number;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-[var(--primitive-radius-full)] px-[var(--primitive-space-3)] py-[var(--primitive-space-1)]",
+        "text-[length:var(--primitive-font-size-xs)] font-[var(--primitive-font-weight-semibold)] tabular-nums",
+        selected > 0
+          ? "bg-[var(--primitive-color-brand-100)] text-[var(--primitive-color-brand-700)]"
+          : "bg-[var(--semantic-color-surface-subtle)] text-[var(--semantic-color-text-secondary)]",
+      )}
+    >
+      {selected}/{total}
+    </span>
+  );
+}
+
+function SelectionSummary({ interests }: { interests: PersonInterest[] }) {
+  if (interests.length === 0) {
+    return null;
+  }
+
+  const labels = interests.map((value) => interestLabel(value));
+
+  return (
+    <div
+      className={cn(
+        "rounded-[var(--primitive-radius-md)] border border-[var(--primitive-color-brand-200)]",
+        "bg-[var(--primitive-color-brand-50)]/80 px-[var(--primitive-space-3)] py-[var(--primitive-space-2)]",
+        "text-[length:var(--primitive-font-size-xs)] leading-[var(--primitive-font-lineHeight-sm)] text-[var(--primitive-color-brand-800)]",
+      )}
+    >
+      <span className="font-[var(--primitive-font-weight-semibold)]">
+        {interests.length} مورد انتخاب شده:
+      </span>{" "}
+      {labels.join("، ")}
+    </div>
+  );
+}
 
 function PersonFormFields({
   state,
   onChange,
   fieldError = null,
   showStatus = false,
+  focusOnOpen = false,
 }: PersonFormFieldsProps) {
-  const toggleInterest = (value: PersonInterest, checked: boolean) => {
+  const fullNameRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (!focusOnOpen) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      fullNameRef.current?.focus({ preventScroll: true });
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [focusOnOpen]);
+
+  const toggleInterest = (value: PersonInterest) => {
+    const checked = state.interests.includes(value);
     onChange({
       interests: checked
-        ? [...state.interests, value]
-        : state.interests.filter((item) => item !== value),
+        ? state.interests.filter((item) => item !== value)
+        : [...state.interests, value],
     });
   };
 
   return (
-    <div className="flex flex-col gap-[var(--primitive-space-5)]">
-      <section className="flex flex-col gap-[var(--primitive-space-4)]">
-        <h3 className="text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
-          اطلاعات شخص
-        </h3>
-
+    <div className="flex flex-col gap-[var(--primitive-space-4)]">
+      <FormSection
+        title="اطلاعات شخص"
+        description="فیلدهای ستاره‌دار برای ثبت اولیه الزامی هستند."
+        icon={<UserRound className="size-4" aria-hidden />}
+      >
         <div className="grid grid-cols-1 gap-[var(--primitive-space-4)] md:grid-cols-3">
           <FormField
             label="نام کامل"
@@ -135,13 +326,16 @@ function PersonFormFields({
             error={fieldError?.field === "full_name" ? fieldError : null}
           >
             <TextInput
+              ref={fullNameRef}
               value={state.fullName}
               onChange={(e) => onChange({ fullName: e.target.value })}
+              placeholder="نام و نام خانوادگی"
             />
           </FormField>
 
           <FormField
             label="تاریخ تولد"
+            className="md:col-span-3 lg:col-span-1"
             error={fieldError?.field === "birth_date" ? fieldError : null}
           >
             <DatePicker
@@ -149,17 +343,22 @@ function PersonFormFields({
               onChange={(value) => onChange({ birthDate: value })}
               minYear={1300}
               maxYear={currentJalaliMonth().year}
+              className="min-w-0"
             />
           </FormField>
 
           <FormField
-            label="تلفن"
+            label="شماره تماس"
             required
+            helperText="برای پیگیری و ارتباط با شخص استفاده می‌شود."
             error={fieldError?.field === "phone" ? fieldError : null}
           >
             <TextInput
               value={state.phone}
               onChange={(e) => onChange({ phone: e.target.value })}
+              placeholder="۰۹۱۲۳۴۵۶۷۸۹"
+              dir="ltr"
+              className="text-start"
             />
           </FormField>
 
@@ -171,6 +370,9 @@ function PersonFormFields({
               type="email"
               value={state.email}
               onChange={(e) => onChange({ email: e.target.value })}
+              placeholder="example@email.com"
+              dir="ltr"
+              className="text-start"
             />
           </FormField>
 
@@ -208,51 +410,55 @@ function PersonFormFields({
             </FormField>
           ) : null}
         </div>
-      </section>
+      </FormSection>
 
-      <Divider />
-
-      <section className="flex flex-col gap-[var(--primitive-space-4)]">
-        <h3 className="text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
-          علاقه‌مندی‌ها
-        </h3>
-
-        <div className="grid grid-cols-1 gap-[var(--primitive-space-4)] md:grid-cols-3">
-          <FormField
-            label="علاقه‌مندی‌ها"
-            className="md:col-span-3"
-            error={fieldError?.field === "interests" ? fieldError : null}
-          >
-            <div className="grid grid-cols-1 gap-[var(--primitive-space-2)] sm:grid-cols-2 lg:grid-cols-3">
-              {INTERESTS_OPTIONS.map((option) => (
-                <SelectionControl.Checkbox
+      <FormSection
+        title="علاقه‌مندی‌های آموزشی"
+        description="حوزه‌هایی که شخص به آن‌ها علاقه دارد."
+        icon={<Sparkles className="size-4" aria-hidden />}
+        badge={
+          <SelectionBadge
+            selected={state.interests.length}
+            total={INTERESTS_OPTIONS.length}
+          />
+        }
+        headerExtra={<SelectionSummary interests={state.interests} />}
+      >
+        <FormField
+          label="علاقه‌مندی‌ها"
+          error={fieldError?.field === "interests" ? fieldError : null}
+        >
+          <div className="grid grid-cols-2 gap-[var(--primitive-space-3)] sm:grid-cols-3">
+            {INTERESTS_OPTIONS.map((option) => {
+              const selected = state.interests.includes(option.value);
+              return (
+                <InterestTile
                   key={option.value}
+                  value={option.value}
                   label={option.label}
-                  checked={state.interests.includes(option.value)}
-                  onChange={(e) =>
-                    toggleInterest(option.value, e.target.checked)
-                  }
+                  selected={selected}
+                  onToggle={() => toggleInterest(option.value)}
                 />
-              ))}
-            </div>
-          </FormField>
+              );
+            })}
+          </div>
 
-          <FormField
-            label="توضیحات علاقه‌مندی"
-            className="md:col-span-3"
-            error={fieldError?.field === "interests_note" ? fieldError : null}
-          >
-            <Textarea
-              value={state.interestsNote}
-              onChange={(e) => onChange({ interestsNote: e.target.value })}
-              placeholder="توضیحات بیشتر..."
-              rows={3}
-            />
-          </FormField>
+          {state.interests.length === 0 ? (
+            <p className="mt-[var(--primitive-space-3)] text-center text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]">
+              یک یا چند حوزه آموزشی را انتخاب کنید
+            </p>
+          ) : null}
+        </FormField>
+      </FormSection>
 
+      <FormSection
+        title="اطلاعات تکمیلی"
+        description="منبع آشنایی و یادداشت‌های اولیه برای پیگیری."
+        icon={<NotebookPen className="size-4" aria-hidden />}
+      >
+        <div className="flex flex-col gap-[var(--primitive-space-4)]">
           <FormField
             label="منبع آشنایی"
-            className="md:col-span-3"
             error={fieldError?.field === "source" ? fieldError : null}
           >
             <Select
@@ -266,20 +472,34 @@ function PersonFormFields({
             />
           </FormField>
 
+          {state.interests.length > 0 ? (
+            <FormField
+              label="توضیحات علاقه‌مندی"
+              helperText="جزئیات بیشتر درباره حوزه‌های انتخاب‌شده"
+              error={fieldError?.field === "interests_note" ? fieldError : null}
+            >
+              <Textarea
+                value={state.interestsNote}
+                onChange={(e) => onChange({ interestsNote: e.target.value })}
+                placeholder="مثلاً سطح فعلی، هدف یادگیری، یا ترجیح زمان کلاس…"
+                rows={3}
+              />
+            </FormField>
+          ) : null}
+
           <FormField
             label="یادداشت"
-            className="md:col-span-3"
             error={fieldError?.field === "notes" ? fieldError : null}
           >
             <Textarea
               value={state.notes}
               onChange={(e) => onChange({ notes: e.target.value })}
-              placeholder="یادداشت اولیه..."
+              placeholder="یادداشت اولیه برای تیم…"
               rows={3}
             />
           </FormField>
         </div>
-      </section>
+      </FormSection>
     </div>
   );
 }

@@ -22,6 +22,19 @@ export function toPersianDigits(value: string): string {
 }
 
 /**
+ * Format a phone number for read-only display (Persian digits per locale.digitsDisplay).
+ */
+export function formatPhoneDisplay(
+  phone: string | null | undefined,
+  fallback = "—",
+): string {
+  if (!phone?.trim()) {
+    return fallback;
+  }
+  return toPersianDigits(phone);
+}
+
+/**
  * Normalize Persian/Arabic-Indic digits to Latin (for parsing & API).
  * Per locale.digitsInput: normalize-both.
  */
@@ -89,4 +102,34 @@ export function formatTomanInput(raw: string): string {
  */
 export function formatCount(value: number): string {
   return formatToman(value);
+}
+
+/**
+ * Format a finite number for display (supports decimals like session hours).
+ * Integers stay without a fraction; decimals keep up to `maxFractionDigits`.
+ */
+export function formatNumber(
+  value: number,
+  options?: { maxFractionDigits?: number },
+): string {
+  if (!Number.isFinite(value)) {
+    throw new Error(`formatNumber expects a finite number: ${value}`);
+  }
+  const maxFractionDigits = options?.maxFractionDigits ?? 2;
+  if (Number.isInteger(value)) {
+    return formatCount(value);
+  }
+  const rounded =
+    Math.round(value * 10 ** maxFractionDigits) / 10 ** maxFractionDigits;
+  const fixed = rounded
+    .toFixed(maxFractionDigits)
+    .replace(/\.?0+$/, "");
+  const [whole, fraction] = fixed.split(".");
+  const groupedWhole = Math.abs(Number(whole))
+    .toString()
+    .replace(/\B(?=(\d{3})+(?!\d))/g, THOUSANDS_SEPARATOR);
+  const signed =
+    rounded < 0 ? `-${groupedWhole}` : groupedWhole;
+  const withFraction = fraction ? `${signed}.${fraction}` : signed;
+  return toPersianDigits(withFraction);
 }

@@ -1,13 +1,16 @@
 "use client";
 
 import * as React from "react";
+import { AlertTriangle, OctagonAlert } from "lucide-react";
 
 import { CascadeConsequenceList } from "@/components/domain/cascade-consequence-list";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogCloseButton,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -59,62 +62,93 @@ function ConfirmDialog(props: ConfirmDialogProps) {
     tier,
   } = props;
 
+  const isDanger = tier === 3 || confirmVariant === "destructive";
+  const Icon = tier === 3 ? OctagonAlert : AlertTriangle;
+
   const handleCancel = () => {
     onCancel();
     onOpenChange(false);
   };
 
-  const handleConfirm = () => {
-    onConfirm();
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        hideClose
         className={cn(
-          "confirm-dialog-content gap-[var(--semantic-space-sectionGap)]",
-          "max-w-none",
-          tier === 2
-            ? [
-                "w-[480px]",
-                "border-[var(--semantic-confirmationTier-tier2-accent)]",
-                "bg-[var(--semantic-confirmationTier-tier2-surface)]",
-                "shadow-[var(--primitive-elevation-2)]",
-              ].join(" ")
-            : [
-                "w-[560px]",
-                "border-[var(--semantic-confirmationTier-tier3-accent)]",
-                "bg-[var(--semantic-confirmationTier-tier3-surface)]",
-                "shadow-[var(--semantic-confirmationTier-tier3-elevation)]",
-              ].join(" "),
+          "confirm-dialog-content flex max-h-[min(90vh,720px)] max-w-none flex-col gap-0",
+          tier === 3
+            ? "w-[min(560px,calc(100vw-2rem))]"
+            : "w-[min(480px,calc(100vw-2rem))]",
+          "shadow-[0_24px_48px_-12px_rgba(26,26,26,0.18),0_0_0_1px_rgba(26,26,26,0.04)]",
         )}
       >
-        <DialogHeader className="text-start">
-          <DialogTitle
-            className={cn(
-              "text-[length:var(--primitive-font-size-lg)]",
-              tier === 3 && "text-[var(--semantic-color-status-danger-strong)]",
-            )}
-          >
-            {title}
-          </DialogTitle>
-          <DialogDescription
-            className={cn(
-              "text-[length:var(--primitive-font-size-sm)]",
-              "text-[var(--semantic-color-text-primary)]",
-            )}
-          >
-            {body}
-          </DialogDescription>
+        <div
+          className={cn(
+            "h-1 shrink-0",
+            isDanger
+              ? "bg-gradient-to-l from-[var(--semantic-color-status-danger)] via-[var(--semantic-confirmationTier-tier3-accent)] to-[var(--semantic-color-status-danger-strong)]"
+              : "bg-gradient-to-l from-[var(--semantic-confirmationTier-tier2-accent)] via-[#FBBF24] to-[#D97706]",
+          )}
+          aria-hidden
+        />
+
+        <DialogHeader className="relative border-b border-[var(--semantic-color-surface-border)] bg-gradient-to-b from-[var(--semantic-color-surface-subtle)] to-[var(--semantic-color-surface-card)] px-[var(--primitive-space-6)] py-[var(--primitive-space-5)] text-start">
+          <div className="flex items-start gap-[var(--primitive-space-3)]">
+            <div
+              className={cn(
+                "mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-[var(--primitive-radius-lg)] border",
+                isDanger
+                  ? "border-[var(--semantic-color-status-danger)]/25 bg-[var(--semantic-color-surface-danger-subtle)] text-[var(--semantic-color-status-danger-strong)]"
+                  : "border-[var(--semantic-confirmationTier-tier2-accent)]/30 bg-[#FFFBEB] text-[#B45309]",
+              )}
+              aria-hidden
+            >
+              <Icon className="size-5" strokeWidth={2} />
+            </div>
+
+            <div className="min-w-0 flex-1 pe-[var(--primitive-space-2)]">
+              <DialogTitle
+                className={cn(
+                  "text-[length:var(--primitive-font-size-xl)] font-[var(--primitive-font-weight-semibold)] tracking-tight",
+                  isDanger
+                    ? "text-[var(--semantic-color-status-danger-strong)]"
+                    : "text-[var(--semantic-color-text-primary)]",
+                )}
+              >
+                {title}
+              </DialogTitle>
+              <DialogDescription className="mt-[var(--primitive-space-2)] text-[length:var(--primitive-font-size-sm)] leading-[var(--primitive-font-lineHeight-sm)] text-[var(--semantic-color-text-secondary)]">
+                {body}
+              </DialogDescription>
+            </div>
+
+            <DialogCloseButton
+              className="mt-0.5"
+              onClick={handleCancel}
+              disabled={confirmLoading}
+            />
+          </div>
         </DialogHeader>
 
-        {tier === 3 ? (
-          <CascadeConsequenceList consequences={props.consequences} />
-        ) : null}
+        {(tier === 3 || children) && (
+          <div className="flex-1 overflow-y-auto bg-[var(--semantic-color-surface-page)] px-[var(--primitive-space-6)] py-[var(--primitive-space-5)]">
+            <div className="flex flex-col gap-[var(--primitive-space-4)]">
+              {tier === 3 ? (
+                <CascadeConsequenceList consequences={props.consequences} />
+              ) : null}
+              {children}
+            </div>
+          </div>
+        )}
 
-        {children}
-
-        <div className="flex w-full items-center justify-between gap-[var(--semantic-space-inlineGap)]">
+        <DialogFooter
+          className={cn(
+            "flex-row items-center justify-between gap-[var(--primitive-space-3)]",
+            "border-t border-[var(--semantic-color-surface-border)]",
+            "bg-[var(--semantic-color-surface-card)]/90 backdrop-blur-sm",
+            "px-[var(--primitive-space-6)] py-[var(--primitive-space-4)] sm:justify-between",
+          )}
+        >
           <Button
             type="button"
             variant="secondary"
@@ -126,13 +160,14 @@ function ConfirmDialog(props: ConfirmDialogProps) {
           <Button
             type="button"
             variant={confirmVariant}
-            onClick={handleConfirm}
+            onClick={onConfirm}
             loading={confirmLoading}
             disabled={confirmDisabled}
+            className="min-w-[7rem]"
           >
             {confirmLabel}
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

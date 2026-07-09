@@ -33,6 +33,8 @@ export {
 } from "./persian-months";
 export {
   formatCount,
+  formatNumber,
+  formatPhoneDisplay,
   formatToman,
   formatTomanInput,
   normalizeDigitsInput,

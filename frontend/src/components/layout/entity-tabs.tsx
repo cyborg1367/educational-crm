@@ -127,12 +127,12 @@ function EntityTabs({
                 }
               }}
               className={cn(
-                "shrink-0 border-b-2 px-[var(--primitive-space-4)] py-[var(--primitive-space-3)]",
+                "relative shrink-0 px-[var(--primitive-space-4)] py-[var(--primitive-space-3)]",
                 "text-[length:var(--primitive-font-size-sm)] leading-[var(--primitive-font-lineHeight-sm)]",
-                "transition-colors",
+                "transition-colors duration-[var(--primitive-motion-duration-fast)]",
                 isSelected
-                  ? "border-[var(--semantic-color-action-primary)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-action-primary)]"
-                  : "border-transparent text-[var(--semantic-color-text-secondary)] hover:bg-[var(--primitive-color-neutral-50)] hover:text-[var(--semantic-color-text-primary)]",
+                  ? "font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-action-primary)] after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-[var(--semantic-color-action-primary)]"
+                  : "text-[var(--semantic-color-text-secondary)] hover:text-[var(--semantic-color-text-primary)]",
                 focusVisibleStyles,
                 "disabled:pointer-events-none disabled:text-[var(--semantic-color-text-disabled)]",
               )}
