@@ -376,7 +376,7 @@ export default function ClassesListPage() {
       setContextMenu(null);
       void loadData();
     } catch (err) {
-      toast({ variant: "error", title: toApiError(err, "خطا در حذف کلاس").message });
+      toast({ variant: "error", title: toApiError(err, "خطا در حذف کلاس").detail });
     }
   };
 
