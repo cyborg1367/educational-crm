@@ -94,6 +94,7 @@ export type TaskStatus = "open" | "done" | "cancelled";
 
 export type TaskType =
   | "follow_up_registration"
+  | "consultation_follow_up"
   | "pre_enroll_unpaid"
   | "post_course_consultation"
   | "dormant_followup"

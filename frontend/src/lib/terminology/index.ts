@@ -33,6 +33,7 @@ const TERMINOLOGY: Record<string, string> = {
 
   // Task.type
   follow_up_registration: "پیگیری ثبت‌نام",
+  consultation_follow_up: "پیگیری مجدد مشاوره",
   pre_enroll_unpaid: "پیش‌ثبت‌نام بدون پرداخت",
   post_course_consultation: "مشاوره پس از دوره",
   dormant_followup: "پیگیری غیرفعال",
@@ -178,7 +179,7 @@ export const CONSULTATION_OUTCOME_DESCRIPTIONS: Record<
   pre_enroll:
     "آماده ثبت‌نام — کارشناس پذیرش برای انتخاب کلاس و تکمیل ثبت‌نام مطلع می‌شود.",
   follow_up:
-    "هنوز قطعی نیست — وظیفه پیگیری ثبت‌نام به کارشناس پذیرش ارجاع می‌شود.",
+    "هنوز قطعی نیست — وظیفه تماس مجدد (بدون شروع ثبت‌نام) به کارشناس پذیرش ارجاع می‌شود.",
   refer_other_dept:
     "دپارتمان دیگر مناسب‌تر است — پرونده و وظیفه به مدیر آن دپارتمان می‌رود.",
   not_suitable: "ادامه نمی‌دهد — پرونده در این دپارتمان بسته می‌شود.",
@@ -188,6 +189,7 @@ export const CONSULTATION_OUTCOME_DESCRIPTIONS: Record<
 
 export const TASK_TYPE_LABELS: Record<TaskType, string> = {
   follow_up_registration: terminologyLabel("follow_up_registration"),
+  consultation_follow_up: terminologyLabel("consultation_follow_up"),
   pre_enroll_unpaid: terminologyLabel("pre_enroll_unpaid"),
   post_course_consultation: terminologyLabel("post_course_consultation"),
   dormant_followup: terminologyLabel("dormant_followup"),

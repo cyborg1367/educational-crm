@@ -18,7 +18,11 @@ import {
   relatedEntityHref,
   relatedEntityLabel,
 } from "@/lib/task/queue";
-import { TASK_TYPE_LABELS } from "@/lib/terminology";
+import {
+  levelLabel,
+  motivationLabel,
+  TASK_TYPE_LABELS,
+} from "@/lib/terminology";
 
 export type TaskDetailPaneProps = {
   task: TaskRead;
@@ -26,11 +30,102 @@ export type TaskDetailPaneProps = {
   assigneeName?: string | null;
   linkedConsultation?: ConsultationRead | null;
   loadingConsultation?: boolean;
+  recommendedCourseName?: string | null;
   completing?: boolean;
   onMarkComplete: () => void;
   onNavigate: (href: string) => void;
   today?: string;
 };
+
+/**
+ * Summary of the consultation behind a task — replaces a bare "#id" link
+ * with the fields admission/department staff actually need to act on the
+ * task (level, motivation, recommended course, outcome, notes).
+ */
+function ConsultationSummaryCard({
+  consultation,
+  recommendedCourseName,
+  loading,
+}: {
+  consultation: ConsultationRead | null;
+  recommendedCourseName?: string | null;
+  loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className="rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] p-[var(--primitive-space-4)]">
+        <p className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
+          در حال بارگذاری مشاوره…
+        </p>
+      </div>
+    );
+  }
+
+  if (!consultation) {
+    return (
+      <div className="rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] p-[var(--primitive-space-4)]">
+        <p className="text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]">
+          مشاوره
+        </p>
+        <p className="mt-[var(--primitive-space-1)] text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-disabled)]">
+          اطلاعات مشاوره در دسترس نیست.
+        </p>
+      </div>
+    );
+  }
+
+  const rows: { label: string; value: string }[] = [];
+  if (consultation.current_level) {
+    rows.push({ label: "سطح دانش", value: levelLabel(consultation.current_level) });
+  }
+  if (consultation.goal) {
+    rows.push({ label: "انگیزه", value: motivationLabel(consultation.goal) });
+  }
+  if (recommendedCourseName) {
+    rows.push({ label: "دوره پیشنهادی", value: recommendedCourseName });
+  }
+
+  return (
+    <div className="rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] p-[var(--primitive-space-4)]">
+      <div className="flex items-center justify-between gap-[var(--primitive-space-2)]">
+        <p className="text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]">
+          مشاوره
+        </p>
+        {consultation.outcome ? (
+          <StatusBadge domain="consultation" value={consultation.outcome} />
+        ) : (
+          <span className="text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-disabled)]">
+            در انتظار نتیجه
+          </span>
+        )}
+      </div>
+
+      {rows.length > 0 ? (
+        <dl className="mt-[var(--primitive-space-3)] flex flex-col gap-[var(--primitive-space-2)]">
+          {rows.map((row) => (
+            <div
+              key={row.label}
+              className="flex items-baseline justify-between gap-[var(--primitive-space-3)]"
+            >
+              <dt className="shrink-0 text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]">
+                {row.label}
+              </dt>
+              <dd className="truncate text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-primary)]">
+                {row.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+
+      {consultation.notes?.trim() ? (
+        <p className="mt-[var(--primitive-space-3)] border-t border-[var(--semantic-color-surface-border)] pt-[var(--primitive-space-3)] text-[length:var(--primitive-font-size-sm)] leading-relaxed text-[var(--semantic-color-text-primary)]">
+          {consultation.notes}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 function primaryCta(task: TaskRead): {
   label: string;
@@ -62,6 +157,14 @@ function primaryCta(task: TaskRead): {
     };
   }
 
+  if (task.type === "consultation_follow_up") {
+    const related = relatedEntityHref(task);
+    return {
+      label: related ? "مشاهده مشاوره قبلی" : "باز کردن پرونده شخص",
+      href: related ?? `/people/${task.person_id}`,
+    };
+  }
+
   if (
     task.type === "referral" ||
     task.type === "dormant_followup" ||
@@ -87,6 +190,7 @@ function TaskDetailPane({
   assigneeName,
   linkedConsultation = null,
   loadingConsultation = false,
+  recommendedCourseName = null,
   completing = false,
   onMarkComplete,
   onNavigate,
@@ -101,7 +205,11 @@ function TaskDetailPane({
   const relatedHref = relatedEntityHref(task);
   const relativeDue = formatDueRelative(task.due_date, today);
   const absoluteDue = formatDateDisplay(task.due_date);
-  const showComplete = task.status === "open" && !intake;
+  // Enrollment-follow-up tasks close themselves when the enrollment wizard
+  // finishes (see enrollments/new/page.tsx) — a manual "تکمیل" here would let
+  // staff skip the wizard entirely and mark registration done with no
+  // enrollment ever created.
+  const showComplete = task.status === "open" && !intake && !followUpEnrollment;
 
   return (
     <div className="flex h-full flex-col gap-[var(--primitive-space-5)] p-[var(--primitive-space-6)]">
@@ -145,7 +253,13 @@ function TaskDetailPane({
         href={`/people/${task.person_id}`}
       />
 
-      {task.related_entity_type && task.related_entity_type !== "person" ? (
+      {task.related_entity_type === "consultation" ? (
+        <ConsultationSummaryCard
+          consultation={linkedConsultation}
+          recommendedCourseName={recommendedCourseName}
+          loading={loadingConsultation}
+        />
+      ) : task.related_entity_type && task.related_entity_type !== "person" ? (
         <RelationshipCard
           label={relatedEntityLabel(task.related_entity_type)}
           title={`${relatedEntityLabel(task.related_entity_type)} #${task.related_entity_id ?? "—"}`}
@@ -157,6 +271,12 @@ function TaskDetailPane({
         {intake ? (
           <p className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
             ابتدا نتیجه مشاوره را ثبت کنید؛ تکمیل دستی این وظیفه لازم نیست.
+          </p>
+        ) : null}
+
+        {followUpEnrollment ? (
+          <p className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
+            این وظیفه با انجام ثبت‌نام به‌صورت خودکار تکمیل می‌شود؛ تکمیل دستی لازم نیست.
           </p>
         ) : null}
 

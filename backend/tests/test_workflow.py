@@ -269,7 +269,7 @@ def test_consultation_outcome_follow_up(
 
     tasks, _ = task_service.list_tasks(db_session, org_id)
     follow_up_tasks = [
-        task for task in tasks if task.type == TaskType.follow_up_registration
+        task for task in tasks if task.type == TaskType.consultation_follow_up
     ]
     assert len(follow_up_tasks) == 1
     task = follow_up_tasks[0]
