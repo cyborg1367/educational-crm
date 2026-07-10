@@ -514,6 +514,7 @@ def create_journey_roadmap_waiver(
         payload={
             "journey_id": journey.id,
             "roadmap_item_id": item.id,
+            "roadmap_item_title": item.title,
             "course_id": item.course_id,
             "waiver_id": waiver.id,
             "reason": waiver.reason,
@@ -541,9 +542,16 @@ def delete_journey_roadmap_waiver(
     if waiver is None:
         raise NotFoundError("Waiver not found")
 
+    item = db.scalars(
+        scoped(select(RoadmapItem), RoadmapItem, org_id).where(
+            RoadmapItem.id == waiver.roadmap_item_id
+        )
+    ).first()
+
     payload = {
         "journey_id": journey_id,
         "roadmap_item_id": waiver.roadmap_item_id,
+        "roadmap_item_title": item.title if item is not None else None,
         "course_id": waiver.course_id,
         "waiver_id": waiver.id,
         "reason": waiver.reason,

@@ -94,15 +94,33 @@ export function mapClassSessions(
   return events;
 }
 
+/**
+ * Map installments to due-date calendar events.
+ *
+ * Paid and cancelled installments need no follow-up (the upfront
+ * installment recorded during enrollment, in particular, is paid the
+ * moment it's created) — only unresolved ones belong on the calendar.
+ * Partially paid installments show the remaining balance, not the
+ * original amount, so the number on the calendar matches what's still
+ * owed.
+ */
 export function mapInstallmentDueDates(
   installments: InstallmentRead[],
 ): CalendarEvent[] {
-  return installments.map((installment) => ({
-    date: installment.due_date,
-    label: `قسط ${installment.sequence} — ${formatToman(installment.amount, { suffix: true })}`,
-    type: "installment" as const,
-    href: `/invoices/${installment.invoice_id}`,
-  }));
+  return installments
+    .filter(
+      (installment) =>
+        installment.status !== "paid" && installment.status !== "cancelled",
+    )
+    .map((installment) => {
+      const remaining = installment.amount - installment.paid_amount;
+      return {
+        date: installment.due_date,
+        label: `قسط ${installment.sequence} — ${formatToman(remaining, { suffix: true })}`,
+        type: "installment" as const,
+        href: `/invoices/${installment.invoice_id}`,
+      };
+    });
 }
 
 export function mapTaskDueDates(tasks: TaskRead[]): CalendarEvent[] {

@@ -2,7 +2,24 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Clock, MessageSquare, Zap } from "lucide-react";
+import {
+  CalendarClock,
+  CheckCircle2,
+  Clock,
+  Coins,
+  CreditCard,
+  GraduationCap,
+  MessageSquare,
+  RotateCcw,
+  ShieldOff,
+  ShieldCheck,
+  Sparkles,
+  UserPlus,
+  Wallet,
+  XCircle,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 
 import { EmptyState } from "@/components/feedback/empty-state";
 import { ErrorState } from "@/components/feedback/error-state";
@@ -20,7 +37,7 @@ import type {
   TaskType,
 } from "@/lib/api/types";
 import type { ApiError } from "@/lib/api/error";
-import { formatDateTimeDisplay } from "@/lib/locale/date";
+import { formatDateTimeDisplay, todayStorage } from "@/lib/locale/date";
 import { formatToman } from "@/lib/locale";
 import { mergeTimelineEntries, type TimelineEntry } from "@/lib/timeline/merge";
 import {
@@ -94,30 +111,82 @@ function actorName(
   return usersMap[actorId];
 }
 
-function activityBorderColor(action: string): string {
-  if (action === "person_created") {
-    return "var(--semantic-color-action-primary)";
-  }
-  if (action === "consultation_done" || action === "consultation_referred") {
-    return "var(--semantic-color-action-primary)";
-  }
-  if (
-    action === "enrollment_created" ||
-    action === "enrollment_prepayment" ||
-    action === "course_completed"
-  ) {
-    return "var(--semantic-color-status-success)";
-  }
-  if (action === "payment_recorded") {
-    return "var(--semantic-color-status-warning)";
-  }
-  if (action === "task_created" || action === "manual_note") {
-    return "var(--semantic-color-status-neutral)";
-  }
-  if (action === "enrollment_dropped" || action === "payment_refunded") {
-    return "var(--semantic-color-status-danger)";
-  }
-  return "var(--semantic-color-surface-border)";
+/** Icon + accent color for each activity action — gives every event a distinct visual identity. */
+const ACTIVITY_VISUALS: Record<string, { icon: LucideIcon; color: string }> = {
+  person_created: {
+    icon: UserPlus,
+    color: "var(--semantic-color-action-primary)",
+  },
+  consultation_referred: {
+    icon: MessageSquare,
+    color: "var(--semantic-color-action-primary)",
+  },
+  consultation_assessment_saved: {
+    icon: Sparkles,
+    color: "var(--semantic-color-status-neutral)",
+  },
+  consultation_done: {
+    icon: CheckCircle2,
+    color: "var(--semantic-color-action-primary)",
+  },
+  consultation_closed: {
+    icon: XCircle,
+    color: "var(--semantic-color-status-neutral)",
+  },
+  enrollment_created: {
+    icon: GraduationCap,
+    color: "var(--semantic-color-status-success)",
+  },
+  enrollment_prepayment: {
+    icon: Wallet,
+    color: "var(--semantic-color-status-success)",
+  },
+  enrollment_activated: {
+    icon: CheckCircle2,
+    color: "var(--semantic-color-status-success)",
+  },
+  enrollment_dropped: {
+    icon: XCircle,
+    color: "var(--semantic-color-status-danger)",
+  },
+  enrollment_path_gap_warning: {
+    icon: ShieldOff,
+    color: "var(--semantic-color-status-warning)",
+  },
+  payment_recorded: {
+    icon: Coins,
+    color: "var(--semantic-color-status-warning)",
+  },
+  payment_refunded: {
+    icon: RotateCcw,
+    color: "var(--semantic-color-status-danger)",
+  },
+  task_created: {
+    icon: Clock,
+    color: "var(--semantic-color-status-neutral)",
+  },
+  course_completed: {
+    icon: GraduationCap,
+    color: "var(--semantic-color-status-success)",
+  },
+  roadmap_step_waived: {
+    icon: ShieldCheck,
+    color: "var(--semantic-color-status-neutral)",
+  },
+  roadmap_step_unwaived: {
+    icon: ShieldOff,
+    color: "var(--semantic-color-status-neutral)",
+  },
+  manual_note: {
+    icon: MessageSquare,
+    color: "var(--semantic-color-status-neutral)",
+  },
+};
+
+const DEFAULT_ACTIVITY_VISUAL = { icon: Zap, color: "var(--semantic-color-surface-border)" };
+
+function activityVisual(action: string): { icon: LucideIcon; color: string } {
+  return ACTIVITY_VISUALS[action] ?? DEFAULT_ACTIVITY_VISUAL;
 }
 
 function ActivityDetails({
@@ -133,6 +202,11 @@ function ActivityDetails({
 }) {
   const detailClassName =
     "mt-[var(--primitive-space-1)] text-[length:var(--primitive-font-size-sm)] leading-[var(--primitive-font-lineHeight-sm)] text-[var(--semantic-color-text-secondary)]";
+  const linkClassName = cn(
+    detailClassName,
+    "inline-flex items-center gap-1 font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-action-primary)]",
+    "hover:text-[var(--semantic-color-action-primaryHover)]",
+  );
 
   switch (action) {
     case "person_created": {
@@ -232,14 +306,7 @@ function ActivityDetails({
           ) : null}
           {actor ? <p className={detailClassName}>توسط: {actor}</p> : null}
           {enrollmentId != null ? (
-            <Link
-              href={`/enrollments/${enrollmentId}`}
-              className={cn(
-                detailClassName,
-                "inline-block font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-action-primary)]",
-                "hover:text-[var(--semantic-color-action-primaryHover)]",
-              )}
-            >
+            <Link href={`/enrollments/${enrollmentId}`} className={linkClassName}>
               مشاهده ثبت‌نام ←
             </Link>
           ) : null}
@@ -257,15 +324,8 @@ function ActivityDetails({
             </p>
           ) : null}
           {enrollmentId != null ? (
-            <Link
-              href={`/enrollments/${enrollmentId}`}
-              className={cn(
-                detailClassName,
-                "inline-block font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-action-primary)]",
-                "hover:text-[var(--semantic-color-action-primaryHover)]",
-              )}
-            >
-              مشاهده ثبت‌نام →
+            <Link href={`/enrollments/${enrollmentId}`} className={linkClassName}>
+              مشاهده ثبت‌نام ←
             </Link>
           ) : null}
         </>
@@ -283,6 +343,45 @@ function ActivityDetails({
           دلیل: {reason}
         </p>
       ) : null;
+    }
+    case "enrollment_path_gap_warning": {
+      const courseName = payloadString(payload, "course_name");
+      const gapCount = payloadNumber(payload, "gap_item_count");
+      const enrollmentId = payloadNumber(payload, "enrollment_id");
+      const actor = actorName(actorId, usersMap);
+      return (
+        <>
+          {courseName ? (
+            <p className={detailClassName}>دوره: {courseName}</p>
+          ) : null}
+          {gapCount != null ? (
+            <p className={detailClassName}>
+              {gapCount} مرحله پیش‌نیاز هنوز تکمیل یا معاف نشده است
+            </p>
+          ) : null}
+          {actor ? <p className={detailClassName}>توسط: {actor}</p> : null}
+          {enrollmentId != null ? (
+            <Link href={`/enrollments/${enrollmentId}`} className={linkClassName}>
+              مشاهده ثبت‌نام ←
+            </Link>
+          ) : null}
+        </>
+      );
+    }
+    case "roadmap_step_waived":
+    case "roadmap_step_unwaived": {
+      const stepTitle = payloadString(payload, "roadmap_item_title");
+      const reason = payloadString(payload, "reason");
+      const actor = actorName(actorId, usersMap);
+      return (
+        <>
+          {stepTitle ? (
+            <p className={detailClassName}>مرحله: {stepTitle}</p>
+          ) : null}
+          {reason ? <p className={detailClassName}>دلیل: {reason}</p> : null}
+          {actor ? <p className={detailClassName}>توسط: {actor}</p> : null}
+        </>
+      );
     }
     case "payment_recorded": {
       const amount = payloadNumber(payload, "amount");
@@ -334,9 +433,7 @@ function ActivityDetails({
       );
     }
     case "course_completed":
-      return (
-        <p className={detailClassName}>دوره با موفقیت تکمیل شد</p>
-      );
+      return <p className={detailClassName}>دوره با موفقیت تکمیل شد</p>;
     default:
       return null;
   }
@@ -372,48 +469,55 @@ function TimelineSkeleton() {
 function TimelineRow({
   entry,
   usersMap,
+  showConnector,
 }: {
   entry: TimelineEntry;
   usersMap?: Record<number, string>;
+  showConnector: boolean;
 }) {
   const isActivity = entry.kind === "activity";
-  const Icon = isActivity ? Zap : MessageSquare;
-  const label = isActivity
-    ? actionLabel(entry.action)
-    : entry.channelLabel;
-  const borderColor = isActivity
-    ? activityBorderColor(entry.action)
-    : undefined;
+  const label = isActivity ? actionLabel(entry.action) : entry.channelLabel;
+  const visual = isActivity
+    ? activityVisual(entry.action)
+    : { icon: MessageSquare, color: "var(--semantic-color-action-primary)" };
+  const Icon = visual.icon;
 
   return (
-    <article className="flex gap-[var(--primitive-space-3)] border-b border-[var(--semantic-color-surface-border)] py-[var(--primitive-space-4)] last:border-b-0">
-      <div
-        className={cn(
-          "flex size-[var(--primitive-space-10)] shrink-0 items-center justify-center",
-          "rounded-[var(--primitive-radius-full)] bg-[var(--semantic-color-surface-subtle)]",
-          "text-[var(--semantic-color-text-secondary)]",
-        )}
-        aria-hidden
-      >
-        <Icon className="size-[var(--primitive-space-5)]" />
-      </div>
-      <div
-        className={cn(
-          "min-w-0 flex-1",
-          borderColor &&
-            "border-s-[2px] ps-[var(--primitive-space-3)]",
-        )}
-        style={borderColor ? { borderInlineStartColor: borderColor } : undefined}
-      >
-        <time
-          dateTime={entry.created_at}
-          className="text-[length:var(--primitive-font-size-xs)] leading-[var(--primitive-font-lineHeight-xs)] text-[var(--semantic-color-text-secondary)]"
+    <article className="group flex gap-[var(--primitive-space-3)]">
+      <div className="flex shrink-0 flex-col items-center">
+        <div
+          className={cn(
+            "flex size-[var(--primitive-space-9)] items-center justify-center rounded-[var(--primitive-radius-full)]",
+            "ring-4 ring-[var(--semantic-color-surface-card)] transition-transform duration-150 group-hover:scale-105",
+          )}
+          style={{
+            backgroundColor: `color-mix(in srgb, ${visual.color} 14%, var(--semantic-color-surface-card))`,
+            color: visual.color,
+          }}
+          aria-hidden
         >
-          {formatDateTimeDisplay(entry.created_at)}
-        </time>
-        <p className="mt-[var(--primitive-space-1)] text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)] leading-[var(--primitive-font-lineHeight-sm)] text-[var(--semantic-color-text-primary)]">
-          {label}
-        </p>
+          <Icon className="size-[var(--primitive-space-4)]" strokeWidth={2.25} />
+        </div>
+        {showConnector ? (
+          <div
+            className="mt-[var(--primitive-space-1)] w-px flex-1 bg-[var(--semantic-color-surface-border)]"
+            aria-hidden
+          />
+        ) : null}
+      </div>
+
+      <div className="min-w-0 flex-1 pb-[var(--primitive-space-5)]">
+        <div className="flex flex-wrap items-baseline gap-x-[var(--primitive-space-2)]">
+          <p className="text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-semibold)] leading-[var(--primitive-font-lineHeight-sm)] text-[var(--semantic-color-text-primary)]">
+            {label}
+          </p>
+          <time
+            dateTime={entry.created_at}
+            className="text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-disabled)]"
+          >
+            {formatDateTimeDisplay(entry.created_at, "HH:mm")}
+          </time>
+        </div>
         {isActivity ? (
           <ActivityDetails
             action={entry.action}
@@ -429,6 +533,42 @@ function TimelineRow({
       </div>
     </article>
   );
+}
+
+function dayGroupLabel(isoDateTime: string): string {
+  const dateOnly = formatDateTimeDisplay(isoDateTime, "YYYY/MM/DD");
+  const today = formatDateTimeDisplay(new Date().toISOString(), "YYYY/MM/DD");
+  const yesterday = formatDateTimeDisplay(
+    new Date(Date.now() - 86_400_000).toISOString(),
+    "YYYY/MM/DD",
+  );
+  if (dateOnly === today) return "امروز";
+  if (dateOnly === yesterday) return "دیروز";
+  return dateOnly;
+}
+
+type TimelineDayGroup = {
+  key: string;
+  label: string;
+  entries: TimelineEntry[];
+};
+
+function groupEntriesByDay(entries: TimelineEntry[]): TimelineDayGroup[] {
+  const groups: TimelineDayGroup[] = [];
+  for (const entry of entries) {
+    const dateKey = formatDateTimeDisplay(entry.created_at, "YYYY/MM/DD");
+    const lastGroup = groups[groups.length - 1];
+    if (lastGroup && lastGroup.key === dateKey) {
+      lastGroup.entries.push(entry);
+    } else {
+      groups.push({
+        key: dateKey,
+        label: dayGroupLabel(entry.created_at),
+        entries: [entry],
+      });
+    }
+  }
+  return groups;
 }
 
 type TimelineBodyProps = TimelineProps;
@@ -501,22 +641,42 @@ function TimelineBody({
   if (!entries || entries.length === 0) {
     return (
       <div className={className}>
-        <EmptyState
-          icon={Clock}
-          message="رویدادی ثبت نشده است"
-        />
+        <EmptyState icon={Clock} message="رویدادی ثبت نشده است" />
       </div>
     );
   }
 
+  const groups = groupEntriesByDay(entries);
+
   return (
     <div className={className} role="feed" aria-label="تایم‌لاین">
-      {entries.map((entry) => (
-        <TimelineRow
-          key={`${entry.kind}-${entry.id}`}
-          entry={entry}
-          usersMap={usersMap}
-        />
+      {groups.map((group, groupIndex) => (
+        <section key={group.key} className="mb-[var(--primitive-space-2)]">
+          <div className="mb-[var(--primitive-space-3)] flex items-center gap-[var(--primitive-space-2)]">
+            <CalendarClock
+              className="size-[var(--primitive-space-4)] text-[var(--semantic-color-text-disabled)]"
+              aria-hidden
+            />
+            <p className="text-[length:var(--primitive-font-size-xs)] font-[var(--primitive-font-weight-semibold)] uppercase tracking-wide text-[var(--semantic-color-text-secondary)]">
+              {group.label}
+            </p>
+            <div
+              className="h-px flex-1 bg-[var(--semantic-color-surface-border)]"
+              aria-hidden
+            />
+          </div>
+          {group.entries.map((entry, entryIndex) => (
+            <TimelineRow
+              key={`${entry.kind}-${entry.id}`}
+              entry={entry}
+              usersMap={usersMap}
+              showConnector={
+                entryIndex < group.entries.length - 1 ||
+                groupIndex < groups.length - 1
+              }
+            />
+          ))}
+        </section>
       ))}
     </div>
   );
