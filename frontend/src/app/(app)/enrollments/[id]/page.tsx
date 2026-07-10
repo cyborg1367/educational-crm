@@ -55,6 +55,7 @@ import type { InvoiceData } from "@/lib/pdf/types";
 import { canManageEnrollments, canManageFinance } from "@/lib/auth/role";
 import { computeDropPreflight } from "@/lib/finance/preflight";
 import { formatDateDisplay, formatPhoneDisplay, formatToman } from "@/lib/locale";
+import { remainingInstallmentsLabel } from "@/lib/timeline/copy";
 
 const MONEY_LOCK_REASON =
   "مبلغ در زمان ثبت‌نام ثبت شده و قابل تغییر نیست";
@@ -520,10 +521,17 @@ export default function EnrollmentDetailPage() {
               subtitle={formatDateDisplay(courseClass.start_date)}
               href={`/classes/${courseClass.id}`}
             />
-            {invoiceId ? (
+            {invoiceId && invoice ? (
               <RelationshipCard
                 label="فاکتور"
-                title={`فاکتور #${invoiceId}`}
+                title={formatToman(invoice.total_amount)}
+                subtitle={remainingInstallmentsLabel(
+                  installments.filter(
+                    (item) =>
+                      item.status !== "paid" && item.status !== "cancelled",
+                  ).length,
+                )}
+                badges={<StatusBadge domain="invoice" value={invoice.status} />}
                 href={`/invoices/${invoiceId}`}
               />
             ) : null}

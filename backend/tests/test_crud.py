@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.activity import service as activity_service
+from app.course_class import service as class_service
 from app.course_class.model import CourseClass
 from app.enrollment import service as enrollment_service
 from app.enrollment.enums import EnrollmentStatus
@@ -167,3 +168,42 @@ def test_invalid_foreign_key(
 
     assert exc_info.value.status_code == 404
     assert exc_info.value.detail == "Person not found"
+
+
+def test_delete_class_removes_class(
+    db_session: Session,
+    org_id: int,
+    request: pytest.FixtureRequest,
+) -> None:
+    course_class: CourseClass = request.getfixturevalue("class")
+
+    class_service.delete_class(db_session, org_id, course_class.id)
+
+    with pytest.raises(HTTPException) as exc_info:
+        class_service.get_class(db_session, org_id, course_class.id)
+    assert exc_info.value.status_code == 404
+
+
+def test_delete_class_blocked_by_active_enrollment(
+    db_session: Session,
+    org_id: int,
+    person: Person,
+    request: pytest.FixtureRequest,
+) -> None:
+    course_class: CourseClass = request.getfixturevalue("class")
+    enrollment_service.create_enrollment(
+        db_session,
+        org_id,
+        EnrollmentCreate(
+            person_id=person.id,
+            class_id=course_class.id,
+            status=EnrollmentStatus.active,
+        ),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        class_service.delete_class(db_session, org_id, course_class.id)
+
+    assert exc_info.value.status_code == 422
+    # Class must still exist — nothing was deleted.
+    assert class_service.get_class(db_session, org_id, course_class.id) is not None

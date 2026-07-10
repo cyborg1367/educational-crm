@@ -277,6 +277,9 @@ export const ACTION_LABELS: Record<string, string> = {
   payment_refunded: "بازپرداخت انجام شد",
   task_created: "وظیفه ایجاد شد",
   course_completed: "دوره تکمیل شد",
+  roadmap_step_waived: "معافیت مرحله نقشه‌راه",
+  roadmap_step_unwaived: "لغو معافیت مرحله نقشه‌راه",
+  enrollment_path_gap_warning: "ثبت‌نام وسط مسیر (پیش‌نیاز ناقص)",
   manual_note: "یادداشت",
   // Legacy / dotted action keys (mock data and older rows)
   "enrollment.created": "ثبت‌نام انجام شد",

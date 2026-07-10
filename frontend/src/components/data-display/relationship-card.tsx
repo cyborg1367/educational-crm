@@ -10,6 +10,8 @@ export type RelationshipCardProps = {
   label: string;
   title: string;
   subtitle?: string;
+  /** Status badge or similar chip, shown beside the label. */
+  badges?: React.ReactNode;
   href?: string;
   onClick?: () => void;
   className?: string;
@@ -19,15 +21,19 @@ function RelationshipCard({
   label,
   title,
   subtitle,
+  badges,
   href,
   onClick,
   className,
 }: RelationshipCardProps) {
   const content = (
     <>
-      <p className="text-[length:var(--primitive-font-size-xs)] leading-[var(--primitive-font-lineHeight-xs)] text-[var(--semantic-color-text-secondary)]">
-        {label}
-      </p>
+      <div className="flex items-center justify-between gap-[var(--primitive-space-2)]">
+        <p className="text-[length:var(--primitive-font-size-xs)] leading-[var(--primitive-font-lineHeight-xs)] text-[var(--semantic-color-text-secondary)]">
+          {label}
+        </p>
+        {badges ? <div className="shrink-0">{badges}</div> : null}
+      </div>
       <div className="mt-[var(--primitive-space-1)] flex items-center justify-between gap-[var(--primitive-space-2)]">
         <div className="min-w-0">
           <p className="truncate text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)] leading-[var(--primitive-font-lineHeight-sm)] text-[var(--semantic-color-text-primary)]">

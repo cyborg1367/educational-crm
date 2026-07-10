@@ -111,9 +111,7 @@ def update_class(
     return course_class
 
 
-def delete_class(
-    db: Session, org_id: int, class_id: int, *, actor: User | None = None
-) -> None:
+def delete_class(db: Session, org_id: int, class_id: int) -> None:
     from sqlalchemy import func
 
     from app.enrollment.model import Enrollment
@@ -134,12 +132,3 @@ def delete_class(
 
     db.delete(course_class)
     db.commit()
-
-    if actor is not None:
-        workflow_service.log_activity(
-            db,
-            org_id,
-            action="class_deleted",
-            actor_id=actor.id,
-            payload={"class_id": class_id, "class_name": course_class.name},
-        )

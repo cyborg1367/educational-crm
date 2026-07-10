@@ -147,4 +147,4 @@ def delete_class(
     Returns 404 if the class is not found.
     Returns 422 if the class has active enrollments.
     """
-    class_service.delete_class(db, current_user.org_id, class_id, actor=current_user)
+    class_service.delete_class(db, current_user.org_id, class_id)

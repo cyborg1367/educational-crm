@@ -140,8 +140,10 @@ def create_enrollment(
             payload={
                 "enrollment_id": enrollment.id,
                 "course_id": course_id,
+                "course_name": course.title,
                 "journey_id": journey_id_for_gap or journey_id,
                 "gap_item_ids": gap_item_ids,
+                "gap_item_count": len(gap_item_ids),
                 "message": (
                     "ثبت‌نام وسط مسیر ثبت شد؛ مراحل قبل هنوز تکمیل یا معاف نشده‌اند."
                 ),
