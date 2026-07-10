@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: crm
       POSTGRES_USER: crm
@@ -17,6 +18,7 @@ services:
 
   api:
     build: ./backend
+    restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+psycopg2://crm:crm@postgres:5432/crm
       SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
@@ -37,6 +39,7 @@ services:
       args:
         NEXT_PUBLIC_USE_MOCK_API: "false"
         NEXT_PUBLIC_API_URL: /api
+    restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_URL: /api
       NEXT_PUBLIC_USE_MOCK_API: "false"
@@ -44,6 +47,7 @@ services:
 
   nginx:
     image: nginx:alpine
+    restart: unless-stopped
     ports:
       - "80:80"
     volumes:
