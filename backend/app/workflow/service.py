@@ -206,7 +206,7 @@ def _notify_admission_feedback_follow_up(
         db,
         org_id,
         person_id=consultation.person_id,
-        task_type=TaskType.follow_up_registration,
+        task_type=TaskType.consultation_follow_up,
         title=f"پیگیری مجدد با {person.full_name}",
         due_date=date.today() + timedelta(days=3),
         assignee_id=assignee_id,

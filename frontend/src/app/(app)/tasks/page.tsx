@@ -15,6 +15,7 @@ import { SplitViewSkeleton } from "@/components/skeletons";
 import type { ApiError } from "@/lib/api/error";
 import { toApiError } from "@/lib/api/errors";
 import { listConsultations, getConsultation } from "@/lib/api/consultations";
+import { getCourse } from "@/lib/api/finance";
 import { listPeople } from "@/lib/api/people";
 import { listDepartments } from "@/lib/api/departments";
 import type {
@@ -97,6 +98,9 @@ export default function TasksPage() {
   const [linkedConsultation, setLinkedConsultation] =
     React.useState<ConsultationRead | null>(null);
   const [loadingConsultation, setLoadingConsultation] = React.useState(false);
+  const [recommendedCourseName, setRecommendedCourseName] = React.useState<
+    string | null
+  >(null);
   const [today] = React.useState(() => todayStorage());
 
   React.useEffect(() => {
@@ -248,20 +252,31 @@ export default function TasksPage() {
       selectedTask.related_entity_id == null
     ) {
       setLinkedConsultation(null);
+      setRecommendedCourseName(null);
       return;
     }
 
     let cancelled = false;
     setLoadingConsultation(true);
     void getConsultation(selectedTask.related_entity_id)
-      .then((consultation) => {
-        if (!cancelled) {
-          setLinkedConsultation(consultation);
+      .then(async (consultation) => {
+        if (cancelled) return;
+        setLinkedConsultation(consultation);
+        if (consultation.recommended_course_id != null) {
+          try {
+            const course = await getCourse(consultation.recommended_course_id);
+            if (!cancelled) setRecommendedCourseName(course.title);
+          } catch {
+            if (!cancelled) setRecommendedCourseName(null);
+          }
+        } else {
+          setRecommendedCourseName(null);
         }
       })
       .catch(() => {
         if (!cancelled) {
           setLinkedConsultation(null);
+          setRecommendedCourseName(null);
         }
       })
       .finally(() => {
@@ -379,6 +394,7 @@ export default function TasksPage() {
                 }
                 linkedConsultation={linkedConsultation}
                 loadingConsultation={loadingConsultation}
+                recommendedCourseName={recommendedCourseName}
                 completing={completing}
                 onMarkComplete={() => void handleMarkComplete()}
                 onNavigate={(href) => router.push(href)}

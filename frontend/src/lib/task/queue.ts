@@ -242,7 +242,11 @@ export function taskTypePillClassName(
   if (type === "follow_up_registration" || type === "pre_enroll_unpaid") {
     return "border-[var(--primitive-color-brand-300)] bg-[var(--primitive-color-brand-50)] text-[var(--primitive-color-brand-800)]";
   }
-  if (type === "referral" || type === "post_course_consultation") {
+  if (
+    type === "referral" ||
+    type === "post_course_consultation" ||
+    type === "consultation_follow_up"
+  ) {
     return "border-[color-mix(in_srgb,#4169E1_35%,var(--semantic-color-surface-border))] bg-[color-mix(in_srgb,#eef2ff_65%,var(--semantic-color-surface-card))] text-[var(--primitive-color-brand-800)]";
   }
   return "border-[var(--primitive-color-brand-200)]/80 bg-[var(--primitive-color-brand-50)]/70 text-[var(--primitive-color-brand-700)]";
