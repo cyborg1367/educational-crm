@@ -1,0 +1,15 @@
+.root {
+  direction: rtl;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--cert-space-2);
+  font-family: var(--cert-font-fa);
+  font-size: 9px;
+  letter-spacing: 0.2px;
+  color: var(--cert-color-gray-light);
+}
+
+.dot {
+  color: var(--cert-color-gold);
+}

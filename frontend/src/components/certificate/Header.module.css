@@ -1,0 +1,63 @@
+.root {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--cert-space-4);
+}
+
+.logo {
+  display: block;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.spacer {
+  width: 92px;
+  flex-shrink: 0;
+}
+
+.titleBlock {
+  flex: 1;
+  text-align: center;
+  padding-top: var(--cert-space-2);
+}
+
+.ornament {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--cert-space-2);
+}
+
+.ornamentLine {
+  width: 42px;
+  height: 1px;
+  background: var(--cert-color-gold);
+}
+
+.ornamentDot {
+  width: 5px;
+  height: 5px;
+  background: var(--cert-color-gold);
+  transform: rotate(45deg);
+}
+
+.titleFa {
+  direction: rtl;
+  margin: var(--cert-space-2) 0 0;
+  font-family: var(--cert-font-fa);
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--cert-color-dark);
+  letter-spacing: 0;
+}
+
+.titleEn {
+  margin: var(--cert-space-1) 0 0;
+  font-family: var(--cert-font-en);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-style: italic;
+  color: var(--cert-color-gold-dark);
+  letter-spacing: 2.5px;
+}

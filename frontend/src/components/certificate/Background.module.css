@@ -1,0 +1,23 @@
+.root {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at 50% 45%,
+    color-mix(in srgb, var(--cert-color-gold-light) 35%, transparent) 0%,
+    transparent 65%
+  );
+}
+
+.pattern {
+  position: absolute;
+  inset: 0;
+  opacity: 0.05;
+}

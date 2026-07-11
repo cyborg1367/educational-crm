@@ -1,0 +1,83 @@
+@font-face {
+  font-family: "Playfair Display";
+  src: url("/fonts/PlayfairDisplay-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Playfair Display";
+  src: url("/fonts/PlayfairDisplay-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Playfair Display";
+  src: url("/fonts/PlayfairDisplay-Italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+.page {
+  /* palette */
+  --cert-color-orange: #f58220;
+  --cert-color-dark: #1a1a1a;
+  --cert-color-gold: #d9b55a;
+  --cert-color-gold-dark: #a9812f;
+  --cert-color-gold-light: #f0dea8;
+  --cert-color-cream: #faf7f2;
+  --cert-color-border: #e8ddce;
+  --cert-color-gray: #6e6e6e;
+  --cert-color-gray-light: #a2a2a2;
+
+  /* type */
+  --cert-font-fa: "Vazirmatn", Tahoma, sans-serif;
+  --cert-font-en: "Playfair Display", "Times New Roman", serif;
+
+  /* spacing scale */
+  --cert-space-1: 4px;
+  --cert-space-2: 8px;
+  --cert-space-3: 12px;
+  --cert-space-4: 16px;
+  --cert-space-5: 24px;
+  --cert-space-6: 32px;
+  --cert-space-7: 48px;
+
+  --cert-page-padding: 14mm;
+  --cert-frame-padding: 12mm 18mm;
+
+  width: 297mm;
+  height: 210mm;
+  box-sizing: border-box;
+  padding: var(--cert-page-padding);
+  background: var(--cert-color-cream);
+  direction: ltr;
+  position: relative;
+  overflow: hidden;
+}
+
+.frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  padding: var(--cert-frame-padding);
+  gap: var(--cert-space-3);
+}
+
+.footerRow {
+  margin-top: var(--cert-space-2);
+}
