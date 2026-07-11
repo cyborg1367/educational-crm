@@ -207,3 +207,95 @@ def test_delete_class_blocked_by_active_enrollment(
     assert exc_info.value.status_code == 422
     # Class must still exist — nothing was deleted.
     assert class_service.get_class(db_session, org_id, course_class.id) is not None
+
+
+def test_enrollment_status_transition_blocks_reactivation(
+    db_session: Session,
+    org_id: int,
+    person: Person,
+    request: pytest.FixtureRequest,
+) -> None:
+    """completed/dropped are terminal for PATCH /enrollments/{id} — they
+    can't be reactivated by setting .status back manually."""
+    course_class: CourseClass = request.getfixturevalue("class")
+    enrollment = enrollment_service.create_enrollment(
+        db_session,
+        org_id,
+        EnrollmentCreate(
+            person_id=person.id,
+            class_id=course_class.id,
+            status=EnrollmentStatus.completed,
+        ),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        enrollment_service.update_status(
+            db_session,
+            org_id,
+            enrollment.id,
+            EnrollmentUpdate(status=EnrollmentStatus.active),
+        )
+
+    assert exc_info.value.status_code == 422
+    db_session.refresh(enrollment)
+    assert enrollment.status == EnrollmentStatus.completed
+
+
+def test_enrollment_status_transition_blocks_skipping_active(
+    db_session: Session,
+    org_id: int,
+    person: Person,
+    request: pytest.FixtureRequest,
+) -> None:
+    """pre_enroll can't jump straight to completed — it must pass through
+    active first (matching how on_first_payment/on_class_completed drive
+    this transition in practice)."""
+    course_class: CourseClass = request.getfixturevalue("class")
+    enrollment = enrollment_service.create_enrollment(
+        db_session,
+        org_id,
+        EnrollmentCreate(person_id=person.id, class_id=course_class.id),
+    )
+    assert enrollment.status == EnrollmentStatus.pre_enroll
+
+    with pytest.raises(HTTPException) as exc_info:
+        enrollment_service.update_status(
+            db_session,
+            org_id,
+            enrollment.id,
+            EnrollmentUpdate(status=EnrollmentStatus.completed),
+        )
+
+    assert exc_info.value.status_code == 422
+
+
+def test_enrollment_status_transition_allows_forward_progress(
+    db_session: Session,
+    org_id: int,
+    person: Person,
+    request: pytest.FixtureRequest,
+) -> None:
+    """The legal forward path (pre_enroll -> active -> completed) still
+    works through the generic PATCH endpoint."""
+    course_class: CourseClass = request.getfixturevalue("class")
+    enrollment = enrollment_service.create_enrollment(
+        db_session,
+        org_id,
+        EnrollmentCreate(person_id=person.id, class_id=course_class.id),
+    )
+
+    activated = enrollment_service.update_status(
+        db_session,
+        org_id,
+        enrollment.id,
+        EnrollmentUpdate(status=EnrollmentStatus.active),
+    )
+    assert activated.status == EnrollmentStatus.active
+
+    completed = enrollment_service.update_status(
+        db_session,
+        org_id,
+        enrollment.id,
+        EnrollmentUpdate(status=EnrollmentStatus.completed),
+    )
+    assert completed.status == EnrollmentStatus.completed

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
+from app.auth.permissions import require_permission
 from app.core.db import get_db
 from app.core.rate_limit import SENSITIVE_LIMIT
 from app.core.openapi import PROTECTED_RESPONSES
@@ -73,7 +74,9 @@ def get_enrollment(
 def create_enrollment(
     body: EnrollmentCreate,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[
+        User, Depends(require_permission("enrollment", "create"))
+    ],
 ) -> Enrollment:
     """Create a new enrollment.
 
@@ -100,14 +103,19 @@ def update_enrollment(
     enrollment_id: int,
     body: EnrollmentUpdate,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[
+        User, Depends(require_permission("enrollment", "update"))
+    ],
 ) -> Enrollment:
     """Update an enrollment.
 
-    Updates enrollment status or start date.
+    Updates enrollment status or start date. Status changes must follow the
+    enrollment state machine (see enrollment/service.py) — dropping must go
+    through PATCH /{enrollment_id}/drop instead, which also cancels
+    installments/tasks; this endpoint rejects that transition.
     Returns 404 if the enrollment is not found.
     Returns 409 if the status change would create a duplicate live enrollment.
-    Returns 422 if request validation fails.
+    Returns 422 if the status transition is not allowed or validation fails.
     """
     return enrollment_service.update_status(db, current_user.org_id, enrollment_id, body)
 
@@ -119,7 +127,9 @@ def drop_enrollment(
     enrollment_id: int,
     body: EnrollmentDrop,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[
+        User, Depends(require_permission("enrollment", "drop"))
+    ],
 ) -> Enrollment:
     """Drop an enrollment.
 
