@@ -21,6 +21,7 @@ class User(Base):
     )
     department_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    signature_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     org_id: Mapped[int] = mapped_column(
         ForeignKey("organizations.id"), nullable=False, index=True
     )

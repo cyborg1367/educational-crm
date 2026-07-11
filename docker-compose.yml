@@ -28,6 +28,9 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
       PRE_ENROLL_FOLLOWUP_DAYS: ${PRE_ENROLL_FOLLOWUP_DAYS:-3}
       DORMANT_DAYS: ${DORMANT_DAYS:-365}
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -58,3 +61,4 @@ services:
 
 volumes:
   postgres_data:
+  uploads_data:

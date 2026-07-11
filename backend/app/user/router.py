@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, File, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user, require_role
@@ -102,3 +102,38 @@ def delete_user(
     Returns 403 if the caller is not an admin.
     """
     user_service.delete_user(db, current_user.org_id, user_id)
+
+
+@router.post("/{user_id}/signature", response_model=UserRead)
+def upload_user_signature(
+    user_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_role(UserRole.admin))],
+    file: Annotated[
+        UploadFile, File(description="Signature image (PNG/JPEG/WEBP, max 2MB).")
+    ],
+) -> User:
+    """Upload a signature image for a user.
+
+    Stores a scanned signature for use on generated certificates, replacing
+    any previously uploaded signature. Admin role required.
+    Returns 404 if the user is not found in the org.
+    Returns 403 if the caller is not an admin.
+    Returns 422 if the file is not a supported image type or exceeds 2MB.
+    """
+    return user_service.upload_signature(db, current_user.org_id, user_id, file)
+
+
+@router.delete("/{user_id}/signature", response_model=UserRead)
+def delete_user_signature(
+    user_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_role(UserRole.admin))],
+) -> User:
+    """Remove a user's uploaded signature image.
+
+    Admin role required.
+    Returns 404 if the user is not found in the org.
+    Returns 403 if the caller is not an admin.
+    """
+    return user_service.remove_signature(db, current_user.org_id, user_id)

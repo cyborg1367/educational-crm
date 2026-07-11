@@ -19,6 +19,12 @@
   color: var(--cert-color-dark);
 }
 
+.markImage {
+  width: 110px;
+  height: 34px;
+  object-fit: contain;
+}
+
 .line {
   width: 100%;
   height: 1px;

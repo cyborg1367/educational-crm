@@ -20,10 +20,40 @@ function SignatureMark() {
   );
 }
 
-function SignatureColumn({ name, title }: { name: string; title: string }) {
+function SignatureImage({ src, name }: { src: string; name: string }) {
+  const [failed, setFailed] = React.useState(false);
+
+  if (failed) {
+    return <SignatureMark />;
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={`امضای ${name}`}
+      className={styles.markImage}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+function SignatureColumn({
+  name,
+  title,
+  signatureSrc,
+}: {
+  name: string;
+  title: string;
+  signatureSrc?: string | null;
+}) {
   return (
     <div className={styles.column}>
-      <SignatureMark />
+      {signatureSrc ? (
+        <SignatureImage src={signatureSrc} name={name} />
+      ) : (
+        <SignatureMark />
+      )}
       <div className={styles.line} />
       <p className={styles.name}>{name}</p>
       <p className={styles.title}>{title}</p>
@@ -34,26 +64,42 @@ function SignatureColumn({ name, title }: { name: string; title: string }) {
 export type SignaturesProps = {
   directorName: string;
   directorTitle: string;
+  directorSignatureSrc?: string | null;
   instructorName: string;
   instructorTitle: string;
+  instructorSignatureSrc?: string | null;
+  sealSrc?: string | null;
 };
 
 /** Two signatures flanking the institute seal — laid out left-to-right so
  * the DOM order matches the visual order (director left, instructor
- * right), with the seal overlapping both columns' top edge slightly. */
+ * right), with the seal overlapping both columns' top edge slightly.
+ * Each signature/seal falls back to its generated placeholder when no real
+ * scanned image is set, or when that image fails to load. */
 function Signatures({
   directorName,
   directorTitle,
+  directorSignatureSrc,
   instructorName,
   instructorTitle,
+  instructorSignatureSrc,
+  sealSrc,
 }: SignaturesProps) {
   return (
     <div className={styles.root}>
-      <SignatureColumn name={directorName} title={directorTitle} />
+      <SignatureColumn
+        name={directorName}
+        title={directorTitle}
+        signatureSrc={directorSignatureSrc}
+      />
       <div className={styles.sealSlot}>
-        <Seal />
+        <Seal imageSrc={sealSrc} />
       </div>
-      <SignatureColumn name={instructorName} title={instructorTitle} />
+      <SignatureColumn
+        name={instructorName}
+        title={instructorTitle}
+        signatureSrc={instructorSignatureSrc}
+      />
     </div>
   );
 }

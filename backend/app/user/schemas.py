@@ -27,6 +27,10 @@ class UserRead(BaseModel):
         description="Primary department assignment, if any."
     )
     is_active: bool = Field(description="Whether the account can log in.")
+    signature_url: str | None = Field(
+        default=None,
+        description="URL of the user's uploaded signature image, for certificates.",
+    )
     org_id: int = Field(description="Owning organization. Immutable.")
     created_at: datetime = Field(description="Record creation timestamp (UTC).")
     updated_at: datetime = Field(description="Last update timestamp (UTC).")

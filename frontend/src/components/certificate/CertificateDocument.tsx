@@ -2,6 +2,7 @@
 
 import * as React from "react";
 
+import { API_BASE_URL } from "@/lib/api/config";
 import { formatDateDisplay } from "@/lib/locale/date";
 import { currentJalaliMonth } from "@/lib/locale/jalali-month";
 import { toPersianDigits } from "@/lib/locale/number";
@@ -18,13 +19,20 @@ import { Signatures } from "./Signatures";
 
 /** Hardcoded institute-level info — a real, fixed detail about this one
  * institute, not per-record data (same category as the phone/address
- * constants already hardcoded in InvoiceDocument). */
+ * constants already hardcoded in InvoiceDocument).
+ *
+ * directorSignatureSrc/sealSrc point at static files the institute drops
+ * into frontend/public/images/ once real scans are available; until then
+ * the request 404s and Signatures/Seal fall back to their generated
+ * placeholders (see the onError handling in those components). */
 const INSTITUTE = {
   website: "www.kadoos.ac.ir",
   phone: "۰۱۳۹۱۰۰۲۳۴۳ - ۰۱۳۳۳۲۳۲۳۲۳",
   address: "رشت، خیابان لاکانی، ابتدای صندوق عدالت",
   directorName: "مهندس علی شریفی",
   directorTitle: "مدیر مؤسسه",
+  directorSignatureSrc: "/images/director-signature.png",
+  sealSrc: "/images/institute-seal.png",
 } as const;
 
 function genderTitle(gender: CertificateData["person"]["gender"]): string {
@@ -82,8 +90,15 @@ const CertificateDocument = React.forwardRef<HTMLDivElement, { data: Certificate
             <Signatures
               directorName={INSTITUTE.directorName}
               directorTitle={INSTITUTE.directorTitle}
+              directorSignatureSrc={INSTITUTE.directorSignatureSrc}
               instructorName={teacher?.name ?? "—"}
               instructorTitle="مدرس دوره"
+              instructorSignatureSrc={
+                teacher?.signature_url
+                  ? `${API_BASE_URL}${teacher.signature_url}`
+                  : undefined
+              }
+              sealSrc={INSTITUTE.sealSrc}
             />
             <div className={styles.footerRow}>
               <Footer

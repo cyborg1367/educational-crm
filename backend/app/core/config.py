@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     KAVENEGAR_API_KEY: str = ""
     KAVENEGAR_SENDER: str = "EduCRM"
     SMS_ENABLED: bool | None = None
+    UPLOAD_DIR: str = "uploads"
 
     @model_validator(mode="after")
     def default_sms_enabled(self) -> Self:

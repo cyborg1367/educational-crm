@@ -1,4 +1,4 @@
-import { fetchJson } from "@/lib/api/client";
+import { fetchFormData, fetchJson } from "@/lib/api/client";
 import type {
   PaginatedResponse,
   UserCreate,
@@ -40,4 +40,19 @@ export function getMe(): Promise<UserRead> {
 
 export function createUser(body: UserCreate): Promise<UserRead> {
   return fetchJson<UserRead>("/users", { method: "POST", body });
+}
+
+export function uploadUserSignature(
+  userId: number,
+  file: File,
+): Promise<UserRead> {
+  const formData = new FormData();
+  formData.set("file", file);
+  return fetchFormData<UserRead>(`/users/${userId}/signature`, formData);
+}
+
+export function deleteUserSignature(userId: number): Promise<UserRead> {
+  return fetchJson<UserRead>(`/users/${userId}/signature`, {
+    method: "DELETE",
+  });
 }

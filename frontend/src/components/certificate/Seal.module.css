@@ -4,6 +4,12 @@
   overflow: visible;
 }
 
+.image {
+  width: 100px;
+  height: 130px;
+  object-fit: contain;
+}
+
 .ringText {
   font-family: var(--cert-font-en);
   font-size: 5.5px;

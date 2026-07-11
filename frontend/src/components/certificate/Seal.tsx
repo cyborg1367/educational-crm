@@ -10,13 +10,33 @@ const TEXT_RING_RADIUS = 33;
 const TOP_ARC = `M ${CX - TEXT_RING_RADIUS},${CY} A ${TEXT_RING_RADIUS},${TEXT_RING_RADIUS} 0 0 1 ${CX + TEXT_RING_RADIUS},${CY}`;
 const BOTTOM_ARC = `M ${CX + TEXT_RING_RADIUS},${CY} A ${TEXT_RING_RADIUS},${TEXT_RING_RADIUS} 0 0 1 ${CX - TEXT_RING_RADIUS},${CY}`;
 
+export type SealProps = {
+  /** Scanned image of the institute's real stamp. Falls back to the
+   * generated SVG medallion below if unset, or if the image fails to load. */
+  imageSrc?: string | null;
+};
+
 /**
  * Premium institute seal: a scalloped (coin-edge) gold ring, an arced
  * inscription running around the rim, a small central emblem, and a
  * two-tailed ribbon beneath — built entirely from computed paths and
  * gradients (no filters, so it stays crisp through print/PDF export).
  */
-function Seal() {
+function Seal({ imageSrc }: SealProps = {}) {
+  const [imageFailed, setImageFailed] = React.useState(false);
+
+  if (imageSrc && !imageFailed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={imageSrc}
+        alt="مهر مؤسسه کادوس"
+        className={styles.image}
+        onError={() => setImageFailed(true)}
+      />
+    );
+  }
+
   return (
     <svg
       className={styles.root}
