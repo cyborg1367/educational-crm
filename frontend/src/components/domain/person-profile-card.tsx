@@ -27,13 +27,15 @@ export type PersonProfileCardProps = {
 function ProfileField({
   label,
   value,
+  full,
 }: {
   label: string;
   value: React.ReactNode;
+  full?: boolean;
 }) {
   return (
-    <div className="grid grid-cols-[minmax(5.5rem,7rem)_1fr] gap-[var(--primitive-space-3)] border-b border-[var(--semantic-color-surface-border)]/80 py-[var(--primitive-space-3)] last:border-b-0">
-      <dt className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
+    <div className={cn("flex min-w-0 flex-col gap-[2px]", full && "col-span-full")}>
+      <dt className="text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]">
         {label}
       </dt>
       <dd className="text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-primary)]">
@@ -90,7 +92,7 @@ function PersonProfileCard({
           </div>
         </div>
 
-        <dl className="mt-[var(--primitive-space-4)] border-t border-[var(--semantic-color-surface-border)] pt-[var(--primitive-space-1)]">
+        <dl className="mt-[var(--primitive-space-4)] grid grid-cols-2 gap-x-[var(--primitive-space-4)] gap-y-[var(--primitive-space-3)] border-t border-[var(--semantic-color-surface-border)] pt-[var(--primitive-space-4)] sm:grid-cols-3">
           <ProfileField
             label="تلفن"
             value={person.phone ? formatPhoneDisplay(person.phone) : null}
@@ -109,9 +111,14 @@ function PersonProfileCard({
             value={person.gender ? genderLabel(person.gender) : "ثبت نشده"}
           />
           <ProfileField
-            label="علاقه‌مندی‌ها"
-            value={
-              interests.length > 0 ? (
+            label="منبع آشنایی"
+            value={person.source ? sourceLabel(person.source) : "ثبت نشده"}
+          />
+          {interests.length > 0 ? (
+            <ProfileField
+              full
+              label="علاقه‌مندی‌ها"
+              value={
                 <span className="flex flex-wrap gap-[var(--primitive-space-1)]">
                   {interests.map((interest) => (
                     <Badge key={interest} variant="brand">
@@ -119,20 +126,18 @@ function PersonProfileCard({
                     </Badge>
                   ))}
                 </span>
-              ) : (
-                "ثبت نشده"
-              )
-            }
-          />
-          <ProfileField
-            label="منبع آشنایی"
-            value={person.source ? sourceLabel(person.source) : "ثبت نشده"}
-          />
+              }
+            />
+          ) : null}
           {person.interests_note ? (
-            <ProfileField label="توضیحات علاقه‌مندی" value={person.interests_note} />
+            <ProfileField
+              full
+              label="توضیحات علاقه‌مندی"
+              value={person.interests_note}
+            />
           ) : null}
           {person.notes ? (
-            <ProfileField label="یادداشت" value={person.notes} />
+            <ProfileField full label="یادداشت" value={person.notes} />
           ) : null}
         </dl>
       </div>
