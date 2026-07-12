@@ -7,6 +7,7 @@ import { focusVisibleStyles } from "@/components/form/control-styles";
 import { Avatar } from "@/components/primitives/avatar";
 import type { TaskRead } from "@/lib/api/types";
 import { formatDateDisplay } from "@/lib/locale/date";
+import { formatPhoneDisplay } from "@/lib/locale/number";
 import {
   formatDueRelative,
   getTaskDueBucket,
@@ -19,6 +20,7 @@ import { cn } from "@/lib/utils";
 export type TaskQueueRowProps = {
   task: TaskRead;
   personName: string;
+  personPhone?: string | null;
   assigneeName?: string | null;
   selected?: boolean;
   today: string;
@@ -28,6 +30,7 @@ export type TaskQueueRowProps = {
 function TaskQueueRow({
   task,
   personName,
+  personPhone,
   assigneeName,
   selected = false,
   today,
@@ -79,6 +82,12 @@ function TaskQueueRow({
           </p>
           <p className="mt-0.5 truncate text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]">
             {personName}
+            {personPhone ? (
+              <span dir="ltr" className="text-[var(--semantic-color-text-disabled)]">
+                {" "}
+                · {formatPhoneDisplay(personPhone)}
+              </span>
+            ) : null}
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-[var(--primitive-space-1)]">

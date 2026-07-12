@@ -8,6 +8,7 @@ import { Badge } from "@/components/primitives/badge";
 import { Button } from "@/components/ui/button";
 import type { ConsultationRead, TaskRead } from "@/lib/api/types";
 import { formatDateDisplay, todayStorage } from "@/lib/locale/date";
+import { formatPhoneDisplay } from "@/lib/locale/number";
 import { isConsultationIntakeTask } from "@/lib/task/consultation-task";
 import {
   buildEnrollmentWizardHref,
@@ -27,6 +28,7 @@ import {
 export type TaskDetailPaneProps = {
   task: TaskRead;
   personName: string;
+  personPhone?: string | null;
   assigneeName?: string | null;
   linkedConsultation?: ConsultationRead | null;
   loadingConsultation?: boolean;
@@ -187,6 +189,7 @@ function primaryCta(task: TaskRead): {
 function TaskDetailPane({
   task,
   personName,
+  personPhone,
   assigneeName,
   linkedConsultation = null,
   loadingConsultation = false,
@@ -250,6 +253,7 @@ function TaskDetailPane({
       <RelationshipCard
         label="دانش‌پذیر"
         title={personName}
+        subtitle={personPhone ? formatPhoneDisplay(personPhone) : undefined}
         href={`/people/${task.person_id}`}
       />
 
