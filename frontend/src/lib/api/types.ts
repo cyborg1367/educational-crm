@@ -45,6 +45,7 @@ export type CourseClassRead = {
   end_date: StorageDate | null;
   weekdays: string[] | null;
   status: ClassStatus;
+  enrollment_count: number;
   org_id: number;
   created_at: string;
   updated_at: string;
