@@ -26,6 +26,7 @@ export { formatYearMonthLabel } from "./month-label";
 export {
   formatGregorianYearMonthLabel,
   formatJalaliMonthYearTitle,
+  jalaliDayAndMonthLabel,
   jalaliMonthIndexFromGregorianYearMonth,
   PERSIAN_MONTHS,
   PERSIAN_MONTHS_SHORT,

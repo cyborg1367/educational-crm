@@ -51,7 +51,8 @@ import type {
   UserRead,
 } from "@/lib/api/types";
 import { InvoicePrintActions } from "@/components/invoice/invoice-print-actions";
-import type { InvoiceData } from "@/lib/pdf/types";
+import { CertificatePrintActions } from "@/components/certificate/certificate-print-actions";
+import type { CertificateData, InvoiceData } from "@/lib/pdf/types";
 import { canManageEnrollments, canManageFinance } from "@/lib/auth/role";
 import { computeDropPreflight } from "@/lib/finance/preflight";
 import { formatDateDisplay, formatPhoneDisplay, formatToman } from "@/lib/locale";
@@ -312,6 +313,11 @@ export default function EnrollmentDetailPage() {
         }
       : null;
 
+  const certificateData: CertificateData | null =
+    course && enrollment.status === "completed"
+      ? { person, enrollment, courseClass, course, teacher }
+      : null;
+
   return (
     <>
       <Breadcrumb
@@ -347,6 +353,20 @@ export default function EnrollmentDetailPage() {
             label: "اطلاعات کلی",
             content: (
               <div className="flex flex-col gap-[var(--semantic-space-sectionGap)]">
+                {certificateData ? (
+                  <div className="flex flex-wrap items-center justify-between gap-[var(--primitive-space-3)] rounded-[var(--primitive-radius-md)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-subtle)] px-[var(--primitive-space-4)] py-[var(--primitive-space-3)]">
+                    <p className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
+                      این دوره با موفقیت تکمیل شده — گواهی پایان دوره آماده صدور است.
+                    </p>
+                    <CertificatePrintActions
+                      data={certificateData}
+                      showPreview
+                      onError={(message) =>
+                        toast({ variant: "error", title: message })
+                      }
+                    />
+                  </div>
+                ) : null}
                 <div className="grid gap-[var(--primitive-space-4)] md:grid-cols-2">
                   <FrozenField
                     variant="money"

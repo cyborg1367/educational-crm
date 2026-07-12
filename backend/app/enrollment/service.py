@@ -154,11 +154,43 @@ def create_enrollment(
     return enrollment
 
 
+# Legal manual status transitions for PATCH /enrollments/{id}. completed and
+# dropped are terminal: nothing reactivates a finished or dropped enrollment
+# through this generic endpoint. Forward transitions are allowed manually
+# even though pre_enroll -> active and active -> completed normally happen
+# automatically (on_first_payment, on_class_completed) — e.g. a scholarship
+# enrollment with no payment to trigger activation. Dropping via this
+# endpoint (rather than PATCH /{id}/drop) skips the installment-cancel and
+# task-cancel side effects, so prefer /drop for a real withdrawal; this path
+# stays open for callers that don't need those side effects.
+_ALLOWED_STATUS_TRANSITIONS: dict[EnrollmentStatus, frozenset[EnrollmentStatus]] = {
+    EnrollmentStatus.pre_enroll: frozenset(
+        {EnrollmentStatus.active, EnrollmentStatus.dropped}
+    ),
+    EnrollmentStatus.active: frozenset(
+        {EnrollmentStatus.completed, EnrollmentStatus.dropped}
+    ),
+    EnrollmentStatus.completed: frozenset(),
+    EnrollmentStatus.dropped: frozenset(),
+}
+
+
 def update_status(
     db: Session, org_id: int, enrollment_id: int, data: EnrollmentUpdate
 ) -> Enrollment:
     enrollment = get_enrollment(db, org_id, enrollment_id)
     updates = data.model_dump(exclude_unset=True)
+
+    if "status" in updates:
+        new_status = updates["status"]
+        if new_status != enrollment.status:
+            allowed = _ALLOWED_STATUS_TRANSITIONS.get(enrollment.status, frozenset())
+            if new_status not in allowed:
+                raise ValidationError(
+                    f"Cannot change enrollment status from "
+                    f"{enrollment.status.value} to {new_status.value}",
+                    field="status",
+                )
 
     for field, value in updates.items():
         setattr(enrollment, field, value)

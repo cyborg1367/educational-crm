@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -11,6 +13,7 @@ from app.attendance.router import router as attendances_router
 from app.auth.router import router as auth_router
 from app.communication.router import router as communications_router
 from app.consultation.router import router as consultations_router
+from app.core.config import settings
 from app.core.db import get_db
 from app.core.exception_handlers import register_exception_handlers
 from app.core.logging_config import configure_logging
@@ -71,6 +74,9 @@ app.add_middleware(LoggingMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(LoginEmailMiddleware)
+
+Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(organizations_router, prefix="/organizations", tags=["Organizations"])

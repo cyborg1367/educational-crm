@@ -1,0 +1,54 @@
+.root {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: var(--cert-space-7);
+}
+
+.column {
+  width: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  direction: rtl;
+}
+
+.mark {
+  width: 110px;
+  height: 34px;
+  color: var(--cert-color-dark);
+}
+
+.markImage {
+  width: 110px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.line {
+  width: 100%;
+  height: 1px;
+  background: var(--cert-color-border);
+  margin-top: var(--cert-space-1);
+}
+
+.name {
+  margin: var(--cert-space-2) 0 0;
+  font-family: var(--cert-font-fa);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cert-color-dark);
+}
+
+.title {
+  margin: 2px 0 0;
+  font-family: var(--cert-font-fa);
+  font-size: 9.5px;
+  color: var(--cert-color-gray);
+}
+
+.sealSlot {
+  flex-shrink: 0;
+  margin: 0 calc(var(--cert-space-4) * -1);
+  z-index: 1;
+}

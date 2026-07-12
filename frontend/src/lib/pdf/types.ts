@@ -17,3 +17,11 @@ export type InvoiceData = {
   course: CourseRead;
   teacher: UserRead | null;
 };
+
+export type CertificateData = {
+  person: PersonRead;
+  enrollment: EnrollmentRead;
+  courseClass: CourseClassRead;
+  course: CourseRead;
+  teacher: UserRead | null;
+};

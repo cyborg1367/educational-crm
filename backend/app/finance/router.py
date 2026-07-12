@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
+from app.auth.permissions import require_permission
 from app.core.db import get_db
 from app.core.rate_limit import SENSITIVE_LIMIT
 from app.core.openapi import PROTECTED_RESPONSES
@@ -110,7 +111,9 @@ def get_invoice(
 def issue_invoice(
     body: InvoiceCreate,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[
+        User, Depends(require_permission("invoice", "create"))
+    ],
 ) -> Invoice:
     """Issue an invoice for an enrollment.
 
@@ -163,7 +166,9 @@ def update_installment(
     installment_id: int,
     body: InstallmentUpdate,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[
+        User, Depends(require_permission("invoice", "update_installment"))
+    ],
 ) -> Installment:
     """Update an installment.
 
@@ -220,7 +225,9 @@ def record_payment(
     request: Request,
     body: PaymentCreate,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[
+        User, Depends(require_permission("payment", "create"))
+    ],
 ) -> Payment:
     """Record a payment against an installment.
 
@@ -283,7 +290,9 @@ def refund_payment(
     request: Request,
     body: RefundCreate,
     db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[
+        User, Depends(require_permission("refund", "create"))
+    ],
 ) -> Refund:
     """Refund a payment.
 

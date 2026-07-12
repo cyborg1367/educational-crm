@@ -60,3 +60,14 @@ export function formatGregorianYearMonthLabel(yearMonth: string, short = true): 
 export function formatJalaliMonthYearTitle(jalaliYear: number, jalaliMonth: number): string {
   return `${PERSIAN_MONTHS[jalaliMonth - 1] ?? ""} ${toPersianDigits(String(jalaliYear))}`;
 }
+
+/** Day-of-month + short month name for compact date badges (e.g. a timeline). */
+export function jalaliDayAndMonthLabel(
+  isoDateTime: string,
+): { day: string; month: string } {
+  const jalali = dayjs(isoDateTime).calendar("jalali");
+  return {
+    day: toPersianDigits(String(jalali.date())),
+    month: persianMonthName(jalali.month() + 1, true),
+  };
+}

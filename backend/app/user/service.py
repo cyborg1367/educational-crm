@@ -1,7 +1,9 @@
+from fastapi import UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.security import hash_password
+from app.core import uploads as upload_storage
 from app.core.errors import ConflictError, NotFoundError
 from app.core.pagination import paginate_query
 from app.tenancy.scoping import scoped
@@ -68,3 +70,29 @@ def delete_user(db: Session, org_id: int, user_id: int) -> None:
     user = get_user(db, org_id, user_id)
     db.delete(user)
     db.commit()
+
+
+def upload_signature(
+    db: Session, org_id: int, user_id: int, file: UploadFile
+) -> User:
+    user = get_user(db, org_id, user_id)
+    old_signature_url = user.signature_url
+
+    user.signature_url = upload_storage.save_signature_image(user_id, file)
+    db.commit()
+    db.refresh(user)
+
+    if old_signature_url:
+        upload_storage.delete_signature_image(old_signature_url)
+
+    return user
+
+
+def remove_signature(db: Session, org_id: int, user_id: int) -> User:
+    user = get_user(db, org_id, user_id)
+    if user.signature_url:
+        upload_storage.delete_signature_image(user.signature_url)
+        user.signature_url = None
+        db.commit()
+        db.refresh(user)
+    return user

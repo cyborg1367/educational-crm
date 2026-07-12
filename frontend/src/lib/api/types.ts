@@ -619,6 +619,7 @@ export type UserRead = {
   role: UserRole;
   department_id: number | null;
   is_active: boolean;
+  signature_url: string | null;
   org_id: number;
   created_at: string;
   updated_at: string;

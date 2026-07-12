@@ -18,6 +18,7 @@ import {
   type PersonFormState,
 } from "@/components/domain/person-form-fields";
 import { PersonProfileCard } from "@/components/domain/person-profile-card";
+import { PersonConsultationTimeline } from "@/components/domain/person-consultation-timeline";
 import { PersonFormDialog } from "@/components/domain/person-form-dialog";
 import {
   getPersonRoadmapSidebarSummary,
@@ -47,15 +48,11 @@ import {
 } from "@/lib/api/people";
 import { getMe, listUsers } from "@/lib/api/users";
 import {
-  canConductConsultation,
   canManageEnrollments,
   canReferToDepartment,
   getCurrentRole,
 } from "@/lib/auth/role";
-import {
-  assessmentStatusLabel,
-  isConsultationAssessmentComplete,
-} from "@/lib/consultation/assessment";
+import { isConsultationAssessmentComplete } from "@/lib/consultation/assessment";
 import {
   matchDepartmentsToInterests,
   sortDepartmentsByInstituteCatalog,
@@ -88,19 +85,6 @@ const emptyPage = <T,>(): PaginatedResponse<T> => ({
   offset: 0,
   has_more: false,
 });
-
-function KeyValueRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="grid grid-cols-[minmax(6rem,8rem)_1fr] gap-[var(--primitive-space-4)] border-b border-[var(--semantic-color-surface-border)]/80 py-[var(--primitive-space-4)] last:border-b-0">
-      <dt className="text-[length:var(--primitive-font-size-sm)] text-[var(--semantic-color-text-secondary)]">
-        {label}
-      </dt>
-      <dd className="text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-medium)] text-[var(--semantic-color-text-primary)]">
-        {value ?? "—"}
-      </dd>
-    </div>
-  );
-}
 
 export default function PersonDetailPage() {
   const params = useParams<{ id: string }>();
@@ -553,86 +537,21 @@ export default function PersonDetailPage() {
                       مشاوره‌ای ثبت نشده است
                     </p>
                   ) : (
-                    <div className="flex flex-col gap-[var(--primitive-space-3)]">
-                      {personConsultations.map((consultation) => (
-                        <div
-                          key={consultation.id}
-                          className="rounded-[var(--primitive-radius-lg)] border border-[var(--semantic-color-surface-border)] bg-[var(--semantic-color-surface-card)] px-[var(--primitive-space-5)] py-[var(--primitive-space-4)] shadow-[var(--primitive-elevation-1)] transition-shadow duration-[var(--primitive-motion-duration-fast)] hover:shadow-[var(--primitive-elevation-2)]"
-                        >
-                          <dl className="flex flex-col gap-[var(--primitive-space-2)]">
-                            <KeyValueRow
-                              label="دپارتمان"
-                              value={
-                                departmentNameById.get(consultation.department_id) ??
-                                "—"
-                              }
-                            />
-                            <KeyValueRow
-                              label="مشاور"
-                              value={
-                                usersMap[consultation.consultant_id] ?? "—"
-                              }
-                            />
-                            <KeyValueRow
-                              label="سطح"
-                              value={consultation.current_level ?? "—"}
-                            />
-                            <KeyValueRow
-                              label="هدف"
-                              value={consultation.goal ?? "—"}
-                            />
-                            <KeyValueRow
-                              label="ارزیابی"
-                              value={assessmentStatusLabel(consultation)}
-                            />
-                            <KeyValueRow
-                              label="تاریخ"
-                              value={formatDateTimeDisplay(
-                                consultation.created_at,
-                                "YYYY/MM/DD",
-                              )}
-                            />
-                            <KeyValueRow
-                              label="وضعیت"
-                              value={
-                                <div className="flex flex-wrap items-center gap-[var(--primitive-space-2)]">
-                                  <StatusBadge
-                                    domain="consultation"
-                                    value={consultation.outcome ?? "pending"}
-                                  />
-                                  {me &&
-                                  canConductConsultation(consultation, me) &&
-                                  consultation.outcome === null ? (
-                                    <Button
-                                      type="button"
-                                      variant="primary"
-                                      size="sm"
-                                      onClick={() =>
-                                        router.push(
-                                          `/people/${person.id}/consultations/${consultation.id}?step=${
-                                            isConsultationAssessmentComplete(
-                                              consultation,
-                                            )
-                                              ? "outcome"
-                                              : "assessment"
-                                          }`,
-                                        )
-                                      }
-                                    >
-                                      {isConsultationAssessmentComplete(
-                                        consultation,
-                                      )
-                                        ? "تعیین نتیجه"
-                                        : "ادامه مشاوره"}
-                                    </Button>
-                                  ) : null}
-                                </div>
-                              }
-                            />
-                          </dl>
-                        </div>
-                      ))}
-                    </div>
+                    <PersonConsultationTimeline
+                      consultations={personConsultations}
+                      departmentNameById={departmentNameById}
+                      usersMap={usersMap}
+                      currentUser={me}
+                      onContinue={(consultation) =>
+                        router.push(
+                          `/people/${person.id}/consultations/${consultation.id}?step=${
+                            isConsultationAssessmentComplete(consultation)
+                              ? "outcome"
+                              : "assessment"
+                          }`,
+                        )
+                      }
+                    />
                   )}
                 </div>
 

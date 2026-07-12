@@ -13,6 +13,7 @@ import {
   userFormStateToCreateBody,
   type UserFormState,
 } from "@/components/domain/user-form-fields";
+import { UserSignatureCell } from "@/components/domain/user-signature-cell";
 import { ErrorState, useToast } from "@/components/feedback";
 import { FilterBar, type FilterValues } from "@/components/layout";
 import { Badge } from "@/components/primitives/badge";
@@ -138,6 +139,17 @@ export default function UsersListPage() {
     [],
   );
 
+  const handleSignatureChanged = (updated: UserRead) => {
+    setUsersPage((prev) => ({
+      ...prev,
+      items: prev.items.map((item) => (item.id === updated.id ? updated : item)),
+    }));
+  };
+
+  const handleSignatureError = (message: string) => {
+    toast({ variant: "error", title: message });
+  };
+
   const resetForm = () => {
     setFormState(emptyUserFormState());
     setFormError(null);
@@ -226,6 +238,17 @@ export default function UsersListPage() {
                 header: "وضعیت",
                 cell: (row) => <ActiveBadge isActive={row.is_active} />,
               },
+              {
+                key: "signature",
+                header: "امضا",
+                cell: (row) => (
+                  <UserSignatureCell
+                    user={row}
+                    onChanged={handleSignatureChanged}
+                    onError={handleSignatureError}
+                  />
+                ),
+              },
             ]}
             data={tableData}
             loading={loading}
@@ -254,6 +277,13 @@ export default function UsersListPage() {
                       <RoleBadge role={user.role} />
                       <ActiveBadge isActive={user.is_active} />
                     </>
+                  }
+                  footer={
+                    <UserSignatureCell
+                      user={user}
+                      onChanged={handleSignatureChanged}
+                      onError={handleSignatureError}
+                    />
                   }
                 />
               ))

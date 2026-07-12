@@ -58,3 +58,39 @@ export async function fetchJson<T>(
 
   return (await response.json()) as T;
 }
+
+/** Like fetchJson, but sends a FormData body — no Content-Type header, so
+ * the browser can set the multipart boundary itself. */
+export async function fetchFormData<T>(
+  path: string,
+  formData: FormData,
+  options: { method?: "POST" | "PUT" | "PATCH"; token?: string | null } = {},
+): Promise<T> {
+  const { method = "POST", token = getAccessToken() } = options;
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method,
+    headers,
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let errorBody: ApiError | null = null;
+    try {
+      errorBody = (await response.json()) as ApiError;
+    } catch {
+      errorBody = null;
+    }
+    throw new ApiRequestError(response.status, errorBody);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
+}

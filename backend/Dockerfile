@@ -18,6 +18,7 @@ COPY alembic/ alembic/
 COPY alembic.ini .
 COPY scripts/ scripts/
 
+RUN mkdir -p /app/uploads
 RUN chown -R app:app /app
 USER app
 
