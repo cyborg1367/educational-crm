@@ -147,6 +147,7 @@ export type PersonRead = {
   id: number;
   full_name: string;
   phone: string | null;
+  secondary_phone: string | null;
   email: string | null;
   birth_date: StorageDate | null;
   gender: PersonGender | null;
@@ -164,6 +165,7 @@ export type PersonRead = {
 export type PersonCreate = {
   full_name: string;
   phone?: string | null;
+  secondary_phone?: string | null;
   email?: string | null;
   birth_date?: StorageDate | null;
   gender?: PersonGender | null;
@@ -177,6 +179,7 @@ export type PersonCreate = {
 export type PersonUpdate = {
   full_name?: string;
   phone?: string | null;
+  secondary_phone?: string | null;
   email?: string | null;
   birth_date?: StorageDate | null;
   gender?: PersonGender | null;

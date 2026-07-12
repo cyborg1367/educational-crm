@@ -10,6 +10,7 @@ import { Avatar } from "@/components/primitives/avatar";
 import type { PersonRead } from "@/lib/api/types";
 import { formatDateDisplay } from "@/lib/locale";
 import { formatPhoneDisplay } from "@/lib/locale/number";
+import { isPersonMinor } from "@/lib/person/age";
 import {
   genderLabel,
   interestLabel,
@@ -52,6 +53,7 @@ function PersonProfileCard({
   className,
 }: PersonProfileCardProps) {
   const interests = person.interests ?? [];
+  const isMinor = isPersonMinor(person.birth_date);
 
   return (
     <section
@@ -97,6 +99,12 @@ function PersonProfileCard({
             label="تلفن"
             value={person.phone ? formatPhoneDisplay(person.phone) : null}
           />
+          {person.secondary_phone ? (
+            <ProfileField
+              label={isMinor ? "تلفن والد" : "تلفن دوم"}
+              value={formatPhoneDisplay(person.secondary_phone)}
+            />
+          ) : null}
           <ProfileField label="ایمیل" value={person.email} />
           <ProfileField
             label="تاریخ تولد"

@@ -1,3 +1,5 @@
+from datetime import date
+
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -8,7 +10,7 @@ from app.attendance.model import Attendance
 from app.attendance.waiver_model import JourneyRoadmapWaiver
 from app.communication.model import Communication
 from app.consultation.model import Consultation
-from app.core.errors import ConflictError, NotFoundError
+from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.core.pagination import paginate_query
 from app.enrollment.model import Enrollment
 from app.finance.model import Installment, Invoice, Payment, Refund
@@ -25,6 +27,26 @@ def _phone_taken(db: Session, org_id: int, phone: str, exclude_id: int | None = 
     if exclude_id is not None:
         stmt = stmt.where(Person.id != exclude_id)
     return db.scalars(stmt).first() is not None
+
+
+def _is_minor(birth_date: date | None) -> bool:
+    if birth_date is None:
+        return False
+    today = date.today()
+    age = today.year - birth_date.year
+    if (today.month, today.day) < (birth_date.month, birth_date.day):
+        age -= 1
+    return age < 18
+
+
+def _validate_guardian_phone(
+    birth_date: date | None, secondary_phone: str | None
+) -> None:
+    if _is_minor(birth_date) and not (secondary_phone and secondary_phone.strip()):
+        raise ValidationError(
+            "Parent/guardian phone number is required for people under 18",
+            field="secondary_phone",
+        )
 
 
 def list_people(
@@ -58,10 +80,12 @@ def create_person(
 ) -> Person:
     if data.phone is not None and _phone_taken(db, org_id, data.phone):
         raise ConflictError("Phone already registered")
+    _validate_guardian_phone(data.birth_date, data.secondary_phone)
 
     person = Person(
         full_name=data.full_name,
         phone=data.phone,
+        secondary_phone=data.secondary_phone,
         email=str(data.email) if data.email is not None else None,
         birth_date=data.birth_date,
         gender=data.gender,
@@ -105,6 +129,10 @@ def update_person(db: Session, org_id: int, person_id: int, data: PersonUpdate) 
 
     if "email" in updates and updates["email"] is not None:
         updates["email"] = str(updates["email"])
+
+    effective_birth_date = updates.get("birth_date", person.birth_date)
+    effective_secondary_phone = updates.get("secondary_phone", person.secondary_phone)
+    _validate_guardian_phone(effective_birth_date, effective_secondary_phone)
 
     for field, value in updates.items():
         setattr(person, field, value)
