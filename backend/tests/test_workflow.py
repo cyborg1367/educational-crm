@@ -294,18 +294,6 @@ def test_consultation_outcome_refer_other_dept(
     person: Person,
     department: Department,
 ) -> None:
-    admission_user = User(
-        name="Admission Staff",
-        email="admission-refer@test.example",
-        password_hash="test-password",
-        role=UserRole.admission,
-        org_id=org_id,
-        is_active=True,
-    )
-    db_session.add(admission_user)
-    db_session.commit()
-    db_session.refresh(admission_user)
-
     target_department = Department(
         name="Target Department",
         manager_id=admin_user.id,
@@ -342,18 +330,20 @@ def test_consultation_outcome_refer_other_dept(
 
     tasks, _ = task_service.list_tasks(db_session, org_id)
     referral_tasks = [task for task in tasks if task.type == TaskType.referral]
-    assert len(referral_tasks) == 2
-    manager_task = next(
-        task for task in referral_tasks if task.assignee_id == target_department.manager_id
-    )
+    # Referring to another department should create exactly one task, sent
+    # straight to that department's manager — not an extra one for the
+    # admission officer who ran the original consultation.
+    assert len(referral_tasks) == 1
+    manager_task = referral_tasks[0]
+    assert manager_task.assignee_id == target_department.manager_id
     assert manager_task.person_id == person.id
     assert manager_task.related_entity_type == "consultation"
     assert manager_task.related_entity_id == consultation.id
-    admission_feedback = next(
-        task for task in referral_tasks if task.assignee_id == admission_user.id
+    assert manager_task.title == f"مشاوره ارجاعی: {person.full_name}"
+    assert (
+        manager_task.description
+        == f"ارجاع جهت مشاوره به دپارتمان {target_department.name}"
     )
-    assert admission_feedback.title == f"ارجاع {person.full_name} به دپارتمان دیگر"
-    assert admission_feedback.description == f"ارجاع به دپارتمان {target_department.name}"
 
     done_activities = _consultation_done_activities(
         db_session, org_id, person.id, consultation.id

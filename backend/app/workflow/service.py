@@ -240,33 +240,6 @@ def _log_consultation_closed(
     )
 
 
-def _notify_admission_refer_other_dept_feedback(
-    db: Session,
-    org_id: int,
-    consultation: Consultation,
-    *,
-    actor_id: int | None,
-) -> None:
-    if consultation.refer_to_department_id is None:
-        return
-    person = person_service.get_person(db, org_id, consultation.person_id)
-    target_dept = department_service.get_department(
-        db, org_id, consultation.refer_to_department_id
-    )
-    assignee_id = _resolve_referring_admission_officer(db, org_id, consultation)
-    task_service.create_task(
-        db,
-        org_id,
-        person_id=consultation.person_id,
-        task_type=TaskType.referral,
-        title=f"ارجاع {person.full_name} به دپارتمان دیگر",
-        due_date=date.today() + timedelta(days=2),
-        assignee_id=assignee_id,
-        description=f"ارجاع به دپارتمان {target_dept.name}",
-        actor_id=actor_id,
-    )
-
-
 def _complete_consultation_tasks(
     db: Session, org_id: int, consultation_id: int
 ) -> None:
@@ -333,6 +306,7 @@ def _route_refer_other_dept(
         consultation.person_id,
         consultation.refer_to_department_id,
     )
+    person = person_service.get_person(db, org_id, consultation.person_id)
     target_dept = department_service.get_department(
         db, org_id, consultation.refer_to_department_id
     )
@@ -341,9 +315,10 @@ def _route_refer_other_dept(
         org_id,
         person_id=consultation.person_id,
         task_type=TaskType.referral,
-        title=f"Referral to {target_dept.name}",
+        title=f"مشاوره ارجاعی: {person.full_name}",
         due_date=date.today() + timedelta(days=3),
         assignee_id=target_dept.manager_id,
+        description=f"ارجاع جهت مشاوره به دپارتمان {target_dept.name}",
         related_entity_type="consultation",
         related_entity_id=consultation.id,
         actor_id=actor_id,
@@ -395,9 +370,6 @@ def on_consultation_outcome(
         )
     elif new_outcome == ConsultationOutcome.refer_other_dept:
         _route_refer_other_dept(db, org_id, consultation, actor_id=actor_id)
-        _notify_admission_refer_other_dept_feedback(
-            db, org_id, consultation, actor_id=actor_id
-        )
     elif new_outcome in (
         ConsultationOutcome.not_suitable,
         ConsultationOutcome.closed,
