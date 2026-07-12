@@ -20,10 +20,11 @@ class PersonRead(BaseModel):
     id: int = Field(description="Unique person identifier.")
     full_name: str = Field(description="Person's full legal or display name.")
     phone: str | None = Field(description="Contact phone number. Unique per org when set.")
-    secondary_phone: str | None = Field(
+    extra_phones: list[str] | None = Field(
         description=(
-            "Second contact number. Required and treated as a parent/guardian "
-            "number when the person is under 18."
+            "Additional contact numbers. When the person is under 18, at "
+            "least one entry is required (the first is treated as the "
+            "parent/guardian's number)."
         )
     )
     email: EmailStr | None = Field(description="Contact email address.")
@@ -59,12 +60,11 @@ class PersonCreate(BaseModel):
         description="Contact phone. Unique per org when set.",
         examples=["09121234567"],
     )
-    secondary_phone: str | None = Field(
+    extra_phones: list[str] | None = Field(
         default=None,
-        max_length=50,
         description=(
-            "Second contact number. Required when the person is under 18 "
-            "(treated as the parent/guardian's number in that case)."
+            "Additional contact numbers. Required (at least one) when the "
+            "person is under 18 — treated as the parent/guardian's number."
         ),
     )
     email: EmailStr | None = Field(
@@ -102,10 +102,9 @@ class PersonUpdate(BaseModel):
         max_length=50,
         description="Updated phone. Unique per org when set.",
     )
-    secondary_phone: str | None = Field(
+    extra_phones: list[str] | None = Field(
         default=None,
-        max_length=50,
-        description="Updated second/guardian contact number.",
+        description="Updated additional/guardian contact numbers.",
     )
     email: EmailStr | None = Field(default=None, description="Updated email address.")
     birth_date: date | None = Field(default=None, description="Updated date of birth.")

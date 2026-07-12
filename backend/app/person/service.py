@@ -40,13 +40,21 @@ def _is_minor(birth_date: date | None) -> bool:
 
 
 def _validate_guardian_phone(
-    birth_date: date | None, secondary_phone: str | None
+    birth_date: date | None, extra_phones: list[str] | None
 ) -> None:
-    if _is_minor(birth_date) and not (secondary_phone and secondary_phone.strip()):
+    has_any = bool(extra_phones) and any(phone.strip() for phone in extra_phones)
+    if _is_minor(birth_date) and not has_any:
         raise ValidationError(
             "Parent/guardian phone number is required for people under 18",
-            field="secondary_phone",
+            field="extra_phones",
         )
+
+
+def _clean_extra_phones(extra_phones: list[str] | None) -> list[str] | None:
+    if extra_phones is None:
+        return None
+    cleaned = [phone.strip() for phone in extra_phones if phone and phone.strip()]
+    return cleaned or None
 
 
 def list_people(
@@ -80,12 +88,12 @@ def create_person(
 ) -> Person:
     if data.phone is not None and _phone_taken(db, org_id, data.phone):
         raise ConflictError("Phone already registered")
-    _validate_guardian_phone(data.birth_date, data.secondary_phone)
+    _validate_guardian_phone(data.birth_date, data.extra_phones)
 
     person = Person(
         full_name=data.full_name,
         phone=data.phone,
-        secondary_phone=data.secondary_phone,
+        extra_phones=_clean_extra_phones(data.extra_phones),
         email=str(data.email) if data.email is not None else None,
         birth_date=data.birth_date,
         gender=data.gender,
@@ -130,9 +138,12 @@ def update_person(db: Session, org_id: int, person_id: int, data: PersonUpdate) 
     if "email" in updates and updates["email"] is not None:
         updates["email"] = str(updates["email"])
 
+    if "extra_phones" in updates:
+        updates["extra_phones"] = _clean_extra_phones(updates["extra_phones"])
+
     effective_birth_date = updates.get("birth_date", person.birth_date)
-    effective_secondary_phone = updates.get("secondary_phone", person.secondary_phone)
-    _validate_guardian_phone(effective_birth_date, effective_secondary_phone)
+    effective_extra_phones = updates.get("extra_phones", person.extra_phones)
+    _validate_guardian_phone(effective_birth_date, effective_extra_phones)
 
     for field, value in updates.items():
         setattr(person, field, value)

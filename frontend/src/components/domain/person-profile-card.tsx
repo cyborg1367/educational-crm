@@ -54,6 +54,12 @@ function PersonProfileCard({
 }: PersonProfileCardProps) {
   const interests = person.interests ?? [];
   const isMinor = isPersonMinor(person.birth_date);
+  const extraPhones = person.extra_phones ?? [];
+  // When the person is a minor, the first extra phone is the required
+  // guardian number (see isPersonFormValid) — call it out on its own line;
+  // everything after that is just "other numbers", for anyone.
+  const guardianPhone = isMinor ? extraPhones[0] : undefined;
+  const otherPhones = isMinor ? extraPhones.slice(1) : extraPhones;
 
   return (
     <section
@@ -99,10 +105,16 @@ function PersonProfileCard({
             label="تلفن"
             value={person.phone ? formatPhoneDisplay(person.phone) : null}
           />
-          {person.secondary_phone ? (
+          {guardianPhone ? (
             <ProfileField
-              label={isMinor ? "تلفن والد" : "تلفن دوم"}
-              value={formatPhoneDisplay(person.secondary_phone)}
+              label="تلفن والد"
+              value={formatPhoneDisplay(guardianPhone)}
+            />
+          ) : null}
+          {otherPhones.length > 0 ? (
+            <ProfileField
+              label="شماره‌های دیگر"
+              value={otherPhones.map((phone) => formatPhoneDisplay(phone)).join("، ")}
             />
           ) : null}
           <ProfileField label="ایمیل" value={person.email} />

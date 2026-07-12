@@ -368,6 +368,36 @@ def test_consultation_outcome_refer_other_dept(
     )
 
 
+def test_consultation_outcome_refer_other_dept_rejects_own_department(
+    db_session: Session,
+    org_id: int,
+    admin_user: User,
+    person: Person,
+    department: Department,
+) -> None:
+    """A department can't refer a consultation to itself — that's not what
+    refer_other_dept means. (A person can still have multiple consultations
+    within the same department over time; that's unrelated and unrestricted.)"""
+    consultation = _create_consultation(
+        db_session,
+        org_id,
+        person,
+        department,
+        admin_user,
+        refer_to_department_id=department.id,
+    )
+
+    with pytest.raises(Exception) as exc_info:
+        workflow_service.on_consultation_outcome(
+            db_session,
+            org_id,
+            consultation.id,
+            ConsultationOutcome.refer_other_dept,
+            actor_id=admin_user.id,
+        )
+    assert getattr(exc_info.value, "status_code", None) == 422
+
+
 def test_consultation_outcome_not_suitable(
     db_session: Session,
     org_id: int,

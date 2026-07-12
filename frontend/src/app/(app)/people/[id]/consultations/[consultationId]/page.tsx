@@ -99,13 +99,13 @@ export default function ConsultationOutcomeWizardPage() {
       consultationToAssessmentFormState({
         current_level: null,
         goal: null,
-        recommended_course_id: null,
         notes: null,
       }),
     );
 
   const [outcome, setOutcome] = React.useState<ConsultationOutcome>(DEFAULT_OUTCOME);
   const [referDepartmentId, setReferDepartmentId] = React.useState("");
+  const [recommendedCourseId, setRecommendedCourseId] = React.useState("");
   const [admissionNotes, setAdmissionNotes] = React.useState("");
   const [fieldError, setFieldError] = React.useState<ApiFieldError | null>(null);
   const [savingAssessment, setSavingAssessment] = React.useState(false);
@@ -157,6 +157,11 @@ export default function ConsultationOutcomeWizardPage() {
       setConsultation(consultationData);
       setMe(meData);
       setRecommendedCourse(course);
+      setRecommendedCourseId(
+        consultationData.recommended_course_id != null
+          ? String(consultationData.recommended_course_id)
+          : "",
+      );
       setDepartments(deptRes.items);
       setCourses(deptCourses);
       setAssessmentForm(consultationToAssessmentFormState(consultationData));
@@ -177,7 +182,8 @@ export default function ConsultationOutcomeWizardPage() {
     canConductConsultation(consultation, me);
 
   const canSubmitOutcome =
-    outcome !== "refer_other_dept" || referDepartmentId.length > 0;
+    (outcome !== "refer_other_dept" || referDepartmentId.length > 0) &&
+    (outcome !== "pre_enroll" || recommendedCourseId.length > 0);
 
   const saveAssessment = async (): Promise<boolean> => {
     if (!consultation) return false;
@@ -190,10 +196,6 @@ export default function ConsultationOutcomeWizardPage() {
       );
       setConsultation(updated);
       setAssessmentForm(consultationToAssessmentFormState(updated));
-      if (updated.recommended_course_id != null) {
-        const course = await getCourse(updated.recommended_course_id);
-        setRecommendedCourse(course);
-      }
       toast({ variant: "success", title: "ارزیابی ذخیره شد" });
       return true;
     } catch (err) {
@@ -220,6 +222,10 @@ export default function ConsultationOutcomeWizardPage() {
       if (outcome === "refer_other_dept") {
         await updateConsultation(consultation.id, {
           refer_to_department_id: Number(referDepartmentId),
+        });
+      } else if (outcome === "pre_enroll") {
+        await updateConsultation(consultation.id, {
+          recommended_course_id: Number(recommendedCourseId),
         });
       }
 
@@ -439,7 +445,6 @@ export default function ConsultationOutcomeWizardPage() {
             onChange={(patch) =>
               setAssessmentForm((prev) => ({ ...prev, ...patch }))
             }
-            courses={courses}
             fieldError={fieldError}
           />
         ) : null}
@@ -448,9 +453,14 @@ export default function ConsultationOutcomeWizardPage() {
           <ConsultationOutcomeFields
             outcome={outcome}
             onOutcomeChange={setOutcome}
-            departments={departments}
+            departments={departments.filter(
+              (dept) => dept.id !== consultation.department_id,
+            )}
             referDepartmentId={referDepartmentId}
             onReferDepartmentIdChange={setReferDepartmentId}
+            courses={courses}
+            recommendedCourseId={recommendedCourseId}
+            onRecommendedCourseIdChange={setRecommendedCourseId}
             admissionNotes={admissionNotes}
             onAdmissionNotesChange={setAdmissionNotes}
             fieldError={fieldError}
