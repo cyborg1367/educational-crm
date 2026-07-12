@@ -43,3 +43,4 @@ alwaysApply: true
 - An Alembic migration generated for any schema change.
 - No other entity touched.
 - All capsule constraints satisfied; if any can't be, reported instead of bypassed.
+
