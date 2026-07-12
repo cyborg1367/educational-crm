@@ -3,11 +3,11 @@
 import * as React from "react";
 import { CheckSquare } from "lucide-react";
 
+import { PersonPhoneBadge } from "@/components/domain/person-phone-badge";
 import { TaskQueueRow } from "@/components/domain/task-queue-row";
 import { EmptyState } from "@/components/feedback";
 import type { ConsultationRead, TaskRead } from "@/lib/api/types";
 import { formatDateDisplay } from "@/lib/locale/date";
-import { formatPhoneDisplay } from "@/lib/locale/number";
 import { assessmentStatusLabel } from "@/lib/consultation/assessment";
 import { groupTasksByDueBucket } from "@/lib/task/queue";
 import { focusVisibleStyles } from "@/components/form/control-styles";
@@ -106,17 +106,16 @@ function TaskQueueList({
                     )}
                     onClick={() => onOpenReferral?.(row)}
                   >
-                    <p className="truncate text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
-                      {row.person_name}
-                    </p>
+                    <div className="flex min-w-0 flex-wrap items-center gap-[var(--primitive-space-2)]">
+                      <p className="truncate text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
+                        {row.person_name}
+                      </p>
+                      {row.person_phone ? (
+                        <PersonPhoneBadge phone={row.person_phone} />
+                      ) : null}
+                    </div>
                     <p className="mt-0.5 truncate text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]">
                       {row.department_name} · {assessmentStatusLabel(row)}
-                      {row.person_phone ? (
-                        <span dir="ltr" className="text-[var(--semantic-color-text-disabled)]">
-                          {" "}
-                          · {formatPhoneDisplay(row.person_phone)}
-                        </span>
-                      ) : null}
                     </p>
                     <p className="mt-0.5 text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-disabled)]">
                       {formatDateDisplay(row.created_at.slice(0, 10))}

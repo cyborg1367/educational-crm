@@ -2,12 +2,12 @@
 
 import * as React from "react";
 
+import { PersonPhoneBadge } from "@/components/domain/person-phone-badge";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { focusVisibleStyles } from "@/components/form/control-styles";
 import { Avatar } from "@/components/primitives/avatar";
 import type { TaskRead } from "@/lib/api/types";
 import { formatDateDisplay } from "@/lib/locale/date";
-import { formatPhoneDisplay } from "@/lib/locale/number";
 import {
   formatDueRelative,
   getTaskDueBucket,
@@ -80,15 +80,12 @@ function TaskQueueRow({
           <p className="truncate text-[length:var(--primitive-font-size-sm)] font-[var(--primitive-font-weight-semibold)] text-[var(--semantic-color-text-primary)]">
             {task.title}
           </p>
-          <p className="mt-0.5 truncate text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]">
-            {personName}
-            {personPhone ? (
-              <span dir="ltr" className="text-[var(--semantic-color-text-disabled)]">
-                {" "}
-                · {formatPhoneDisplay(personPhone)}
-              </span>
-            ) : null}
-          </p>
+          <div className="mt-[var(--primitive-space-1)] flex min-w-0 flex-wrap items-center gap-[var(--primitive-space-2)]">
+            <p className="truncate text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]">
+              {personName}
+            </p>
+            {personPhone ? <PersonPhoneBadge phone={personPhone} /> : null}
+          </div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-[var(--primitive-space-1)]">
           <span

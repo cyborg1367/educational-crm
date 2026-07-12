@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, NotebookPen, Sparkles, UserRound } from "lucide-react";
+import { Check, NotebookPen, Plus, Sparkles, UserRound, X } from "lucide-react";
 
 import { INTEREST_ICONS } from "@/components/icons/interest-icons";
 
@@ -12,6 +12,7 @@ import { Select } from "@/components/form/select";
 import { currentJalaliMonth } from "@/lib/locale";
 import { TextInput } from "@/components/form/text-input";
 import { Textarea } from "@/components/form/textarea";
+import { Button } from "@/components/ui/button";
 import type { ApiFieldError } from "@/lib/api/error";
 import type {
   PersonCreate,
@@ -36,7 +37,7 @@ const OPTIONAL_PLACEHOLDER = "انتخاب کنید";
 export type PersonFormState = {
   fullName: string;
   phone: string;
-  secondaryPhone: string;
+  extraPhones: string[];
   email: string;
   birthDate: StorageDate | null;
   gender: string;
@@ -51,7 +52,7 @@ export function emptyPersonFormState(): PersonFormState {
   return {
     fullName: "",
     phone: "",
-    secondaryPhone: "",
+    extraPhones: [],
     email: "",
     birthDate: null,
     gender: "",
@@ -67,7 +68,7 @@ export function personFormStateFromRead(person: PersonRead): PersonFormState {
   return {
     fullName: person.full_name,
     phone: person.phone ?? "",
-    secondaryPhone: person.secondary_phone ?? "",
+    extraPhones: person.extra_phones ?? [],
     email: person.email ?? "",
     birthDate: person.birth_date,
     gender: person.gender ?? "",
@@ -84,13 +85,16 @@ function optionalString(value: string): string | null {
   return trimmed ? trimmed : null;
 }
 
-/** A minor's secondary phone doubles as the required parent/guardian
+/** A minor's first extra phone doubles as the required parent/guardian
  * contact number — everything else in the form stays optional. */
 export function isPersonFormValid(state: PersonFormState): boolean {
   if (!state.fullName.trim() || !state.phone.trim()) {
     return false;
   }
-  if (isPersonMinor(state.birthDate) && !state.secondaryPhone.trim()) {
+  if (
+    isPersonMinor(state.birthDate) &&
+    !state.extraPhones.some((phone) => phone.trim())
+  ) {
     return false;
   }
   return true;
@@ -99,10 +103,13 @@ export function isPersonFormValid(state: PersonFormState): boolean {
 export function personFormStateToCreateBody(
   state: PersonFormState,
 ): PersonCreate {
+  const cleanedExtraPhones = state.extraPhones
+    .map((phone) => phone.trim())
+    .filter(Boolean);
   return {
     full_name: state.fullName.trim(),
     phone: optionalString(state.phone),
-    secondary_phone: optionalString(state.secondaryPhone),
+    extra_phones: cleanedExtraPhones.length > 0 ? cleanedExtraPhones : null,
     email: optionalString(state.email),
     birth_date: state.birthDate,
     gender: state.gender ? (state.gender as PersonCreate["gender"]) : null,
@@ -329,6 +336,24 @@ function PersonFormFields({
   };
 
   const isMinor = isPersonMinor(state.birthDate);
+  const displayedPhones =
+    isMinor && state.extraPhones.length === 0 ? [""] : state.extraPhones;
+
+  const updateExtraPhoneAt = (index: number, value: string) => {
+    const next = [...state.extraPhones];
+    next[index] = value;
+    onChange({ extraPhones: next });
+  };
+
+  const removeExtraPhoneAt = (index: number) => {
+    onChange({
+      extraPhones: state.extraPhones.filter((_, i) => i !== index),
+    });
+  };
+
+  const addExtraPhone = () => {
+    onChange({ extraPhones: [...state.extraPhones, ""] });
+  };
 
   return (
     <div className="flex flex-col gap-[var(--primitive-space-4)]">
@@ -382,24 +407,66 @@ function PersonFormFields({
           </FormField>
 
           <FormField
-            label={isMinor ? "شماره تماس والد" : "شماره تماس دوم"}
+            label={isMinor ? "شماره تماس والد و سایر شماره‌ها" : "شماره‌های تماس دیگر"}
             required={isMinor}
+            className="md:col-span-3"
             helperText={
               isMinor
-                ? "چون سن شخص زیر ۱۸ سال است، شماره تماس والد الزامی است."
-                : "در صورت وجود، شماره تماس دیگر شخص."
+                ? "چون سن شخص زیر ۱۸ سال است، ثبت شماره تماس والد الزامی است."
+                : "در صورت وجود، شماره‌های تماس دیگر شخص را اضافه کنید."
             }
-            error={
-              fieldError?.field === "secondary_phone" ? fieldError : null
-            }
+            error={fieldError?.field === "extra_phones" ? fieldError : null}
           >
-            <TextInput
-              value={state.secondaryPhone}
-              onChange={(e) => onChange({ secondaryPhone: e.target.value })}
-              placeholder="۰۹۱۲۳۴۵۶۷۸۹"
-              dir="ltr"
-              className="text-start"
-            />
+            <div className="flex flex-col gap-[var(--primitive-space-2)]">
+              {displayedPhones.map((phone, index) => {
+                const isRequiredGuardianRow = isMinor && index === 0;
+                return (
+                  <div
+                    key={index}
+                    className="flex items-center gap-[var(--primitive-space-2)]"
+                  >
+                    <TextInput
+                      value={phone}
+                      onChange={(e) =>
+                        updateExtraPhoneAt(index, e.target.value)
+                      }
+                      placeholder={
+                        isRequiredGuardianRow
+                          ? "شماره تماس والد"
+                          : "۰۹۱۲۳۴۵۶۷۸۹"
+                      }
+                      dir="ltr"
+                      className="min-w-0 flex-1 text-start"
+                    />
+                    {!isRequiredGuardianRow ? (
+                      <button
+                        type="button"
+                        onClick={() => removeExtraPhoneAt(index)}
+                        aria-label="حذف شماره"
+                        className={cn(
+                          "flex size-9 shrink-0 items-center justify-center rounded-[var(--primitive-radius-md)]",
+                          "text-[var(--semantic-color-text-secondary)] transition-colors",
+                          "hover:bg-[var(--semantic-color-surface-subtle)] hover:text-[var(--semantic-color-status-danger)]",
+                          focusVisibleStyles,
+                        )}
+                      >
+                        <X className="size-4" aria-hidden />
+                      </button>
+                    ) : null}
+                  </div>
+                );
+              })}
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={addExtraPhone}
+                className="self-start"
+              >
+                <Plus className="size-4" aria-hidden />
+                افزودن شماره
+              </Button>
+            </div>
           </FormField>
 
           <FormField

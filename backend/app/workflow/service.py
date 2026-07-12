@@ -308,6 +308,11 @@ def _route_refer_other_dept(
             "refer_to_department_id required for refer_other_dept",
             field="refer_to_department_id",
         )
+    if consultation.refer_to_department_id == consultation.department_id:
+        raise ValidationError(
+            "Cannot refer a consultation to its own department",
+            field="refer_to_department_id",
+        )
 
     consultation_service.create_consultation(
         db,
