@@ -407,6 +407,35 @@ function PersonFormFields({
           </FormField>
 
           <FormField
+            label="ایمیل"
+            error={fieldError?.field === "email" ? fieldError : null}
+          >
+            <TextInput
+              type="email"
+              value={state.email}
+              onChange={(e) => onChange({ email: e.target.value })}
+              placeholder="example@email.com"
+              dir="ltr"
+              className="text-start"
+            />
+          </FormField>
+
+          <FormField
+            label="جنسیت"
+            error={fieldError?.field === "gender" ? fieldError : null}
+          >
+            <Select
+              options={GENDER_OPTIONS.map((opt) => ({
+                value: opt.value,
+                label: opt.label,
+              }))}
+              value={state.gender}
+              onChange={(value) => onChange({ gender: value })}
+              placeholder={OPTIONAL_PLACEHOLDER}
+            />
+          </FormField>
+
+          <FormField
             label={isMinor ? "شماره تماس والد و سایر شماره‌ها" : "شماره‌های تماس دیگر"}
             required={isMinor}
             className="md:col-span-3"
@@ -467,35 +496,6 @@ function PersonFormFields({
                 افزودن شماره
               </Button>
             </div>
-          </FormField>
-
-          <FormField
-            label="ایمیل"
-            error={fieldError?.field === "email" ? fieldError : null}
-          >
-            <TextInput
-              type="email"
-              value={state.email}
-              onChange={(e) => onChange({ email: e.target.value })}
-              placeholder="example@email.com"
-              dir="ltr"
-              className="text-start"
-            />
-          </FormField>
-
-          <FormField
-            label="جنسیت"
-            error={fieldError?.field === "gender" ? fieldError : null}
-          >
-            <Select
-              options={GENDER_OPTIONS.map((opt) => ({
-                value: opt.value,
-                label: opt.label,
-              }))}
-              value={state.gender}
-              onChange={(value) => onChange({ gender: value })}
-              placeholder={OPTIONAL_PLACEHOLDER}
-            />
           </FormField>
 
           {showStatus ? (
