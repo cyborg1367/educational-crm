@@ -194,6 +194,14 @@ export default function TasksPage() {
     return map;
   }, [peopleById]);
 
+  const peoplePhones = React.useMemo(() => {
+    const map = new Map<number, string | null>();
+    for (const [id, person] of peopleById) {
+      map.set(id, person.phone);
+    }
+    return map;
+  }, [peopleById]);
+
   const filteredTasks = React.useMemo(() => {
     const base = operationalTasks.filter((task) => {
       if (!matchesSecondaryFilters(task, secondaryFilters)) {
@@ -225,6 +233,7 @@ export default function TasksPage() {
             person_name:
               peopleById.get(consultation.person_id)?.full_name ??
               `#${consultation.person_id}`,
+            person_phone: peopleById.get(consultation.person_id)?.phone,
             department_name:
               departmentsById.get(consultation.department_id)?.name ?? "—",
           }))
@@ -369,6 +378,7 @@ export default function TasksPage() {
               today={today}
               selectedTaskId={selectedTaskId}
               peopleNames={peopleNames}
+              peoplePhones={peoplePhones}
               assigneeNames={assigneeNames}
               onSelectTask={handleSelectTask}
               loading={loading}
@@ -387,6 +397,7 @@ export default function TasksPage() {
                   peopleNames.get(selectedTask.person_id) ??
                   `#${selectedTask.person_id}`
                 }
+                personPhone={peoplePhones.get(selectedTask.person_id)}
                 assigneeName={
                   selectedTask.assignee_id
                     ? (assigneeNames.get(selectedTask.assignee_id) ?? null)

@@ -20,6 +20,12 @@ class PersonRead(BaseModel):
     id: int = Field(description="Unique person identifier.")
     full_name: str = Field(description="Person's full legal or display name.")
     phone: str | None = Field(description="Contact phone number. Unique per org when set.")
+    secondary_phone: str | None = Field(
+        description=(
+            "Second contact number. Required and treated as a parent/guardian "
+            "number when the person is under 18."
+        )
+    )
     email: EmailStr | None = Field(description="Contact email address.")
     birth_date: date | None = Field(description="Date of birth.")
     gender: PersonGender | None = Field(description="Gender identity.")
@@ -52,6 +58,14 @@ class PersonCreate(BaseModel):
         max_length=50,
         description="Contact phone. Unique per org when set.",
         examples=["09121234567"],
+    )
+    secondary_phone: str | None = Field(
+        default=None,
+        max_length=50,
+        description=(
+            "Second contact number. Required when the person is under 18 "
+            "(treated as the parent/guardian's number in that case)."
+        ),
     )
     email: EmailStr | None = Field(
         default=None,
@@ -87,6 +101,11 @@ class PersonUpdate(BaseModel):
         default=None,
         max_length=50,
         description="Updated phone. Unique per org when set.",
+    )
+    secondary_phone: str | None = Field(
+        default=None,
+        max_length=50,
+        description="Updated second/guardian contact number.",
     )
     email: EmailStr | None = Field(default=None, description="Updated email address.")
     birth_date: date | None = Field(default=None, description="Updated date of birth.")

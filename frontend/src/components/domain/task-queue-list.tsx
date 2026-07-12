@@ -7,6 +7,7 @@ import { TaskQueueRow } from "@/components/domain/task-queue-row";
 import { EmptyState } from "@/components/feedback";
 import type { ConsultationRead, TaskRead } from "@/lib/api/types";
 import { formatDateDisplay } from "@/lib/locale/date";
+import { formatPhoneDisplay } from "@/lib/locale/number";
 import { assessmentStatusLabel } from "@/lib/consultation/assessment";
 import { groupTasksByDueBucket } from "@/lib/task/queue";
 import { focusVisibleStyles } from "@/components/form/control-styles";
@@ -15,6 +16,7 @@ import { cn } from "@/lib/utils";
 
 export type ReferralQueueItem = ConsultationRead & {
   person_name: string;
+  person_phone?: string | null;
   department_name: string;
 };
 
@@ -23,6 +25,7 @@ export type TaskQueueListProps = {
   today: string;
   selectedTaskId: number | null;
   peopleNames: Map<number, string>;
+  peoplePhones?: Map<number, string | null>;
   assigneeNames: Map<number, string>;
   onSelectTask: (taskId: number) => void;
   loading?: boolean;
@@ -36,6 +39,7 @@ function TaskQueueList({
   today,
   selectedTaskId,
   peopleNames,
+  peoplePhones,
   assigneeNames,
   onSelectTask,
   loading = false,
@@ -107,6 +111,12 @@ function TaskQueueList({
                     </p>
                     <p className="mt-0.5 truncate text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-secondary)]">
                       {row.department_name} · {assessmentStatusLabel(row)}
+                      {row.person_phone ? (
+                        <span dir="ltr" className="text-[var(--semantic-color-text-disabled)]">
+                          {" "}
+                          · {formatPhoneDisplay(row.person_phone)}
+                        </span>
+                      ) : null}
                     </p>
                     <p className="mt-0.5 text-[length:var(--primitive-font-size-xs)] text-[var(--semantic-color-text-disabled)]">
                       {formatDateDisplay(row.created_at.slice(0, 10))}
@@ -155,6 +165,7 @@ function TaskQueueList({
                   personName={
                     peopleNames.get(task.person_id) ?? `#${task.person_id}`
                   }
+                  personPhone={peoplePhones?.get(task.person_id)}
                   assigneeName={
                     task.assignee_id
                       ? (assigneeNames.get(task.assignee_id) ?? null)

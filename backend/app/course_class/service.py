@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import NotFoundError, ValidationError
@@ -8,10 +8,28 @@ from app.course.model import Course
 from app.course_class.enums import ClassStatus
 from app.course_class.model import CourseClass
 from app.course_class.schemas import CourseClassCreate, CourseClassUpdate
+from app.enrollment.model import Enrollment
 from app.tenancy.scoping import scoped
 from app.user import service as user_service
 from app.user.enums import UserRole
 from app.user.model import User
+
+
+def _attach_enrollment_counts(
+    db: Session, classes: list[CourseClass]
+) -> list[CourseClass]:
+    if not classes:
+        return classes
+    class_ids = [course_class.id for course_class in classes]
+    rows = db.execute(
+        select(Enrollment.class_id, func.count(Enrollment.id))
+        .where(Enrollment.class_id.in_(class_ids))
+        .group_by(Enrollment.class_id)
+    ).all()
+    counts = dict(rows)
+    for course_class in classes:
+        course_class.enrollment_count = counts.get(course_class.id, 0)
+    return classes
 
 
 def list_classes(
@@ -27,7 +45,9 @@ def list_classes(
     )
     if status is not None:
         stmt = stmt.where(CourseClass.status == status)
-    return paginate_query(db, stmt, limit=limit, offset=offset)
+    classes, total_count = paginate_query(db, stmt, limit=limit, offset=offset)
+    _attach_enrollment_counts(db, classes)
+    return classes, total_count
 
 
 def get_class(db: Session, org_id: int, class_id: int) -> CourseClass:
@@ -37,6 +57,7 @@ def get_class(db: Session, org_id: int, class_id: int) -> CourseClass:
     course_class = db.scalars(stmt).first()
     if course_class is None:
         raise NotFoundError("Class not found")
+    _attach_enrollment_counts(db, [course_class])
     return course_class
 
 
@@ -84,6 +105,7 @@ def create_class(
     db.add(course_class)
     db.commit()
     db.refresh(course_class)
+    course_class.enrollment_count = 0
     return course_class
 
 
@@ -108,14 +130,11 @@ def update_class(
 
     db.commit()
     db.refresh(course_class)
+    _attach_enrollment_counts(db, [course_class])
     return course_class
 
 
 def delete_class(db: Session, org_id: int, class_id: int) -> None:
-    from sqlalchemy import func
-
-    from app.enrollment.model import Enrollment
-
     course_class = get_class(db, org_id, class_id)
 
     active_enrollments = db.scalar(

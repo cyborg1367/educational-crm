@@ -14,6 +14,7 @@ import {
 import { PersonCardGrid } from "@/components/domain/person-card";
 import {
   emptyPersonFormState,
+  isPersonFormValid,
   personFormStateToCreateBody,
   type PersonFormState,
 } from "@/components/domain/person-form-fields";
@@ -159,7 +160,7 @@ export default function PeopleListPage() {
   };
 
   const handleCreate = async () => {
-    if (!formState.fullName.trim() || !formState.phone.trim()) {
+    if (!isPersonFormValid(formState)) {
       return;
     }
     setSubmitting(true);
@@ -322,9 +323,7 @@ export default function PeopleListPage() {
         onSubmit={handleCreate}
         submitLabel="ثبت فرد"
         submitLoading={submitting}
-        submitDisabled={
-          !formState.fullName.trim() || !formState.phone.trim()
-        }
+        submitDisabled={!isPersonFormValid(formState)}
         fieldError={fieldError}
         formError={formError}
       />

@@ -328,22 +328,35 @@ def test_consultation_outcome_refer_other_dept(
     assert len(target_journeys) == 1
     assert target_journeys[0].person_id == person.id
 
+    # Referring to another department mid-consultation is a *sequential*
+    # handoff, not the parallel multi-department referral flow — it must
+    # start a brand new, actionable consultation for the target department
+    # (consultant defaults to that department's manager), not just point a
+    # task back at the original, already-decided consultation.
+    consultations, _ = consultation_service.list_consultations(db_session, org_id)
+    new_consultations = [
+        c
+        for c in consultations
+        if c.department_id == target_department.id and c.id != consultation.id
+    ]
+    assert len(new_consultations) == 1
+    new_consultation = new_consultations[0]
+    assert new_consultation.person_id == person.id
+    assert new_consultation.consultant_id == target_department.manager_id
+    assert new_consultation.outcome is None
+
     tasks, _ = task_service.list_tasks(db_session, org_id)
-    referral_tasks = [task for task in tasks if task.type == TaskType.referral]
-    # Referring to another department should create exactly one task, sent
-    # straight to that department's manager — not an extra one for the
-    # admission officer who ran the original consultation.
-    assert len(referral_tasks) == 1
-    manager_task = referral_tasks[0]
-    assert manager_task.assignee_id == target_department.manager_id
-    assert manager_task.person_id == person.id
-    assert manager_task.related_entity_type == "consultation"
-    assert manager_task.related_entity_id == consultation.id
-    assert manager_task.title == f"مشاوره ارجاعی: {person.full_name}"
-    assert (
-        manager_task.description
-        == f"ارجاع جهت مشاوره به دپارتمان {target_department.name}"
-    )
+    intake_tasks = [
+        task
+        for task in tasks
+        if task.type == TaskType.custom
+        and task.related_entity_type == "consultation"
+        and task.related_entity_id == new_consultation.id
+    ]
+    assert len(intake_tasks) == 1
+    assert intake_tasks[0].assignee_id == target_department.manager_id
+    assert intake_tasks[0].person_id == person.id
+    assert target_department.name in intake_tasks[0].title
 
     done_activities = _consultation_done_activities(
         db_session, org_id, person.id, consultation.id

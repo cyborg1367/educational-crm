@@ -21,6 +21,7 @@ import type {
   PersonUpdate,
 } from "@/lib/api/types";
 import type { StorageDate } from "@/lib/locale/date";
+import { isPersonMinor } from "@/lib/person/age";
 import {
   GENDER_OPTIONS,
   INTERESTS_OPTIONS,
@@ -35,6 +36,7 @@ const OPTIONAL_PLACEHOLDER = "انتخاب کنید";
 export type PersonFormState = {
   fullName: string;
   phone: string;
+  secondaryPhone: string;
   email: string;
   birthDate: StorageDate | null;
   gender: string;
@@ -49,6 +51,7 @@ export function emptyPersonFormState(): PersonFormState {
   return {
     fullName: "",
     phone: "",
+    secondaryPhone: "",
     email: "",
     birthDate: null,
     gender: "",
@@ -64,6 +67,7 @@ export function personFormStateFromRead(person: PersonRead): PersonFormState {
   return {
     fullName: person.full_name,
     phone: person.phone ?? "",
+    secondaryPhone: person.secondary_phone ?? "",
     email: person.email ?? "",
     birthDate: person.birth_date,
     gender: person.gender ?? "",
@@ -80,12 +84,25 @@ function optionalString(value: string): string | null {
   return trimmed ? trimmed : null;
 }
 
+/** A minor's secondary phone doubles as the required parent/guardian
+ * contact number — everything else in the form stays optional. */
+export function isPersonFormValid(state: PersonFormState): boolean {
+  if (!state.fullName.trim() || !state.phone.trim()) {
+    return false;
+  }
+  if (isPersonMinor(state.birthDate) && !state.secondaryPhone.trim()) {
+    return false;
+  }
+  return true;
+}
+
 export function personFormStateToCreateBody(
   state: PersonFormState,
 ): PersonCreate {
   return {
     full_name: state.fullName.trim(),
     phone: optionalString(state.phone),
+    secondary_phone: optionalString(state.secondaryPhone),
     email: optionalString(state.email),
     birth_date: state.birthDate,
     gender: state.gender ? (state.gender as PersonCreate["gender"]) : null,
@@ -311,6 +328,8 @@ function PersonFormFields({
     });
   };
 
+  const isMinor = isPersonMinor(state.birthDate);
+
   return (
     <div className="flex flex-col gap-[var(--primitive-space-4)]">
       <FormSection
@@ -356,6 +375,27 @@ function PersonFormFields({
             <TextInput
               value={state.phone}
               onChange={(e) => onChange({ phone: e.target.value })}
+              placeholder="۰۹۱۲۳۴۵۶۷۸۹"
+              dir="ltr"
+              className="text-start"
+            />
+          </FormField>
+
+          <FormField
+            label={isMinor ? "شماره تماس والد" : "شماره تماس دوم"}
+            required={isMinor}
+            helperText={
+              isMinor
+                ? "چون سن شخص زیر ۱۸ سال است، شماره تماس والد الزامی است."
+                : "در صورت وجود، شماره تماس دیگر شخص."
+            }
+            error={
+              fieldError?.field === "secondary_phone" ? fieldError : null
+            }
+          >
+            <TextInput
+              value={state.secondaryPhone}
+              onChange={(e) => onChange({ secondaryPhone: e.target.value })}
               placeholder="۰۹۱۲۳۴۵۶۷۸۹"
               dir="ltr"
               className="text-start"

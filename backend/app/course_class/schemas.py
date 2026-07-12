@@ -22,6 +22,9 @@ class CourseClassRead(BaseModel):
         description="Weekdays the class meets, e.g. saturday, monday."
     )
     status: ClassStatus = Field(description="Current class lifecycle status.")
+    enrollment_count: int = Field(
+        description="Number of enrollment records currently referencing this class."
+    )
     org_id: int = Field(description="Owning organization. Immutable.")
     created_at: datetime = Field(description="Record creation timestamp (UTC).")
     updated_at: datetime = Field(description="Last update timestamp (UTC).")

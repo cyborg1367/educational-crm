@@ -10,6 +10,7 @@ from app.activity.model import Activity
 from app.consultation import service as consultation_service
 from app.consultation.enums import ConsultationOutcome
 from app.consultation.model import Consultation
+from app.consultation.schemas import ConsultationCreate
 from app.course import service as course_service
 from app.course_class import service as class_service
 from app.course_class.enums import ClassStatus
@@ -294,33 +295,28 @@ def _route_refer_other_dept(
     *,
     actor_id: int | None,
 ) -> None:
+    """Referring to another department mid-consultation starts a brand new
+    consultation there — it isn't a parallel referral (that path creates its
+    own Consultation rows directly, one per selected department); this is a
+    sequential handoff, so the same "new pending consultation" machinery
+    used everywhere else applies: create_consultation resolves the target
+    department's manager as consultant and, via on_consultation_created,
+    creates the journey and the "مشاوره در انتظار" intake task that the
+    target manager actually sees and can act on."""
     if consultation.refer_to_department_id is None:
         raise ValidationError(
             "refer_to_department_id required for refer_other_dept",
             field="refer_to_department_id",
         )
 
-    journey_service.get_or_create_journey(
+    consultation_service.create_consultation(
         db,
         org_id,
-        consultation.person_id,
-        consultation.refer_to_department_id,
-    )
-    person = person_service.get_person(db, org_id, consultation.person_id)
-    target_dept = department_service.get_department(
-        db, org_id, consultation.refer_to_department_id
-    )
-    task_service.create_task(
-        db,
-        org_id,
-        person_id=consultation.person_id,
-        task_type=TaskType.referral,
-        title=f"مشاوره ارجاعی: {person.full_name}",
-        due_date=date.today() + timedelta(days=3),
-        assignee_id=target_dept.manager_id,
-        description=f"ارجاع جهت مشاوره به دپارتمان {target_dept.name}",
-        related_entity_type="consultation",
-        related_entity_id=consultation.id,
+        ConsultationCreate(
+            person_id=consultation.person_id,
+            department_id=consultation.refer_to_department_id,
+            notes=consultation.notes,
+        ),
         actor_id=actor_id,
     )
 

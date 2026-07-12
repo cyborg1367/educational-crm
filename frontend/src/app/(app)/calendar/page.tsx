@@ -54,7 +54,12 @@ export default function CalendarPage() {
         }),
       ]);
 
-      setClasses(classesRes.items);
+      // A class with no enrollment records left (e.g. every enrolled person
+      // was deleted) has nobody to meet for — don't clutter the calendar
+      // with sessions for it. The class definition itself is untouched.
+      setClasses(
+        classesRes.items.filter((item) => item.enrollment_count > 0),
+      );
       setTasks(tasksRes.items);
       setInstallments(installmentsRes.items);
     } catch (err) {

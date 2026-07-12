@@ -45,6 +45,7 @@ export type CourseClassRead = {
   end_date: StorageDate | null;
   weekdays: string[] | null;
   status: ClassStatus;
+  enrollment_count: number;
   org_id: number;
   created_at: string;
   updated_at: string;
@@ -146,6 +147,7 @@ export type PersonRead = {
   id: number;
   full_name: string;
   phone: string | null;
+  secondary_phone: string | null;
   email: string | null;
   birth_date: StorageDate | null;
   gender: PersonGender | null;
@@ -163,6 +165,7 @@ export type PersonRead = {
 export type PersonCreate = {
   full_name: string;
   phone?: string | null;
+  secondary_phone?: string | null;
   email?: string | null;
   birth_date?: StorageDate | null;
   gender?: PersonGender | null;
@@ -176,6 +179,7 @@ export type PersonCreate = {
 export type PersonUpdate = {
   full_name?: string;
   phone?: string | null;
+  secondary_phone?: string | null;
   email?: string | null;
   birth_date?: StorageDate | null;
   gender?: PersonGender | null;

@@ -13,6 +13,7 @@ import {
 } from "@/components/domain";
 import {
   emptyPersonFormState,
+  isPersonFormValid,
   personFormStateFromRead,
   personFormStateToUpdateBody,
   type PersonFormState,
@@ -400,7 +401,7 @@ export default function PersonDetailPage() {
   };
 
   const handleUpdate = async () => {
-    if (!person || !formState || !formState.fullName.trim()) return;
+    if (!person || !formState || !isPersonFormValid(formState)) return;
     setSubmitting(true);
     setFormError(null);
     setFieldError(null);
@@ -761,9 +762,7 @@ export default function PersonDetailPage() {
         }
         onSubmit={handleUpdate}
         submitLoading={submitting}
-        submitDisabled={
-          !formState?.fullName.trim() || !formState?.phone.trim()
-        }
+        submitDisabled={!formState || !isPersonFormValid(formState)}
         fieldError={fieldError}
         formError={formError}
         showStatus
